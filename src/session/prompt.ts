@@ -19,7 +19,7 @@ import { changedFiles, track } from "../snapshot/snapshot"
 import { project } from "../project"
 import { compact, shouldCompact } from "./compaction"
 import { toModelMessages } from "./convert"
-import { MAX_STEPS_REMINDER, shortenDescription, systemPrompt, useCompactPrompt } from "./system"
+import { COMPACT_DROPPED_TOOLS, MAX_STEPS_REMINDER, shortenDescription, systemPrompt, useCompactPrompt } from "./system"
 import {
   addMessage,
   createSession,
@@ -324,8 +324,9 @@ interface StepInput {
 
 async function runStep(input: StepInput): Promise<{ next: "continue" | "stop" | "compact"; message?: AssistantMessage }> {
   const { sessionID, agent, provider, model, signal } = input
-  const tools = input.finalStep ? [] : model.toolCall ? await toolsFor(agent) : []
   const compact = useCompactPrompt(provider, model)
+  let tools = input.finalStep ? [] : model.toolCall ? await toolsFor(agent) : []
+  if (compact) tools = tools.filter((t) => !COMPACT_DROPPED_TOOLS.has(t.id))
   const system = await systemPrompt({ agent, model, compact })
   const history = toModelMessages(await getMessages(sessionID))
   if (input.finalStep) history.push({ role: "user", content: [{ type: "text", text: MAX_STEPS_REMINDER }] })

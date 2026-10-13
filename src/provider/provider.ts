@@ -148,7 +148,7 @@ function detectedToModel(providerID: string, d: DetectedModel, existing?: ModelC
     limit: { context: d.context ?? 8192, output: d.reasoning ? 16_384 : 8192 },
   }
   const model = toModel(providerID, d.id, base, existing)
-  if (d.details) model.options = { ...model.options, details: d.details }
+  if (d.details || d.paramsB !== undefined) model.meta = { details: d.details, paramsB: d.paramsB }
   return model
 }
 

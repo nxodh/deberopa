@@ -134,8 +134,8 @@ test("detecting servers and reading each model's real capabilities", async () =>
     const o = servers.find((s) => s.id === "ollama")!
     expect(o.protocol).toBe("ollama")
     expect(Object.keys(o.models).sort()).toEqual(["llama3.2:1b", "llava:7b", "qwen3:8b"]) // the embedding model is not a chat model
-    expect(o.models["qwen3:8b"]).toMatchObject({ context: 32768, maxContext: 40960, toolCall: true, reasoning: true, attachment: false })
-    expect(o.models["llama3.2:1b"]).toMatchObject({ context: 32768, maxContext: 131072, toolCall: false })
+    expect(o.models["qwen3:8b"]).toMatchObject({ context: 16384, maxContext: 40960, toolCall: true, reasoning: true, attachment: false })
+    expect(o.models["llama3.2:1b"]).toMatchObject({ context: 16384, maxContext: 131072, toolCall: false, paramsB: 1.2 })
     expect(o.models["llava:7b"]).toMatchObject({ context: 4096, attachment: true })
     expect(o.models["qwen3:8b"]!.details).toContain("Q4_K_M")
 
@@ -163,8 +163,9 @@ test("an unreachable server is simply absent", async () => {
 })
 
 test("the request asks for the context window explicitly", () => {
-  const body = ollama.buildBody(input({ tools: [{ name: "read", description: "Read", parameters: { type: "object", properties: {} } }] })) as any
+  const body = ollama.buildBody(input({ model: model({ meta: { details: "8B · Q4_K_M", paramsB: 8 } }), tools: [{ name: "read", description: "Read", parameters: { type: "object", properties: {} } }] })) as any
   expect(body.options.num_ctx).toBe(32768)
+  expect(Object.keys(body.options).sort()).toEqual(["num_ctx", "num_predict"]) // no metadata leaks into the request
   expect(body.options.num_predict).toBe(8192)
   expect(body.stream).toBe(true)
   expect(body.keep_alive).toBe("30m")
@@ -215,6 +216,21 @@ test("streams thinking, text and tool calls from /api/chat", async () => {
   const finish = events.at(-1) as any
   expect(finish).toMatchObject({ type: "finish", reason: "tool-calls", usage: { input: 321, output: 17 } })
   expect(requests.find((r) => r.path === "/api/chat")!.body.options.num_ctx).toBe(32768)
+})
+
+test("context usage stays honest when Ollama reports only the uncached part of the prompt", async () => {
+  const long = "word ".repeat(2000) // ~10K characters, a few thousand tokens
+  chat = () => ndjson([{ message: { role: "assistant", content: "ok" } }, done({ prompt_eval_count: 12, eval_count: 3 })])
+  const events = await collect(streamOllama(input({ messages: [{ role: "user", content: [{ type: "text", text: long }] }] })))
+  const usage = (events.at(-1) as any).usage
+  expect(usage.output).toBe(3)
+  expect(usage.input).toBeGreaterThan(2500) // not the 12 the server claimed
+  expect(usage.input).toBeLessThan(4000)
+  expect(ollama.estimatePromptTokens({ messages: [{ role: "user", content: "한글".repeat(100) }] })).toBeGreaterThanOrEqual(200)
+  // a server that really evaluated everything is believed when it says more than the estimate
+  chat = () => ndjson([{ message: { role: "assistant", content: "ok" } }, done({ prompt_eval_count: 9000 })])
+  const big = await collect(streamOllama(input()))
+  expect((big.at(-1) as any).usage.input).toBe(9000)
 })
 
 test("helpful errors for the failures people actually hit", async () => {
@@ -330,6 +346,8 @@ test("hosted providers skip the compatibility layer", async () => {
 test("small context windows switch to the compact prompt", () => {
   expect(useCompactPrompt({ local: true }, model({ limit: { context: 8192, output: 2048 } }))).toBe(true)
   expect(useCompactPrompt({ local: true }, model({ limit: { context: 32768, output: 2048 } }))).toBe(false)
+  expect(useCompactPrompt({ local: true }, model({ limit: { context: 32768, output: 2048 }, meta: { paramsB: 0.75 } }))).toBe(true) // small model
+  expect(useCompactPrompt({ local: true }, model({ limit: { context: 32768, output: 2048 }, meta: { paramsB: 8 } }))).toBe(false)
   expect(useCompactPrompt({ local: false }, model({ limit: { context: 8192, output: 2048 } }))).toBe(false)
   expect(useCompactPrompt({ local: false }, model({ options: { compact_prompt: true } }))).toBe(true)
   expect(useCompactPrompt({ local: true }, model({ limit: { context: 4096, output: 1024 }, options: { compact_prompt: false } }))).toBe(false)
@@ -370,9 +388,29 @@ test("end to end: a configured Ollama provider drives a full tool round trip", a
   const chats = requests.filter((r) => r.path === "/api/chat" && !isTitle(r.body))
   expect(chats).toHaveLength(2)
   expect(chats[0]!.body.options.num_ctx).toBe(12000)
-  // 12000 tokens is below the compact threshold, so the short prompt and short tool descriptions were used
   expect(chats[0]!.body.messages[0].content).toContain("You are Vedecaps")
-  expect(chats[0]!.body.messages[0].content.length).toBeLessThan(2500)
+  expect(chats[0]!.body.tools.map((t: any) => t.function.name)).toContain("task")
   const parts = (await getMessages(session.id)).flatMap((m) => m.parts).filter((p): p is ToolPart => p.type === "tool")
   expect(parts[0]!.state.status).toBe("completed")
+})
+
+test("a small model gets the compact prompt and only the core tools", async () => {
+  const dir = tmpDir()
+  await Bun.write(`${dir}/hello.txt`, "hi\n")
+  useProject(dir, {
+    model: "ollama/tiny",
+    snapshot: false,
+    provider: { ollama: { name: "Ollama", api: base, models: { tiny: { name: "Tiny", tool_call: true, limit: { context: 6000, output: 1000 } } } } },
+  })
+  chat = (body) => {
+    if (String(body.messages?.[0]?.content ?? "").startsWith("You generate short titles")) return ndjson([{ message: { role: "assistant", content: "t" } }, done()])
+    return ndjson([{ message: { role: "assistant", content: "ok" } }, done()])
+  }
+  const session = await createSession()
+  await prompt({ sessionID: session.id, text: "hi" })
+  const sent = requests.filter((r) => r.path === "/api/chat" && !String(r.body.messages?.[0]?.content).startsWith("You generate"))[0]!.body
+  const names = sent.tools.map((t: any) => t.function.name).sort()
+  expect(names).toEqual(["bash", "edit", "glob", "grep", "list", "read", "write"])
+  expect(sent.messages[0].content.length).toBeLessThan(2500)
+  expect(sent.tools.every((t: any) => t.function.description.length <= 281)).toBe(true)
 })

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased (0.1.1)
+
+- Local models: Ollama, LM Studio, llama.cpp and vLLM are detected automatically, with each model's real context window and capabilities (`vedecaps debug local`).
+- Ollama native API with an explicit `num_ctx` (default: the model's maximum, capped at 16,384), instead of the OpenAI-compatible API that silently truncates prompts to 2-4K tokens.
+- Compact prompt and core-tools-only mode for small context windows and small models (about 4,800 -> 1,600 tokens per request measured on qwen3:0.6b).
+- Recovery of tool calls written as text (Hermes/Qwen, Qwen3-Coder, Mistral, JSON fences) and of `<think>` tags.
+- Context usage and auto-compaction stay correct when Ollama under-reports cached prompt tokens.
+- Providers configured by URL only list their models from `/models`.
+
 ## 0.1.0
 
 First release.

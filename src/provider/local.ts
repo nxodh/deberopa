@@ -4,7 +4,7 @@ import { createLogger } from "../util/log"
 const log = createLogger("local")
 
 /** Context window requested from a local server unless the user says otherwise; KV cache memory grows with it. */
-export const DEFAULT_NUM_CTX_CAP = 32_768
+export const DEFAULT_NUM_CTX_CAP = 16_384
 
 export interface DetectedModel {
   id: string
@@ -17,6 +17,17 @@ export interface DetectedModel {
   reasoning: boolean
   attachment: boolean
   details?: string
+  /** Parameter count in billions, when the server reports it. */
+  paramsB?: number
+}
+
+/** "8.2B", "751.63M", "70B" -> billions. */
+export function parseParamSize(text: unknown): number | undefined {
+  const m = /^\s*([\d.]+)\s*([KMBT])\s*$/i.exec(String(text ?? ""))
+  if (!m) return undefined
+  const n = Number(m[1])
+  if (!Number.isFinite(n)) return undefined
+  return { K: 1e-6, M: 1e-3, B: 1, T: 1e3 }[m[2]!.toUpperCase() as "K" | "M" | "B" | "T"] * n
 }
 
 export interface LocalServer {
@@ -121,6 +132,7 @@ export async function detectOllama(baseURL: string, timeoutMs = 700): Promise<Lo
       reasoning,
       attachment: capabilities.includes("vision"),
       details: parts.join(" · ") || undefined,
+      paramsB: parseParamSize(entry.details?.parameter_size),
     }
   }
   return { id: "ollama", name: "Ollama", protocol: "ollama", baseURL, models }

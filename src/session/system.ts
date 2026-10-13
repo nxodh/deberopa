@@ -61,13 +61,20 @@ const COMPACT_PROMPT = `You are Vedecaps, a coding agent running in the user's t
 - Be brief. Reply in the user's language. Refer to code as path:line.`
 
 /** Context windows at or below this get the compact prompt on local servers. */
-export const SMALL_CONTEXT = 16_384
+export const SMALL_CONTEXT = 8_192
+/** Models at or below this many billion parameters do better with fewer tools and a shorter prompt. */
+export const SMALL_MODEL_B = 4
 
 export function useCompactPrompt(provider: { local?: boolean }, model: Model): boolean {
   const explicit = (model.options as Record<string, unknown> | undefined)?.compact_prompt
   if (typeof explicit === "boolean") return explicit
-  return !!provider.local && model.limit.context > 0 && model.limit.context <= SMALL_CONTEXT
+  if (!provider.local) return false
+  if (model.limit.context > 0 && model.limit.context <= SMALL_CONTEXT) return true
+  return model.meta?.paramsB !== undefined && model.meta.paramsB <= SMALL_MODEL_B
 }
+
+/** Tools left out in compact mode: each schema costs tokens, and small models pick worse among many. */
+export const COMPACT_DROPPED_TOOLS = new Set(["multiedit", "todowrite", "todoread", "task", "skill", "webfetch"])
 
 /** First paragraph of a tool description, for compact mode. */
 export function shortenDescription(text: string, max = 280): string {

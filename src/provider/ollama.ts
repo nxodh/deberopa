@@ -46,6 +46,21 @@ function toMessages(input: StreamInput): any[] {
   return out
 }
 
+/**
+ * Ollama reuses the KV cache of a shared prompt prefix and then reports only the tokens it
+ * evaluated this time as `prompt_eval_count`, so a long conversation can look like 300 tokens.
+ * The context-usage figure and auto-compaction need the real size, so estimate it from the
+ * request. Calibrated on a real run (6.6K chars of JSON -> 1.6K tokens, 4.1 chars/token) and
+ * deliberately pessimistic: CJK text costs about a token per character.
+ */
+export function estimatePromptTokens(body: { messages?: unknown; tools?: unknown }): number {
+  const json = JSON.stringify({ messages: body.messages ?? [], tools: body.tools ?? [] })
+  let ascii = 0
+  for (let i = 0; i < json.length; i++) if (json.charCodeAt(i) < 128) ascii++
+  const messageCount = Array.isArray(body.messages) ? body.messages.length : 0
+  return Math.ceil(ascii / 3.5 + (json.length - ascii) + messageCount * 6)
+}
+
 export function buildBody(input: StreamInput) {
   const { model } = input
   const options: Record<string, unknown> = { num_ctx: numCtx(input) }
@@ -164,6 +179,7 @@ export async function* streamOllama(input: StreamInput): AsyncGenerator<StreamEv
     throw explain(response.status, String(message), model.id, baseURL)
   }
 
+  const estimated = estimatePromptTokens(body as { messages: unknown; tools: unknown })
   let usage: Usage = { ...EMPTY_USAGE }
   let reason: FinishReason = "stop"
   let calls = 0
@@ -207,7 +223,8 @@ export async function* streamOllama(input: StreamInput): AsyncGenerator<StreamEv
       }
     }
     if (line.done) {
-      usage = { ...EMPTY_USAGE, input: line.prompt_eval_count ?? 0, output: line.eval_count ?? 0 }
+      const reported = line.prompt_eval_count ?? 0
+      usage = { ...EMPTY_USAGE, input: Math.max(reported, estimated), output: line.eval_count ?? 0 }
       if (line.done_reason === "length") reason = "length"
       // The prompt exactly filled the window: Ollama has already dropped the oldest part of it.
       if (usage.input >= ctx - 8) log.warn(`prompt filled the whole ${ctx}-token window of ${model.id}; older context was truncated`)
@@ -217,4 +234,4 @@ export async function* streamOllama(input: StreamInput): AsyncGenerator<StreamEv
   yield { type: "finish", reason: calls > 0 && reason !== "length" ? "tool-calls" : reason, usage }
 }
 
-export const __test = { buildBody, toMessages }
+export const __test = { buildBody, toMessages, estimatePromptTokens }

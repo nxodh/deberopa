@@ -13,7 +13,10 @@ export interface Model {
   attachment: boolean
   temperature: boolean
   releaseDate?: string
+  /** Extra request fields sent to the server (sampling options, num_ctx, ...). Not for metadata. */
   options?: Record<string, unknown>
+  /** Descriptive facts about a locally served model. */
+  meta?: { details?: string; paramsB?: number }
 }
 
 export interface ProviderInfo {

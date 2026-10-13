@@ -113,24 +113,42 @@ API 키는 `vedecaps auth login`, TUI의 `/connect`, 또는 환경 변수로 등
 
 모델 목록은 [models.dev](https://models.dev)에서 받아 하루 단위로 캐시합니다. `vedecaps models`로 사용할 수 있는 모델을 확인하고, `-m provider/model` 또는 설정의 `model`로 선택합니다. 목록에 없는 모델 ID도 그대로 사용할 수 있습니다.
 
-**로컬 모델·OpenAI 호환 서버** (Ollama, LM Studio, 사내 프록시 등)는 설정에 추가합니다.
+**로컬 모델** (Ollama, LM Studio, llama.cpp, vLLM)은 실행 중이면 시작할 때 자동으로 감지되어 `/models`와 `vedecaps models`에 나타납니다. 별도 설정이나 API 키가 필요 없습니다. `vedecaps debug local`로 감지된 서버, 모델별 컨텍스트 크기, 도구 호출 지원 여부를 확인할 수 있습니다.
+
+| 서버 | 기본 주소 | 비고 |
+|---|---|---|
+| Ollama | `http://127.0.0.1:11434` (`OLLAMA_HOST`를 따름) | 네이티브 API 사용 |
+| LM Studio | `http://127.0.0.1:1234` | 불러온 컨텍스트 크기를 그대로 사용 |
+| llama.cpp (`llama-server`) | `http://127.0.0.1:8080` | `-c`로 지정한 컨텍스트 크기를 사용 |
+| vLLM | `http://127.0.0.1:8000` | `max_model_len`을 사용 |
+
+로컬 모델을 위해 다음을 처리합니다.
+
+- **컨텍스트 크기 지정**: Ollama의 OpenAI 호환 API는 컨텍스트 창을 지정할 수 없어 2~4K 토큰을 넘는 프롬프트가 조용히 잘립니다. Vedecaps는 Ollama 네이티브 API로 `num_ctx`를 명시합니다. 기본값은 모델 최대치와 16,384 중 작은 값이며(KV 캐시 메모리가 커지므로), 모델 설정의 `limit.context`나 `options.num_ctx`로 바꿀 수 있습니다.
+- **작은 모델용 프롬프트**: 컨텍스트가 8K 이하이거나 파라미터가 40억 이하인 로컬 모델에는 짧은 시스템 프롬프트와 핵심 도구(`bash`, `read`, `edit`, `write`, `glob`, `grep`, `list`)만 보냅니다. 실제 측정에서 요청 크기가 약 4,800토큰에서 약 1,600토큰으로 줄었습니다. 모델 설정의 `options.compact_prompt`를 `true`/`false`로 지정하면 강제하거나 끌 수 있습니다.
+- **텍스트로 쓴 도구 호출 복구**: 도구 호출을 구조화된 형식이 아니라 본문에 쓰는 모델(Hermes/Qwen `<tool_call>`, `<function=…>`, Mistral `[TOOL_CALLS]`, JSON 코드 블록)도 도구 호출로 인식합니다.
+- **`<think>` 태그 분리**: 본문에 섞여 나오는 추론 과정을 추론 블록으로 분리합니다.
+- **컨텍스트 사용량 보정**: Ollama가 캐시된 프롬프트를 사용량에서 빼고 보고해도 실제 크기를 추정해 자동 압축 시점과 상태 표시줄이 틀어지지 않게 합니다.
+- **친절한 오류**: 모델이 없을 때(`ollama pull …`), 도구를 지원하지 않을 때, 서버가 꺼져 있을 때 해결 방법을 알려 줍니다.
+
+감지를 끄려면 설정에 `"local_detect": false`를 넣습니다. 그 밖의 OpenAI 호환 서버(사내 프록시 등)는 직접 추가합니다. 모델을 적지 않으면 `/models` 엔드포인트에서 목록을 가져옵니다.
 
 ```jsonc
 {
   "provider": {
-    "ollama": {
-      "name": "Ollama",
-      "api": "http://localhost:11434/v1",
+    "gpu-box": {
+      "name": "GPU box",
+      "api": "http://192.168.0.20:8000/v1",
       "models": {
         "qwen3-coder": { "name": "Qwen3 Coder", "tool_call": true, "limit": { "context": 64000, "output": 8000 } }
       }
     }
   },
-  "model": "ollama/qwen3-coder"
+  "model": "gpu-box/qwen3-coder"
 }
 ```
 
-Anthropic 프로토콜을 쓰는 게이트웨이는 `"protocol": "anthropic"`을 지정합니다.
+Anthropic 프로토콜을 쓰는 게이트웨이는 `"protocol": "anthropic"`을 지정합니다. 주소가 Ollama(`:11434`)로 보이면 네이티브 API를 쓰며, `"protocol": "openai"`로 호환 API를 강제할 수 있습니다.
 
 ## 설정
 
@@ -275,7 +293,7 @@ vedecaps mcp list
 | `vedecaps serve` | HTTP API 서버 |
 | `vedecaps upgrade [버전]` | 업데이트 (`--check`) |
 | `vedecaps uninstall` | 제거 (`--dry-run`, `--keep-config`, `--keep-data`) |
-| `vedecaps debug` | 경로·설정·제공자·도구 상태 |
+| `vedecaps debug [config\|local]` | 경로·설정·제공자·도구 상태, 로컬 모델 서버 진단 |
 
 각 명령에 `--help`를 붙이면 옵션과 예시가 나옵니다.
 
