@@ -6,6 +6,7 @@ import { resetProviders } from "../src/provider/provider"
 import { resetAgents } from "../src/agent/agent"
 import { resetSkills } from "../src/skill/skill"
 import { initProject } from "../src/project"
+import { resetCommands } from "../src/command/command"
 import { resetSnapshot } from "../src/snapshot/snapshot"
 import { setCatalog } from "../src/provider/models"
 
@@ -19,6 +20,7 @@ export function resetAll() {
   resetAgents()
   resetSkills()
   resetSnapshot()
+  resetCommands()
 }
 
 /** Make `dir` the current project and apply a config object on top of the defaults. */

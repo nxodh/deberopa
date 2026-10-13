@@ -107,6 +107,8 @@ export interface PromptInput {
   files?: { mime: string; filename?: string; data: string }[]
   agent?: string
   model?: { providerID: string; modelID: string }
+  /** Extra instructions added as synthetic text (hidden from the transcript, visible to the model). */
+  synthetic?: string[]
 }
 
 /** Resolve which agent and model a new message should use. */
@@ -226,6 +228,7 @@ export async function prompt(input: PromptInput): Promise<AssistantMessage | und
     const parts: Part[] = [{ id: createID("part"), type: "text", text: input.text }]
     for (const file of input.files ?? []) parts.push({ id: createID("part"), type: "file", ...file })
     parts.push(...(await resolveMentions(input.sessionID, input.text, agent.name)))
+    for (const text of input.synthetic ?? []) parts.push({ id: createID("part"), type: "text", text, synthetic: true })
 
     const user: UserMessage = {
       id: createID("message"),
