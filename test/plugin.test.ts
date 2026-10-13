@@ -176,4 +176,5 @@ test("an untrusted project's plugins are not run", async () => {
   expect((globalThis as any).__vdcEvil).toBe(false)
   const loaded = await loadConfig()
   expect(loaded.blocked.join("\n")).toContain("plugin/")
+  expect(loaded.blocked.join("\n")).toContain("1 plugin file")
 })

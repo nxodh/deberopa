@@ -183,6 +183,15 @@ async function load(): Promise<LoadedConfig> {
   const dotDirs = (await findUp([`.${NAME}`], directory, worktree)).reverse()
   for (const dir of dotDirs) for (const name of FILE_NAMES) await merge(path.join(dir, name), true)
 
+  // A project's plugin folder is code that would run in this process.
+  if (!trusted) {
+    for (const dir of dotDirs) {
+      const entries = await fs.readdir(path.join(dir, "plugin")).catch(() => [] as string[])
+      const scripts = entries.filter((n) => /\.(js|mjs|cjs|ts|mts)$/.test(n) && !n.endsWith(".d.ts") && !n.startsWith("."))
+      if (scripts.length) blocked.push(`${path.relative(worktree, path.join(dir, "plugin")) || "plugin"}/ (${scripts.length} plugin file${scripts.length === 1 ? "" : "s"} that would run in this process)`)
+    }
+  }
+
   if (process.env.VEDECAPS_CONFIG_CONTENT) {
     try {
       config = mergeConfig(config, parseText(process.env.VEDECAPS_CONFIG_CONTENT, "VEDECAPS_CONFIG_CONTENT"))

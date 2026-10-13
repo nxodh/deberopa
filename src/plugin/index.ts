@@ -106,12 +106,8 @@ async function discover(): Promise<LoadedPlugin[]> {
     for (const dir of loaded.directories.filter((d) => d !== Paths.config)) {
       for (const file of await filesIn(path.join(dir, "plugin"))) found.push({ file, source: "project" })
     }
-  } else {
-    for (const dir of loaded.directories.filter((d) => d !== Paths.config)) {
-      const present = await filesIn(path.join(dir, "plugin"))
-      if (present.length) loaded.blocked.push(`${path.relative(worktree, path.join(dir, "plugin")) || "plugin"}/ (${present.length} plugin file${present.length === 1 ? "" : "s"})`)
-    }
   }
+  // (an untrusted project's plugin folder is reported by the config loader)
 
   const seen = new Set<string>()
   const plugins: LoadedPlugin[] = []

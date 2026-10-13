@@ -14,6 +14,14 @@
 - JavaScript SDK (`@vedecaps/sdk`) for the HTTP API, including event streaming and spawning a server.
 - `vedecaps acp`: Agent Client Protocol server for Zed and other editors.
 - GitHub Action (`nxodh/vedecaps`) and example workflows for PR review and `/vedecaps` comments.
+- Plugins: local JS/TS files that add tools and hook `tool.execute.before/after`, `chat.system` and events. Loaded from the user's config directory, the `plugin` setting, and trusted projects; work in the compiled binary without Node or Bun.
+- Project trust: parts of a repository's own config that start programs, route requests or API keys elsewhere, or allow actions without asking are ignored until `vedecaps trust` (or `/trust`). `VEDECAPS_TRUST_PROJECT=1` vouches for a checkout in CI.
+- VS Code extension (`ide/vscode`): opens Vedecaps beside the editor and types `@file#L10-20` references into its prompt. Attached to the release as a `.vsix`.
+- `@file#L10-20` mentions attach only those lines.
+
+### Changed
+
+- A project's `vedecaps.json` can no longer start MCP servers, formatters or language servers, change provider endpoints, or add allow-rules until the project is trusted. Existing setups need a one-time `vedecaps trust`.
 
 ## 0.1.0
 
