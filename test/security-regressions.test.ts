@@ -72,8 +72,11 @@ test("symlinks cannot disguise external paths or .env permissions", async () => 
   const ctx: ToolContext = { sessionID: "fixture", messageID: "", callID: "", agent: "build", abort: new AbortController().signal,
     directory: root, worktree: root, metadata: () => {}, ask: async (request) => { requests.push(request) } }
   await ReadTool.execute({ filePath: link }, ctx)
-  expect(requests.find((r) => r.permission === "external_directory").patterns).toContain(fs.realpathSync(target))
-  expect(requests.find((r) => r.permission === "read").patterns).toContain(fs.realpathSync(target))
+  // Bun's synchronous Windows realpath can retain a DOS short-name ancestor.
+  // Use the asynchronous canonical path, as the actual file permission check does.
+  const resolved = await fs.promises.realpath(target)
+  expect(requests.find((r) => r.permission === "external_directory").patterns).toContain(resolved)
+  expect(requests.find((r) => r.permission === "read").patterns).toContain(resolved)
   fs.symlinkSync(outside, path.join(root, "linked-dir"), "junction")
   requests.length = 0
   await assertInsideProject(ctx, path.join(root, "linked-dir", "new.txt"))
