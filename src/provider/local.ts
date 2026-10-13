@@ -113,10 +113,16 @@ export interface ProbeResult {
  * One GET/POST with a deadline. Never throws. Redirects are errors: a probe that carries a key
  * must not be bounced to another host. The body is only parsed for 2xx answers.
  */
-export async function probe(url: string, timeoutMs: number, init: RequestInit = {}): Promise<ProbeResult> {
+export async function probe(url: string, timeoutMs: number, init: RequestInit = {}, opts: { jsonOnly?: boolean } = {}): Promise<ProbeResult> {
   try {
     const res = await fetch(url, { ...init, redirect: "error", signal: AbortSignal.timeout(timeoutMs), headers: { "User-Agent": `vedecaps/${VERSION}`, ...init.headers } })
     if (!res.ok) return { ok: false, status: res.status, headers: res.headers }
+    // An endpoint that is merely "something that answers 200" (a catch-all proxy, a streaming
+    // mock) is not worth waiting for: do not read a body that cannot be what we asked for.
+    if (opts.jsonOnly && !/json/i.test(res.headers.get("content-type") ?? "")) {
+      void res.body?.cancel().catch(() => {})
+      return { ok: true, status: res.status, headers: res.headers }
+    }
     try {
       return { ok: true, status: res.status, json: await res.json(), headers: res.headers }
     } catch {
@@ -185,7 +191,7 @@ export function parseDiparnuxInfo(json: unknown, headerVersion?: string | null):
 
 /** GET {root}/diparnux/info. Sent without credentials: the contract makes it public. */
 export async function fetchDiparnuxInfo(root: string, timeoutMs = 700, headerVersion?: string | null): Promise<DiparnuxInfo | undefined> {
-  const result = await probe(`${root.replace(/\/+$/, "").replace(/\/v1$/, "")}/diparnux/info`, timeoutMs)
+  const result = await probe(`${root.replace(/\/+$/, "").replace(/\/v1$/, "")}/diparnux/info`, timeoutMs, {}, { jsonOnly: true })
   return parseDiparnuxInfo(result.ok ? result.json : undefined, headerVersion)
 }
 

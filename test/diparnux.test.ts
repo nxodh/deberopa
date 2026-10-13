@@ -173,6 +173,38 @@ test("a configured provider that lists no models gets them, with the slot window
   expect(models[0]!.limit.context).toBe(16384)
 })
 
+test("a server that answers every path slowly with a stream does not hold up startup", async () => {
+  // regression: the gateway lookup once read the whole body of a 200 that was not JSON
+  const slow = Bun.serve({
+    port: 0,
+    hostname: "127.0.0.1",
+    fetch() {
+      const stream = new ReadableStream({
+        async start(controller) {
+          for (let i = 0; i < 8; i++) {
+            controller.enqueue(new TextEncoder().encode(`data: {"n":${i}}\n\n`))
+            await new Promise((r) => setTimeout(r, 400))
+          }
+          controller.close()
+        },
+      })
+      return new Response(stream, { headers: { "content-type": "text/event-stream" } })
+    },
+  })
+  try {
+    delete process.env.VEDECAPS_DISABLE_LOCAL_DETECT
+    useProject(tmpDir(), { provider: { slowpoke: { name: "Slow", api: `http://127.0.0.1:${slow.port}/v1`, models: { m: { name: "M" } } } } })
+    const started = Date.now()
+    const providers = await allProviders()
+    expect(Date.now() - started).toBeLessThan(1500) // eight 400 ms chunks would take over three seconds
+    expect(providers.slowpoke!.diparnux).toBeUndefined()
+    expect(providers.slowpoke!.models.m!.limit.context).toBe(128000) // untouched guess, as before
+  } finally {
+    process.env.VEDECAPS_DISABLE_LOCAL_DETECT = "1"
+    slow.stop(true)
+  }
+})
+
 test("T1.9 a hosted address is never asked for /diparnux/info", async () => {
   const requested: string[] = []
   const realFetch = globalThis.fetch

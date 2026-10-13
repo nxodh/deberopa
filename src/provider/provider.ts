@@ -191,42 +191,42 @@ function detectedToModel(providerID: string, d: DetectedModel, existing?: ModelC
  */
 async function addLocalProviders(result: Record<string, ProviderInfo>, config: Awaited<ReturnType<typeof getConfig>>, assumedContext: Set<string>) {
   const configured = Object.entries(result).filter(([, p]) => p.local && p.protocol !== "anthropic")
+  const probing = !process.env.VEDECAPS_DISABLE_LOCAL_DETECT
+  // Server detection and the per-provider lookups below are independent: run them side by side so
+  // startup waits for the slowest one, not for the sum.
+  const detecting = config.local_detect === false ? Promise.resolve([]) : detectLocalServers()
 
-  // providers configured by URL only: ask the server what it has
   await Promise.all(
     configured.map(async ([id, provider]) => {
-      if (Object.keys(provider.models).length > 0 || !provider.baseURL || process.env.VEDECAPS_DISABLE_LOCAL_DETECT) return
-      if (provider.protocol === "ollama") return // filled in by detection below
-      const found = await discoverOpenAIModels(provider.baseURL, provider.headers, provider.apiKey)
-      for (const d of found) {
-        provider.models[d.id] = detectedToModel(id, d, config.provider?.[id]?.models?.[d.id])
-        if (d.context === undefined && config.provider?.[id]?.models?.[d.id]?.limit?.context === undefined) assumedContext.add(`${id}/${d.id}`)
+      if (!provider.baseURL || !probing) return
+
+      // providers configured by URL only: ask the server what it has
+      if (Object.keys(provider.models).length === 0 && provider.protocol !== "ollama") {
+        const found = await discoverOpenAIModels(provider.baseURL, provider.headers, provider.apiKey)
+        for (const d of found) {
+          provider.models[d.id] = detectedToModel(id, d, config.provider?.[id]?.models?.[d.id])
+          if (d.context === undefined && config.provider?.[id]?.models?.[d.id]?.limit?.context === undefined) assumedContext.add(`${id}/${d.id}`)
+        }
+        if (found.length) provider.source = provider.source === "none" ? "config" : provider.source
       }
-      if (found.length) provider.source = provider.source === "none" ? "config" : provider.source
+
+      // A Diparnux gateway says how big each slot's context really is. Ask only addresses on this
+      // machine or its network (never a hosted API), without credentials, and only to fill in a
+      // guess: a window written in the config always wins.
+      if (config.local_detect === false || provider.protocol === "ollama") return
+      const info = await fetchDiparnuxInfo(provider.baseURL)
+      if (!info) return
+      provider.diparnux = info
+      if (!info.ctxPerSlot) return
+      for (const [modelID, model] of Object.entries(provider.models)) {
+        if (!assumedContext.has(`${id}/${modelID}`)) continue
+        model.limit = { ...model.limit, context: info.ctxPerSlot }
+      }
     }),
   )
 
-  // A Diparnux gateway says how big each slot's context really is. Ask only addresses on this
-  // machine or its network (never a hosted API), without credentials, and only to fill in a guess:
-  // a window written in the config always wins.
-  if (config.local_detect !== false && !process.env.VEDECAPS_DISABLE_LOCAL_DETECT) {
-    await Promise.all(
-      configured.map(async ([id, provider]) => {
-        if (!provider.baseURL || provider.protocol === "ollama") return
-        const info = await fetchDiparnuxInfo(provider.baseURL)
-        if (!info) return
-        provider.diparnux = info
-        if (!info.ctxPerSlot) return
-        for (const [modelID, model] of Object.entries(provider.models)) {
-          if (!assumedContext.has(`${id}/${modelID}`)) continue
-          model.limit = { ...model.limit, context: info.ctxPerSlot }
-        }
-      }),
-    )
-  }
-
   if (config.local_detect === false) return
-  for (const server of await detectLocalServers()) {
+  for (const server of await detecting) {
     const existing = result[server.id]
     if (existing && existing.source !== "none") {
       // configured by the user: add any models they did not list
