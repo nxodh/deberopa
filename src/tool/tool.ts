@@ -58,6 +58,8 @@ export function defineTool<Args = any>(def: ToolDefinition<Args>): ToolDefinitio
 }
 
 export class PermissionDeniedError extends Error {
+  /** True when the user declined without comment: the turn should stop and wait for them. */
+  byUser = false
   constructor(message = "The user rejected permission to use this specific tool call.") {
     super(message)
     this.name = "PermissionDeniedError"
