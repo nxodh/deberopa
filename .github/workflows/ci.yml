@@ -41,6 +41,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - run: npm ci
       - name: Build every target
         run: npx bun run script/build.ts --all
@@ -55,7 +58,10 @@ jobs:
       - name: Smoke test (clean debian:13 container, only the binaries inside)
         run: docker run --rm -v "$PWD/dist:/s:ro" debian:13 /s/smoke-linux-x64 /s/linux-x64/vedecaps
       - name: Terminal UI in a pseudo-terminal (compiled binary, mock model)
-        run: python3 script/tui-pty.py "$PWD/dist/linux-x64/vedecaps"
+        run: |
+          python3 -m venv "$RUNNER_TEMP/tui-venv"
+          "$RUNNER_TEMP/tui-venv/bin/python" -m pip install -r script/requirements-tui.txt
+          "$RUNNER_TEMP/tui-venv/bin/python" script/tui-pty.py "$PWD/dist/linux-x64/vedecaps"
       - name: install.sh in a clean debian:13 container (local release host)
         run: |
           npx bun run script/release-server.ts dist 48731 &

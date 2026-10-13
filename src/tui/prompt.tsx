@@ -20,6 +20,7 @@ export interface PromptProps {
   width: number
   /** Rows above this box in the frame, so the real cursor can be placed for IME input. */
   offsetTop: number
+  maxHeight?: number
   agent: string
   active: boolean
   busy: boolean
@@ -73,7 +74,9 @@ export function Prompt(props: PromptProps) {
     return fuzzyFilter(token.query, files ?? [], (f) => f, 30).map((f) => ({ label: f, value: `@${f} ` }))
   }, [token?.kind, token?.query, files, props.commands])
   const index = Math.min(selected, Math.max(0, options.length - 1))
-  const popup = options.length > 0
+  const maxHeight = props.maxHeight ?? MAX_ROWS + POPUP_ROWS + 5
+  const popup = options.length > 0 && maxHeight >= 7
+  const maxRows = Math.max(1, Math.min(MAX_ROWS, maxHeight - 3 - (popup ? 3 : 0)))
 
   const update = (next: E.EditorState) => {
     setState(next)
@@ -208,11 +211,11 @@ export function Prompt(props: PromptProps) {
   )
 
   // Scroll the editor when the buffer is taller than the box.
-  const first = Math.max(0, Math.min(view.cursorRow - MAX_ROWS + 1, view.rows.length - MAX_ROWS), view.cursorRow >= MAX_ROWS ? view.cursorRow - MAX_ROWS + 1 : 0)
-  const rows = view.rows.slice(first, first + MAX_ROWS)
+  const first = Math.max(0, view.cursorRow - maxRows + 1)
+  const rows = view.rows.slice(first, first + maxRows)
 
-  const popupRows = popup ? Math.min(POPUP_ROWS, options.length) : 0
-  const popupStart = Math.max(0, Math.min(index - Math.floor(POPUP_ROWS / 2), options.length - POPUP_ROWS))
+  const popupRows = popup ? Math.min(POPUP_ROWS, options.length, Math.max(1, maxHeight - rows.length - 5)) : 0
+  const popupStart = Math.max(0, Math.min(index - Math.floor(popupRows / 2), options.length - popupRows))
   const popupHeight = popup ? popupRows + 2 : 0
 
   // Park the real terminal cursor on the caret: IME composition (Korean, Japanese, Chinese) is drawn there.

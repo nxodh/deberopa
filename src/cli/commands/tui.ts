@@ -42,8 +42,13 @@ export async function main(argv: string[]): Promise<number> {
     exitOnCtrlC: false,
     patchConsole: true,
     incrementalRendering: true,
+    alternateScreen: true,
   })
-  await instance.waitUntilExit()
+  try {
+    await instance.waitUntilExit()
+  } finally {
+    instance.unmount()
+  }
   if (app.session) process.stdout.write(`\nResume this session with: vedecaps -s ${app.session.id}\n`)
   return 0
 }

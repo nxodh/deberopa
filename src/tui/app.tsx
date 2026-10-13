@@ -3,7 +3,7 @@ import fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { spawn } from "node:child_process"
-import { Box, Static, Text, useApp, useBoxMetrics, useWindowSize } from "ink"
+import { Box, Text, useApp, useBoxMetrics, useWindowSize } from "ink"
 import { Paths, VERSION } from "../global"
 import { project } from "../project"
 import { getConfig, readState, writeState } from "../config/config"
@@ -17,7 +17,7 @@ import { cancel, compactSession, NoModelError, prompt, shell } from "../session/
 import { redo, undo } from "../session/revert"
 import { exportMarkdown, forkSession } from "../session/export"
 import { shareHTML } from "../session/share"
-import { totalTokens, type AssistantMessage, type Message } from "../session/message"
+import { totalTokens, type AssistantMessage } from "../session/message"
 import { listFiles } from "../util/walk"
 import { mcpStatus } from "../mcp"
 import { lspStatus } from "../lsp"
@@ -32,6 +32,7 @@ import { DEFAULT_KEYBINDS } from "./keybinds"
 import { getTheme, THEMES } from "./theme"
 import { Header, MessageView, Muted, Plain, SPINNER } from "./view"
 import { Prompt, type Completion } from "./prompt"
+import { Conversation } from "./conversation"
 import { InputDialog, PermissionDialog, SelectDialog, TextDialog, type SelectItem } from "./dialog"
 import type { Model } from "../provider/types"
 
@@ -115,7 +116,8 @@ export function App(props: { options: AppOptions }) {
   useSyncExternalStore(app.subscribe, app.snapshot)
   const { exit, suspendTerminal } = useApp()
   const { columns, rows } = useWindowSize()
-  const width = Math.max(40, Math.min(columns || 80, 140))
+  const width = Math.max(1, columns || 80)
+  const height = Math.max(1, rows || 24)
   const theme = getTheme(app.theme)
   const [dialog, setDialog] = useState<Dialog | undefined>()
   const [frame, setFrame] = useState(0)
@@ -469,7 +471,7 @@ export function App(props: { options: AppOptions }) {
     app.notify(true)
   }
 
-  // Finished messages are printed once into the scrollback; only the unfinished tail re-renders.
+  // Keep completed and live messages separate so only streaming messages receive animation frames.
   const { settled, live } = useMemo(() => {
     let split = app.messages.length
     for (let i = 0; i < app.messages.length; i++) {
@@ -481,14 +483,6 @@ export function App(props: { options: AppOptions }) {
     }
     return { settled: app.messages.slice(0, split), live: app.messages.slice(split) }
   }, [app.version, app.epoch])
-
-  const lastEpoch = useRef<number | undefined>(undefined)
-  if (ready && lastEpoch.current !== app.epoch) {
-    // Start the scrollback over: the static region is about to be printed again from the top.
-    // (Not on the very first draw: whatever was on the terminal before we started stays.)
-    if (lastEpoch.current !== undefined && process.stdout.isTTY) process.stdout.write("\x1b[2J\x1b[3J\x1b[H")
-    lastEpoch.current = app.epoch
-  }
 
   const usage = useMemo(() => {
     let cost = 0
@@ -503,21 +497,20 @@ export function App(props: { options: AppOptions }) {
     return { cost, tokens, percent }
   }, [app.version, modelInfo])
 
+  const footer = useRef(null)
+  const footerMetrics = useBoxMetrics(footer)
   const wrapper = useRef(null)
   const metrics = useBoxMetrics(wrapper)
   const permission = app.permissions[0]
   const activeTodo = app.todos.find((t) => t.status === "in_progress")
   const remaining = app.todos.filter((t) => t.status === "pending" || t.status === "in_progress").length
 
-  type StaticItem = { key: string; kind: "header" } | { key: string; kind: "message"; message: Message }
-  const staticItems: StaticItem[] = [{ key: "header", kind: "header" }, ...settled.map((message) => ({ key: message.id, kind: "message" as const, message }))]
-
   const elapsed = app.status.type !== "idle" ? Math.floor((Date.now() - app.status.since) / 1000) : 0
-  const dialogRows = Math.max(6, Math.min(14, (rows || 24) - 10))
+  const dialogRows = Math.max(1, Math.min(14, Math.floor((height - 8) / 2)))
 
   let bottom: React.ReactNode
   if (permission) {
-    bottom = <PermissionDialog key={permission.id} theme={theme} width={width} request={permission} queued={app.permissions.length - 1} onReply={(reply) => replyPermission(permission.id, reply)} />
+    bottom = <PermissionDialog key={permission.id} theme={theme} width={width} request={permission} queued={app.permissions.length - 1} maxDetailRows={Math.max(0, height - 13)} onReply={(reply) => replyPermission(permission.id, reply)} />
   } else if (dialog?.type === "models") {
     bottom = (
       <SelectDialog
@@ -653,7 +646,7 @@ export function App(props: { options: AppOptions }) {
       />
     )
   } else if (dialog?.type === "text") {
-    bottom = <TextDialog theme={theme} width={width} height={dialogRows + 4} title={dialog.title} markdown={dialog.markdown} onClose={() => setDialog(undefined)} />
+    bottom = <TextDialog theme={theme} width={width} height={Math.max(1, height - 7)} title={dialog.title} markdown={dialog.markdown} onClose={() => setDialog(undefined)} />
   }
 
   const modelLabel = modelInfo?.name ?? app.model?.modelID ?? "no model · /connect"
@@ -663,28 +656,27 @@ export function App(props: { options: AppOptions }) {
   ]
     .filter(Boolean)
     .join(" · ")
+  const settledViews = useMemo(() => settled.map((message) => (
+    <MessageView key={message.id} message={message} theme={theme} width={width} details={app.details} />
+  )), [settled, theme, width, app.details])
 
-  // Nothing is drawn until settings and the session are loaded, so the scrollback is printed once.
-  if (!ready) return null
+  if (!ready) return <Box width={width} height={height}><Muted theme={theme}>Loading…</Muted></Box>
 
   return (
-    <>
-      <Static key={app.epoch} items={staticItems}>
-        {(item) =>
-          item.kind === "header" ? (
-            <Header key={item.key} theme={theme} directory={project().directory} width={width} />
-          ) : (
-            <Box key={item.key} width={width} flexDirection="column">
-              <MessageView message={item.message} theme={theme} width={width} details={app.details} />
-            </Box>
-          )
-        }
-      </Static>
-      <Box flexDirection="column" width={width}>
+    <Box width={width} height={height} flexDirection="column" overflow="hidden">
+      <Box height={1} flexShrink={0} paddingX={1} justifyContent="space-between">
+        <Box flexShrink={0} marginRight={2}><Plain theme={theme} bold>{`VEDECAPS · v${VERSION}`}</Plain></Box>
+        <Box flexGrow={1} flexShrink={1} minWidth={0} justifyContent="flex-end"><Muted theme={theme} wrap="truncate-end">{project().directory}</Muted></Box>
+      </Box>
+      <Conversation key={app.epoch} width={width} theme={theme} active={!bottom} keybinds={keybinds} followID={app.messages.findLast((m) => m.role === "user")?.id}>
+        <Header theme={theme} directory={project().directory} width={width} />
+        {settledViews}
         {live.map((message) => (
           <MessageView key={message.id} message={message} theme={theme} width={width} details={app.details} frame={frame} live />
         ))}
-        {busy ? (
+      </Conversation>
+      <Box ref={footer} flexShrink={0} flexDirection="column">
+        {busy && !bottom ? (
           <Box marginTop={1} marginLeft={1}>
             <Text wrap="truncate-end">
               <Plain theme={theme} bold>{SPINNER[frame % SPINNER.length]! + " "}</Plain>
@@ -697,7 +689,7 @@ export function App(props: { options: AppOptions }) {
             </Text>
           </Box>
         ) : null}
-        {app.toast ? (
+        {app.toast && !bottom ? (
           <Box marginTop={1} marginLeft={1}>
             <Text wrap="truncate-end">
               {app.toast.kind === "error" ? <Plain theme={theme} inverse bold>{" ERROR "}</Plain> : <Plain theme={theme} bold>{"◆"}</Plain>}
@@ -712,7 +704,8 @@ export function App(props: { options: AppOptions }) {
               keybinds={keybinds}
               theme={theme}
               width={width}
-              offsetTop={metrics.hasMeasured ? metrics.top : 0}
+              offsetTop={(footerMetrics.hasMeasured ? footerMetrics.top : 0) + (metrics.hasMeasured ? metrics.top : 0)}
+              maxHeight={Math.max(4, height - 5 - (busy ? 2 : 0) - (app.toast ? 2 : 0))}
               agent={app.agent}
               active={!bottom}
               busy={busy}
@@ -733,11 +726,11 @@ export function App(props: { options: AppOptions }) {
             />
           </Box>
         </Box>
-        <Box paddingX={1} justifyContent="space-between" width={width}>
-          <Muted theme={theme} wrap="truncate-end">{`${modelLabel}${app.session ? " · " + app.session.title.slice(0, 40) : ""}${app.git ? "  ⎇ " + formatStatus(app.git) : ""}`}</Muted>
-          <Muted theme={theme}>{right}</Muted>
+        <Box height={1} flexShrink={0} paddingX={1} justifyContent="space-between" width={width}>
+          <Box flexGrow={1} flexShrink={1} minWidth={0}><Muted theme={theme} wrap="truncate-end">{`${modelLabel}${app.session ? " · " + app.session.title : ""}${app.git ? "  ⎇ " + formatStatus(app.git) : ""}`}</Muted></Box>
+          <Box flexShrink={0} marginLeft={2}><Muted theme={theme}>{right}</Muted></Box>
         </Box>
       </Box>
-    </>
+    </Box>
   )
 }

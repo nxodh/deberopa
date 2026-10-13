@@ -602,6 +602,22 @@
         "editor": {
           "type": "string",
           "description": "Default: none"
+        },
+        "scroll_up": {
+          "type": "string",
+          "description": "Default: pageup"
+        },
+        "scroll_down": {
+          "type": "string",
+          "description": "Default: pagedown"
+        },
+        "scroll_top": {
+          "type": "string",
+          "description": "Default: ctrl+home"
+        },
+        "scroll_bottom": {
+          "type": "string",
+          "description": "Default: ctrl+end"
         }
       }
     },

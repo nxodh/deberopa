@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The interactive terminal UI uses the full terminal in an alternate screen, with a fixed prompt/status bar and a scrollable conversation. PageUp/PageDown and Ctrl+Home/End navigate history; terminal resize, exit and external editor handoff restore the appropriate screen.
+
 ## 0.1.2
 
 - Update VS Code packaging to vsce 4, removing the vulnerable braces dependency chain; extension packaging requires Node.js 22+.
