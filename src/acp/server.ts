@@ -426,7 +426,7 @@ export function serveAcp(options: AcpOptions): Promise<void> {
 
   return new Promise<void>((resolve) => {
     let buffer = ""
-    let work = Promise.resolve()
+    const inflight = new Set<Promise<void>>()
     const pump = (line: string) => {
       if (line.trim() === "") return
       let message: unknown
@@ -437,7 +437,10 @@ export function serveAcp(options: AcpOptions): Promise<void> {
         return
       }
       // requests run concurrently (a prompt must not block cancel or permission replies)
-      void dispatch(message).catch((err) => log.error("dispatch failed", err))
+      const task: Promise<void> = dispatch(message)
+        .catch((err) => log.error("dispatch failed", err))
+        .finally(() => inflight.delete(task))
+      inflight.add(task)
     }
     input.setEncoding?.("utf8")
     input.on("data", (chunk: string | Buffer) => {
@@ -448,17 +451,22 @@ export function serveAcp(options: AcpOptions): Promise<void> {
         buffer = buffer.slice(at + 1)
       }
     })
-    const finish = () => {
+    let finished = false
+    const finish = async () => {
+      if (finished) return
+      finished = true
       if (buffer.trim()) pump(buffer)
-      for (const off of unsubscribers) off()
+      // the client is gone: stop running prompts, but let quick requests (session/new, ...) answer
       for (const s of sessions.values()) {
         s.running?.abort()
         cancel(s.id)
       }
-      void work.then(resolve)
+      await Promise.race([Promise.allSettled([...inflight]), new Promise((r) => setTimeout(r, 10_000).unref?.())])
+      for (const off of unsubscribers) off()
+      resolve()
     }
-    input.on("end", finish)
-    input.on("close", finish)
+    input.on("end", () => void finish())
+    input.on("close", () => void finish())
     void clientCapabilities
   })
 }
