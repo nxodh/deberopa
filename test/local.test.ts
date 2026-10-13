@@ -9,7 +9,7 @@ import { prompt } from "../src/session/prompt"
 import { createSession, getMessages } from "../src/session/store"
 import { messageText, type ToolPart } from "../src/session/message"
 import { ProviderError, type Model, type ProviderInfo, type StreamEvent, type StreamInput } from "../src/provider/types"
-import { tmpDir, useProject } from "./helpers"
+import { endProject, tmpDir, useProject } from "./helpers"
 
 const model = (over: Partial<Model> = {}): Model => ({
   id: "qwen3:8b",
@@ -75,7 +75,10 @@ beforeAll(() => {
   })
   base = `http://127.0.0.1:${server.port}`
 })
-afterAll(() => server.stop(true))
+afterAll(() => {
+  server.stop(true)
+  endProject()
+})
 beforeEach(() => {
   requests = []
 })

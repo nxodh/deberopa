@@ -2,7 +2,7 @@ import { afterAll, beforeAll, expect, test } from "bun:test"
 import fs from "node:fs"
 import path from "node:path"
 import { startServer } from "../src/server/server"
-import { mockConfig, reply, startMockLLM, tmpDir, useProject, type MockLLM } from "./helpers"
+import { endProject, mockConfig, reply, startMockLLM, tmpDir, useProject, type MockLLM } from "./helpers"
 
 let mock: MockLLM
 let server: ReturnType<typeof startServer>
@@ -21,6 +21,7 @@ beforeAll(() => {
 afterAll(() => {
   server.stop(true)
   mock.stop()
+  endProject()
 })
 
 const call = async (method: string, route: string, body?: unknown, headers: Record<string, string> = {}) => {

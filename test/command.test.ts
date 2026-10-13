@@ -4,7 +4,7 @@ import path from "node:path"
 import { expandTemplate, getCommand, listCommands, runCommand, splitArguments, CommandNotFoundError } from "../src/command/command"
 import { resetCommands } from "../src/command/command"
 import { createSession } from "../src/session/store"
-import { mockConfig, reply, startMockLLM, tmpDir, useProject, type MockLLM } from "./helpers"
+import { mockConfig, reply, startMockLLM, tmpDir, useProject, type MockLLM, endProject } from "./helpers"
 
 let mock: MockLLM
 let dir: string
@@ -77,3 +77,5 @@ test("subtask commands tell the model to delegate", async () => {
   expect(user).toContain('subagent_type "explore"')
   expect(user).toContain("Dig into the cache")
 })
+
+afterAll(endProject)

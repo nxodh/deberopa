@@ -4,7 +4,7 @@ import path from "node:path"
 import { PatchTool, parsePatch, applyHunks } from "../src/tool/patch"
 import { markRead } from "../src/tool/filetime"
 import { PermissionDeniedError, type PermissionRequest, type ToolContext } from "../src/tool/tool"
-import { tmpDir, useProject } from "./helpers"
+import { endProject, tmpDir, useProject } from "./helpers"
 
 let dir: string
 let asked: PermissionRequest[]
@@ -42,7 +42,7 @@ beforeEach(() => {
   deny = false
   useProject(dir, { snapshot: false, lsp: false, formatter: false })
 })
-afterAll(() => {})
+afterAll(endProject)
 
 test("parsing every kind of section", () => {
   const ops = parsePatch(

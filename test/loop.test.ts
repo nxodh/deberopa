@@ -6,7 +6,7 @@ import { createSession, getMessages } from "../src/session/store"
 import { messageText, type ToolPart } from "../src/session/message"
 import { subscribe } from "../src/util/bus"
 import { pendingPermissions, replyPermission } from "../src/permission/permission"
-import { mockConfig, reply, startMockLLM, tmpDir, useProject, type MockLLM } from "./helpers"
+import { endProject, mockConfig, reply, startMockLLM, tmpDir, useProject, type MockLLM } from "./helpers"
 
 let mock: MockLLM
 let dir: string
@@ -14,7 +14,10 @@ let dir: string
 beforeAll(() => {
   mock = startMockLLM()
 })
-afterAll(() => mock.stop())
+afterAll(() => {
+  mock.stop()
+  endProject()
+})
 
 beforeEach(() => {
   dir = tmpDir()

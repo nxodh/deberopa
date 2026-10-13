@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "vedecaps-fmt-home-"))
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vedecaps-fmt-proj-"))
 process.env.VEDECAPS_HOME = home
+delete process.env.VEDECAPS_CONFIG_CONTENT // a previous test file may have left one behind
 
 const { initProject } = await import("../src/project")
 const { resetConfig } = await import("../src/config/config")

@@ -3,6 +3,7 @@ import path from "node:path"
 import { assertInsideProject, defineTool, resolvePath, ToolInputError, type ToolContext } from "./tool"
 import { assertFresh, markRead } from "./filetime"
 import { afterWrite, countChanges, unifiedDiff } from "./edit"
+import { toPosix } from "../util/fs"
 
 /** One file operation parsed from a patch. */
 export type PatchOp =
@@ -234,7 +235,7 @@ Rules:
     }
 
     // 2. One permission request that shows the whole change.
-    const rel = (f: string) => path.relative(ctx.worktree, f) || f
+    const rel = (f: string) => toPosix(path.relative(ctx.worktree, f) || f)
     const diffs = planned.map((p) => unifiedDiff(rel(p.target ?? p.file), p.before, p.after ?? ""))
     await ctx.ask({
       permission: "edit",

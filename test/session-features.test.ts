@@ -6,7 +6,7 @@ import { prompt } from "../src/session/prompt"
 import { createSession, deleteSession, getMessages, getSession } from "../src/session/store"
 import { redo, revert, undo, unrevert, visibleMessages } from "../src/session/revert"
 import { exportJSON, exportMarkdown, forkSession, importExport, parseExport } from "../src/session/export"
-import { mockConfig, reply, startMockLLM, tmpDir, useProject, type MockLLM } from "./helpers"
+import { mockConfig, reply, startMockLLM, tmpDir, useProject, type MockLLM, endProject } from "./helpers"
 
 let mock: MockLLM
 let dir: string
@@ -118,3 +118,5 @@ test("export to JSON and markdown, import as a new session, fork", async () => {
   expect(() => parseExport("{}")).toThrow(/not a Vedecaps/)
   expect(() => parseExport("nope")).toThrow(/valid JSON/)
 })
+
+afterAll(endProject)

@@ -6,6 +6,7 @@ import path from "node:path"
 // Must run before any project module loads: global.ts resolves its paths at import time.
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "vedecaps-lsp-home-"))
 process.env.VEDECAPS_HOME = home
+delete process.env.VEDECAPS_CONFIG_CONTENT // a previous test file may have left one behind
 
 const { createLspClient, createMessageDecoder, encodeMessage, diagnosticKey } = await import("../src/lsp/client")
 const { touchFile, formatDiagnostics, lspStatus, shutdownLsp } = await import("../src/lsp/index")

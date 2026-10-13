@@ -31,6 +31,12 @@ export function useProject(dir: string, config: Record<string, unknown> = {}) {
   resetAll()
 }
 
+/** Undo `useProject`: the next test file must not inherit this one's config. */
+export function endProject() {
+  delete process.env.VEDECAPS_CONFIG_CONTENT
+  resetAll()
+}
+
 export type Reply = { chunks?: unknown[]; status?: number; body?: string; delayMs?: number }
 
 /** One chat-completions streaming chunk. */
