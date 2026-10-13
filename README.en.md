@@ -63,6 +63,14 @@ The full reference (configuration, permissions, commands, HTTP routes) is in the
 
 The Korean README documents all of these in detail.
 
+## Git and GitHub
+
+- **Status bar**: `⎇ branch · N changed · ↑ahead ↓behind` in git repositories (read-only, refreshed after each turn and edit).
+- **Undo**: files are restored from snapshots kept in a private store, never touching your `.git`. When that is impossible (not a git repo, no git, `"snapshot": false`) or for git-ignored files, Vedecaps now says so instead of silently only rewinding the conversation.
+- **Commits and PRs**: only on request; follows the repository's message style, stages specific files, never skips hooks, opens PRs with `gh pr create`.
+- **`vedecaps pr <number|url> [message]`**: checks out a pull request with `gh` and reviews it read-only (or works on it when you give a message). Refuses a dirty tree; treats the author's description as untrusted.
+- **GitHub Action**: new inputs `commit`, `branch`, `commit-message`, `pull-request`, `pr-title`, `pr-base`, `github-token`; outputs `changed`, `branch`, `commit`, `pull-request-url`.
+
 ## Not yet
 
 Session sharing, subscription-account OAuth login (deliberately not implemented), Bedrock / Vertex / Azure authentication, npm-packaged plugins, SDKs for other languages, automatic installation of clangd / zls / ruby-lsp / lua-language-server, MCP OAuth, configurable key bindings, musl builds.

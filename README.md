@@ -84,7 +84,7 @@ git diff | vedecaps run "이 변경에 대한 커밋 메시지를 써줘"
 | `/models` | 모델 전환 |
 | `/agents` | 에이전트 전환 |
 | `/connect` | 제공자 API 키 추가 |
-| `/undo`, `/redo` | 마지막 메시지와 파일 변경 되돌리기 / 다시 적용 |
+| `/undo`, `/redo` | 마지막 메시지와 파일 변경 되돌리기 / 다시 적용(git 저장소에서만 파일 복원, 아래 "Git과 GitHub" 참고) |
 | `/compact` | 대화를 요약해 컨텍스트 확보 |
 | `/details` | 도구 출력·추론 전체 보기 전환 |
 | `/export [파일]` | 대화를 Markdown으로 저장 |
@@ -357,6 +357,29 @@ await close()
 
 프롬프트에서 `@파일#L10-20`처럼 줄 범위를 지정하면 그 줄만 첨부됩니다.
 
+## Git과 GitHub
+
+**상태 표시줄**: git 저장소에서는 하단에 `⎇ 브랜치 · N changed · ↑앞섬 ↓뒤처짐`이 표시됩니다. 턴이 끝날 때, 파일이 수정될 때, 그리고 20초마다 갱신되며 읽기 전용으로 동작합니다(`GIT_OPTIONAL_LOCKS=0`이라 사용자의 git과 잠금이 충돌하지 않습니다).
+
+**되돌리기(`/undo`)의 범위**: 에이전트는 각 단계 전에 작업 트리를 Vedecaps 전용 저장소에 기록하며 사용자의 `.git`(HEAD, 인덱스, ref, stash)은 건드리지 않습니다. 다음 경우 파일은 복원되지 않으며, 그때는 화면에 이유가 표시됩니다.
+
+- git 저장소가 아니거나, `git`이 없거나, `"snapshot": false`인 경우: 대화만 되돌려집니다(첫 수정 때 한 번, `/undo`할 때 한 번 알려 줍니다).
+- `.gitignore`에 걸린 파일(`.env`, 빌드 산출물 등): 해당 파일을 수정하면 한 번 알려 줍니다.
+- 되돌리기는 파일을 그 시점의 내용으로 통째로 복원하므로, 그 사이에 직접 고친 내용은 사라집니다.
+
+**커밋과 PR**: 요청하지 않으면 커밋·푸시·브랜치 생성을 하지 않습니다. 요청하면 `git status`/`git diff`/`git log`로 저장소의 메시지 스타일을 확인하고, 파일을 골라 스테이징하며(비밀·로컬 설정 제외), 훅을 건너뛰지 않고(`--no-verify` 금지), PR은 `gh pr create`로 만들고 URL을 알려 줍니다.
+
+**PR 리뷰·작업: `vedecaps pr`**
+
+```sh
+vedecaps pr 123                       # PR을 체크아웃하고 읽기 전용(plan)으로 리뷰
+vedecaps pr https://github.com/owner/repo/pull/123
+vedecaps pr 123 "실패하는 테스트를 고쳐줘"   # 메시지를 주면 build 에이전트로 작업
+vedecaps pr 123 --no-ui > review.md   # UI 없이 결과만 출력
+```
+
+[GitHub CLI(`gh`)](https://cli.github.com)가 설치되어 있고 `gh auth login`이 되어 있어야 합니다. 포크에서 온 PR도 `gh`가 처리합니다. 커밋하지 않은 변경이 있으면 작업을 보호하기 위해 체크아웃을 거부합니다(`--force`로 무시). 작성자가 쓴 PR 설명은 신뢰할 수 없는 텍스트로 표시해 모델에 전달합니다. 다른 저장소의 URL을 주면 그 저장소의 클론 안에서 실행하라고 안내합니다. `/review 123`(TUI)도 PR 번호를 받습니다.
+
 ## GitHub Action
 
 ```yaml
@@ -369,7 +392,32 @@ await close()
     prompt: 이 변경을 리뷰해줘
 ```
 
-출력 `response`에 최종 답변이 들어갑니다. 입력은 `prompt`, `model`, `agent`, `version`, `working-directory`, `config`(JSON), `allow-all`입니다. PR 리뷰와 `/vedecaps` 댓글 응답 예시는 [`examples/github`](examples/github)에 있습니다.
+출력 `response`에 최종 답변이 들어갑니다. 입력은 `prompt`, `model`, `agent`, `version`, `working-directory`, `config`(JSON), `allow-all`이며, 변경 사항을 올리는 옵션도 있습니다.
+
+| 입력 | 설명 |
+|---|---|
+| `commit` | 에이전트가 바꾼 파일을 새 브랜치에 커밋하고 푸시(`contents: write` 필요). 바뀐 것이 없으면 아무것도 하지 않음 |
+| `branch` | 브랜치 이름(기본 `vedecaps/<run id>-<시도>`) |
+| `commit-message` | 커밋 메시지(커밋은 `github-actions[bot]` 이름으로 생성) |
+| `pull-request` | 그 브랜치로 PR 생성(`pull-requests: write` 필요, `commit` 포함) |
+| `pr-title`, `pr-base` | PR 제목, 기준 브랜치(기본: 워크플로가 도는 브랜치) |
+| `github-token` | 푸시와 PR에 쓸 토큰(기본 `github.token`) |
+
+추가 출력: `changed`(`true`/`false`), `branch`, `commit`, `pull-request-url`. 에이전트가 실패하면(0이 아닌 종료 코드) 커밋하지 않습니다.
+
+```yaml
+permissions: { contents: write, pull-requests: write }
+steps:
+  - uses: actions/checkout@v4
+  - uses: nxodh/vedecaps@v0.1.1   # 이 옵션들은 다음 릴리스부터 태그에 포함됩니다
+    env: { ANTHROPIC_API_KEY: "${{ secrets.ANTHROPIC_API_KEY }}" }
+    with:
+      prompt: 의존성 경고를 고쳐줘
+      pull-request: "true"
+      pr-title: "chore: fix dependency warnings"
+```
+
+PR 리뷰와 `/vedecaps` 댓글 응답 예시는 [`examples/github`](examples/github)에 있습니다.
 
 > **주의**: 에이전트는 워크플로 권한으로 명령을 실행할 수 있고, 이슈·PR 본문은 신뢰할 수 없는 입력(프롬프트 인젝션)입니다. 신뢰하는 사용자의 트리거에만 반응하게 하고, `permissions`를 최소로 하며, 읽기만 필요하면 `config: '{"permission":{"bash":"deny","edit":"deny"}}'`로 막으세요.
 
@@ -388,6 +436,7 @@ await close()
 | `vedecaps stats` | 토큰 사용량·비용 |
 | `vedecaps serve` | HTTP API 서버 |
 | `vedecaps acp` | ACP 서버(에디터용) |
+| `vedecaps pr <번호\|URL> [메시지..]` | GitHub PR 체크아웃 후 리뷰·작업 (`--no-ui`, `--agent`, `--force`) |
 | `vedecaps trust [경로]` | 프로젝트 설정 신뢰 (`--status`, `--revoke`, `--list`) |
 | `vedecaps upgrade [버전]` | 업데이트 (`--check`) |
 | `vedecaps uninstall` | 제거 (`--dry-run`, `--keep-config`, `--keep-data`) |

@@ -36,10 +36,54 @@ inputs:
     required: false
     default: "false"
 
+  commit:
+    description: >
+      Commit the files the agent changed to a new branch (and push it). Needs `contents: write`.
+      Nothing is committed when the agent changed nothing.
+    required: false
+    default: "false"
+  branch:
+    description: Branch name for the commit. Default is vedecaps/<run id>-<attempt>.
+    required: false
+    default: ""
+  commit-message:
+    description: Commit message.
+    required: false
+    default: "Changes by Vedecaps"
+  pull-request:
+    description: >
+      Open a pull request from that branch (implies commit). Needs the pull-requests write permission.
+    required: false
+    default: "false"
+  pr-title:
+    description: Pull request title. Default is the commit message.
+    required: false
+    default: ""
+  pr-base:
+    description: Branch to open the pull request against. Default is the branch the workflow runs on.
+    required: false
+    default: ""
+  github-token:
+    description: Token used to push and to open the pull request.
+    required: false
+    default: ${{ github.token }}
+
 outputs:
   response:
     description: The agent's final answer as text.
     value: ${{ steps.run.outputs.response }}
+  changed:
+    description: '"true" when the agent changed files in the working directory.'
+    value: ${{ steps.publish.outputs.changed }}
+  branch:
+    description: The branch that was committed to (empty when nothing was committed).
+    value: ${{ steps.publish.outputs.branch }}
+  commit:
+    description: SHA of the commit that was made (empty when nothing was committed).
+    value: ${{ steps.publish.outputs.commit }}
+  pull-request-url:
+    description: URL of the pull request that was opened (empty when none was).
+    value: ${{ steps.publish.outputs.pull-request-url }}
 
 runs:
   using: composite
@@ -98,3 +142,57 @@ runs:
           echo "$delimiter"
         } >> "$GITHUB_OUTPUT"
         exit "$status"
+
+    - name: Commit, push and open a pull request
+      id: publish
+      shell: bash
+      env:
+        INPUT_DIR: ${{ inputs.working-directory }}
+        INPUT_COMMIT: ${{ inputs.commit }}
+        INPUT_PR: ${{ inputs.pull-request }}
+        INPUT_BRANCH: ${{ inputs.branch }}
+        INPUT_MESSAGE: ${{ inputs.commit-message }}
+        INPUT_TITLE: ${{ inputs.pr-title }}
+        INPUT_BASE: ${{ inputs.pr-base }}
+        GH_TOKEN: ${{ inputs.github-token }}
+        RUN_ID: ${{ github.run_id }}
+        RUN_ATTEMPT: ${{ github.run_attempt }}
+        DEFAULT_BASE: ${{ github.ref_name }}
+        REPOSITORY: ${{ github.repository }}
+        OUTPUT_FILE: ${{ runner.temp }}/vedecaps-response.md
+      run: |
+        set -euo pipefail
+        cd "$INPUT_DIR"
+        {
+          if [ -z "$(git status --porcelain 2>/dev/null)" ]; then
+            echo "changed=false"
+          else
+            echo "changed=true"
+          fi
+        } >> "$GITHUB_OUTPUT"
+        if [ "$INPUT_COMMIT" != "true" ] && [ "$INPUT_PR" != "true" ]; then exit 0; fi
+        if [ -z "$(git status --porcelain)" ]; then
+          echo "The agent changed no files; nothing to commit."
+          exit 0
+        fi
+
+        branch="${INPUT_BRANCH:-vedecaps/${RUN_ID}-${RUN_ATTEMPT}}"
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git checkout -b "$branch"
+        git add -A
+        git commit -m "$INPUT_MESSAGE"
+        sha="$(git rev-parse HEAD)"
+        git push origin "$branch"
+        {
+          echo "branch=$branch"
+          echo "commit=$sha"
+        } >> "$GITHUB_OUTPUT"
+
+        if [ "$INPUT_PR" = "true" ]; then
+          base="${INPUT_BASE:-$DEFAULT_BASE}"
+          title="${INPUT_TITLE:-$INPUT_MESSAGE}"
+          body="$(printf 'Opened by Vedecaps.\n\n%s\n' "$(cat "$OUTPUT_FILE" 2>/dev/null | head -c 6000)")"
+          url="$(gh pr create --repo "$REPOSITORY" --base "$base" --head "$branch" --title "$title" --body "$body")"
+          echo "pull-request-url=$url" >> "$GITHUB_OUTPUT"
+        fi

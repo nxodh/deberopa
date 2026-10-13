@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Status bar shows the git branch, number of changed files and ahead/behind counts.
+- `/undo` now says when it cannot restore files (not a git repository, git missing, snapshots off) and warns once when an edited file is git-ignored.
+- `vedecaps pr <number|url> [message]` checks out a GitHub pull request through `gh` and reviews it read-only, or works on it when given a message. Refuses uncommitted changes; the PR description is passed as untrusted text.
+- System prompt guidance for commits and pull requests (inspect status/diff/log first, stage specific files, no `--no-verify`, `gh pr create`).
+- GitHub Action: `commit`, `branch`, `commit-message`, `pull-request`, `pr-title`, `pr-base`, `github-token` inputs and `changed`, `branch`, `commit`, `pull-request-url` outputs.
+
 ## 0.1.1
 
 - Local models: Ollama, LM Studio, llama.cpp and vLLM are detected automatically, with each model's real context window and capabilities (`vedecaps debug local`).

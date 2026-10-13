@@ -88,6 +88,53 @@ jobs:
           echo "$RESPONSE" | grep -q "완료"
           expected="$(node -p "require('./package.json').version")"
           test "$("$HOME/.vedecaps/bin/vedecaps" --version)" = "$expected"
+      - name: Prepare a throwaway repository with a local bare remote (never the real origin)
+        run: |
+          set -e
+          root="$RUNNER_TEMP/action-commit"
+          rm -rf "$root" && mkdir -p "$root"
+          git init -q --bare "$root/remote.git"
+          git init -q -b main "$root/work"
+          cd "$root/work"
+          git config user.email test@example.com
+          git config user.name test
+          echo "# demo" > README.md
+          git add -A && git commit -qm init
+          git remote add origin "$root/remote.git"
+          git push -q origin main
+      - name: GitHub Action with commit - the agent's change is committed and pushed
+        id: commit
+        uses: ./
+        env:
+          VEDECAPS_RELEASE_URL: http://127.0.0.1:48732
+          VEDECAPS_DISABLE_LOCAL_DETECT: "1"
+          VEDECAPS_DISABLE_MODELS_FETCH: "1"
+        with:
+          prompt: edit the notes
+          working-directory: ${{ runner.temp }}/action-commit/work
+          commit: "true"
+          branch: vedecaps/ci-test
+          commit-message: Add notes via Vedecaps
+          config: >-
+            {"model":"mock/m","snapshot":false,"provider":{"mock":{"name":"Mock","api":"http://127.0.0.1:48733/v1",
+            "models":{"m":{"name":"M","tool_call":true,"limit":{"context":100000,"output":4000}}}}}}
+      - name: Check what reached the remote
+        env:
+          CHANGED: ${{ steps.commit.outputs.changed }}
+          BRANCH: ${{ steps.commit.outputs.branch }}
+          COMMIT: ${{ steps.commit.outputs.commit }}
+          PR_URL: ${{ steps.commit.outputs.pull-request-url }}
+        run: |
+          set -e
+          remote="$RUNNER_TEMP/action-commit/remote.git"
+          test "$CHANGED" = "true"
+          test "$BRANCH" = "vedecaps/ci-test"
+          test -z "$PR_URL"
+          test "$(git -C "$remote" rev-parse vedecaps/ci-test)" = "$COMMIT"
+          test "$(git -C "$remote" log -1 --format=%s vedecaps/ci-test)" = "Add notes via Vedecaps"
+          git -C "$remote" show vedecaps/ci-test:notes.txt | grep -q "line one"
+          # main on the remote is untouched
+          test "$(git -C "$remote" log -1 --format=%s main)" = "init"
       - name: Binaries must not embed build-machine paths
         run: |
           if strings -a dist/linux-x64/vedecaps | grep -E "/home/runner/|/Users/"; then
