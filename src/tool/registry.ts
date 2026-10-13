@@ -6,6 +6,7 @@ import { EditTool, MultiEditTool, WriteTool } from "./edit"
 import { GlobTool } from "./glob"
 import { GrepTool } from "./grep"
 import { ListTool } from "./list"
+import { PatchTool } from "./patch"
 import { ReadTool } from "./read"
 import { createSkillTool } from "./skill"
 import { createTaskTool } from "./task"
@@ -14,7 +15,7 @@ import { WebFetchTool } from "./webfetch"
 import type { ToolDefinition } from "./tool"
 
 /** Tools that change files share the single "edit" permission. */
-const PERMISSION_KEY: Record<string, string> = { write: "edit", multiedit: "edit", edit: "edit" }
+const PERMISSION_KEY: Record<string, string> = { write: "edit", multiedit: "edit", edit: "edit", patch: "edit" }
 
 export function permissionKey(toolID: string): string {
   return PERMISSION_KEY[toolID] ?? toolID
@@ -25,6 +26,7 @@ export const BUILTIN_TOOLS: ToolDefinition[] = [
   ReadTool,
   EditTool,
   MultiEditTool,
+  PatchTool,
   WriteTool,
   GlobTool,
   GrepTool,

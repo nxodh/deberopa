@@ -220,7 +220,7 @@ permission:
 
 | 키 | 대상 |
 |---|---|
-| `edit` | `edit`, `multiedit`, `write` |
+| `edit` | `edit`, `multiedit`, `write`, `patch` |
 | `bash` | 셸 명령 (패턴으로 세분화 가능) |
 | `read` | 파일 읽기 |
 | `webfetch` | URL 가져오기 |
@@ -238,6 +238,7 @@ permission:
 | `bash` | 셸 명령 실행. Windows에서는 Git Bash → PowerShell 7 → Windows PowerShell → cmd 순으로 선택 |
 | `read` | 파일 읽기(줄 범위, 이미지·PDF 첨부) |
 | `edit`, `multiedit`, `write` | 파일 수정·생성. 줄바꿈 형식(CRLF) 보존, 읽지 않은 파일은 수정 거부 |
+| `patch` | `*** Begin Patch` 형식으로 여러 파일을 한 번에 생성·수정·이동·삭제(전부 적용되거나 아무것도 적용되지 않음) |
 | `glob`, `grep`, `list` | 파일·내용 검색 (`.gitignore` 반영) |
 | `webfetch` | 웹 페이지를 Markdown으로 가져오기 |
 | `todowrite`, `todoread` | 작업 목록 |
@@ -325,7 +326,7 @@ vedecaps mcp list
 - 구독 계정 OAuth 로그인: API 키만 지원합니다.
 - Amazon Bedrock, Google Vertex AI, Azure 전용 인증
 - 플러그인 시스템, SDK, IDE 확장, GitHub Action, ACP
-- `websearch`, `patch` 도구
+- `websearch` 도구
 - 언어 서버 자동 설치, MCP OAuth
 - musl(Alpine) 빌드
 

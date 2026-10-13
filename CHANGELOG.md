@@ -8,6 +8,7 @@
 - Recovery of tool calls written as text (Hermes/Qwen, Qwen3-Coder, Mistral, JSON fences) and of `<think>` tags.
 - Context usage and auto-compaction stay correct when Ollama under-reports cached prompt tokens.
 - Providers configured by URL only list their models from `/models`.
+- `patch` tool: create, update, move and delete several files with one `*** Begin Patch` block; atomic, with whitespace-tolerant matching.
 
 ## 0.1.0
 

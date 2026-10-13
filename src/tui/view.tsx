@@ -131,6 +131,8 @@ export function toolSummary(part: ToolPart): { name: string; detail: string } {
       return { name: "Edit", detail: relative(input.filePath) + counts(meta) }
     case "write":
       return { name: meta.created === false ? "Overwrite" : "Write", detail: relative(input.filePath) + counts(meta) }
+    case "patch":
+      return { name: "Patch", detail: (state.status === "completed" ? state.title : "") + counts(meta) }
     case "glob":
       return { name: "Glob", detail: `${input.pattern ?? ""}${typeof meta.count === "number" ? `  (${meta.count} files)` : ""}` }
     case "grep":
@@ -218,7 +220,7 @@ export function ToolView(props: { part: ToolPart; theme: Theme; width: number; d
         </Box>
       )
     }
-  } else if ((part.tool === "edit" || part.tool === "multiedit" || part.tool === "write") && typeof meta.diff === "string") {
+  } else if ((part.tool === "edit" || part.tool === "multiedit" || part.tool === "write" || part.tool === "patch") && typeof meta.diff === "string") {
     body = <DiffView diff={meta.diff} theme={theme} width={width} limit={details ? 200 : 14} />
   } else if (part.tool === "todowrite" && Array.isArray(input.todos)) {
     body = (

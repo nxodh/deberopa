@@ -41,7 +41,7 @@ Run `/init` once per project to generate an `AGENTS.md` that is given to the age
 
 - **Terminal UI**: streamed Markdown, per-tool views (diffs, command output, todo lists, subagent activity), multi-line editor with correct CJK/emoji handling and IME cursor placement, `@file` and `/command` completion, `!shell` mode, model / session / agent / theme pickers, permission prompts, message queueing, monochrome themes.
 - **Agents**: `build`, read-only `plan`, subagents `general` and `explore`; your own agents as Markdown files or config.
-- **Tools**: `bash`, `read`, `edit`, `multiedit`, `write`, `glob`, `grep`, `list`, `webfetch`, `todowrite`/`todoread`, `task`, `skill`.
+- **Tools**: `bash`, `read`, `edit`, `multiedit`, `write`, `patch`, `glob`, `grep`, `list`, `webfetch`, `todowrite`/`todoread`, `task`, `skill`.
 - **Local models**: Ollama, LM Studio, llama.cpp and vLLM are detected automatically (see `vedecaps debug local`). Ollama is driven through its native API so the context window is set explicitly instead of being silently cut to 2-4K tokens; small models get a short prompt and the core tools only; tool calls written as text and `<think>` tags are recovered.
 - **Providers**: Anthropic natively; OpenAI, Google Gemini, OpenRouter, xAI, Groq, DeepSeek, Mistral and any OpenAI-compatible endpoint (Ollama, LM Studio, proxies). Model catalog from [models.dev](https://models.dev).
 - **Sessions**: saved on disk, resume, undo/redo with file restore, automatic compaction, fork, export/import.
@@ -53,7 +53,7 @@ The full reference (configuration, permissions, commands, HTTP routes) is in the
 
 ## Not in 0.1.0
 
-Session sharing, subscription-account OAuth login, Bedrock / Vertex / Azure authentication, plugins, SDK, IDE extensions, GitHub Action, ACP, `websearch` and `patch` tools, automatic language-server installation, MCP OAuth, musl builds.
+Session sharing, subscription-account OAuth login, Bedrock / Vertex / Azure authentication, plugins, SDK, IDE extensions, GitHub Action, ACP, the `websearch` tool, automatic language-server installation, MCP OAuth, musl builds.
 
 ## Development
 
