@@ -112,7 +112,8 @@ test("walk honors root and nested ignore files and built-in skips", async () => 
   expect(files).not.toContain("secret/key.txt")
   // built-in skip list
   expect(files.some((f) => f.startsWith("node_modules/"))).toBe(false)
-  expect(files.some((f) => f.startsWith("build/"))).toBe(false)
+  // build output is only hidden when .gitignore says so (a real src/build dir must stay visible)
+  expect(files).toContain("build/out.js")
   expect(files.some((f) => f.startsWith(".git/"))).toBe(false)
 })
 

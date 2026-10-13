@@ -133,4 +133,20 @@ export function run(command: string, args: string[], opts: { cwd?: string; env?:
   })
 }
 
+/**
+ * How to start a child process on this platform. Batch shims (npx.cmd and friends) only run
+ * through cmd.exe, and PATH lookup needs PATHEXT, so bare names are resolved on Windows and
+ * shims get a hand-built, fully quoted command line (use with `windowsVerbatimArguments`).
+ */
+export function launchSpec(command: string[]): { file: string; args: string[]; verbatim: boolean } {
+  const [exe = "", ...args] = command
+  if (process.platform !== "win32") return { file: exe, args, verbatim: false }
+  const file = path.extname(exe) ? exe : (onPath(exe) ?? exe)
+  if (/\.(cmd|bat)$/i.test(file)) {
+    const line = [file, ...args].map((arg) => `"${arg.replace(/"/g, '""')}"`).join(" ")
+    return { file: process.env.ComSpec || "cmd.exe", args: ["/d", "/s", "/c", `"${line}"`], verbatim: true }
+  }
+  return { file, args, verbatim: false }
+}
+
 export { onPath as which }

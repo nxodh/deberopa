@@ -3,7 +3,7 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { createLogger } from "../util/log"
-import { killTree, which } from "../util/shell"
+import { killTree, launchSpec } from "../util/shell"
 
 const log = createLogger("lsp")
 
@@ -110,19 +110,6 @@ export function createMessageDecoder(onMessage: (msg: any) => void): { feed(chun
 export function encodeMessage(msg: unknown): Buffer {
   const body = Buffer.from(JSON.stringify(msg), "utf8")
   return Buffer.concat([Buffer.from(`Content-Length: ${body.length}\r\n\r\n`, "ascii"), body])
-}
-
-/** Batch files only run through cmd.exe, and PATH lookup needs PATHEXT, so resolve bare names on Windows. */
-function launchSpec(command: string[]): { file: string; args: string[]; verbatim: boolean } {
-  const [exe = "", ...args] = command
-  if (process.platform !== "win32") return { file: exe, args, verbatim: false }
-  const file = path.extname(exe) ? exe : (which(exe) ?? exe)
-  if (/\.(cmd|bat)$/i.test(file)) {
-    // Quote every token so install paths with spaces survive cmd's parsing.
-    const line = [file, ...args].map((arg) => `"${arg}"`).join(" ")
-    return { file: process.env.ComSpec || "cmd.exe", args: ["/d", "/s", "/c", `"${line}"`], verbatim: true }
-  }
-  return { file, args, verbatim: false }
 }
 
 interface RpcMessage {

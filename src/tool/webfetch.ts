@@ -145,6 +145,9 @@ export const WebFetchTool = defineTool<WebFetchArgs>({
       }
     }
 
+    if (/^(application\/(pdf|zip|gzip|octet-stream|x-tar|wasm)|audio\/|video\/|font\/)/.test(contentType)) {
+      throw new Error(`Cannot display ${contentType} content (${body.byteLength} bytes). Download it with a shell command instead.`)
+    }
     const text = decodeText(body, rawContentType)
     let output = text
     if (contentType.includes("text/html")) {

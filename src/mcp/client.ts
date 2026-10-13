@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process"
-import path from "node:path"
 import { NAME, VERSION } from "../global"
 import { createLogger } from "../util/log"
+import { launchSpec } from "../util/shell"
 
 const log = createLogger("mcp")
 
@@ -195,15 +195,14 @@ class StdioWire implements Wire {
   ) {
     const [command, ...args] = config.command
     if (!command) throw new McpError(`MCP server "${name}" has an empty command`)
-    // Windows runs npx/uvx through .cmd shims, which only resolve inside a shell.
-    const shell = process.platform === "win32" && !path.extname(command) && !path.isAbsolute(command)
+    const launch = launchSpec(config.command)
     try {
-      this.child = spawn(command, args, {
+      this.child = spawn(launch.file, launch.args, {
         env: { ...process.env, ...config.environment },
         cwd: config.cwd,
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
-        shell,
+        windowsVerbatimArguments: launch.verbatim,
       })
     } catch (err) {
       throw new McpError(`MCP server "${name}" could not be started (${command}): ${err instanceof Error ? err.message : String(err)}`)

@@ -198,6 +198,9 @@ function tokenize(src: string): Token[] {
         }
         continue
       }
+      // A tag name with no closing ">" anywhere after it: the input ended inside the tag.
+      // Dropping the rest (as browsers do) also avoids rescanning to the end for every "<".
+      if (/[a-zA-Z]/.test(next)) break
     }
     // A "<" that starts no tag is plain text.
     text += "<"

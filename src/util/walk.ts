@@ -17,23 +17,7 @@ export interface WalkOptions {
 }
 
 /** Directories skipped by name when respectIgnore is on. Files with these names are still yielded. */
-const SKIP_DIRS = new Set([
-  ".git",
-  "node_modules",
-  ".hg",
-  ".svn",
-  "dist",
-  "build",
-  "target",
-  ".next",
-  ".venv",
-  "venv",
-  "__pycache__",
-  ".cache",
-  "vendor",
-  ".idea",
-  ".vscode",
-])
+const SKIP_DIRS = new Set([".git", "node_modules", ".hg", ".svn", "__pycache__", ".venv"])
 
 const IGNORE_FILES = [".gitignore", ".ignore"]
 
