@@ -76,6 +76,8 @@ export async function main(argv: string[]): Promise<number> {
   if (loaded.files.length === 0) out("  none")
   for (const f of loaded.files) out(`  ${f}`)
   for (const e of loaded.errors) out(`  ERROR ${e}`)
+  out(`  project ${loaded.trusted ? "trusted" : "not trusted"} (${loaded.trustRoot})`)
+  for (const b of loaded.blocked) out(`  ignored: ${b}`)
   out()
   out("Providers with credentials")
   const providers = Object.values(await allProviders()).filter((x) => x.source !== "none")

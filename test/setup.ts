@@ -8,6 +8,8 @@ process.env.VEDECAPS_HOME = home
 process.env.VEDECAPS_DISABLE_MODELS_FETCH = "1"
 // tests must not depend on whatever happens to be listening on the developer's localhost
 process.env.VEDECAPS_DISABLE_LOCAL_DETECT = "1"
+// most tests write their own project config and want it honoured; trust.test.ts turns this off
+process.env.VEDECAPS_TRUST_PROJECT = "1"
 process.env.VEDECAPS_MODELS_URL = "http://127.0.0.1:9/none"
 for (const key of Object.keys(process.env)) {
   if (/(_API_KEY|_TOKEN)$/.test(key) || key === "GOOGLE_GENERATIVE_AI_API_KEY") delete process.env[key]

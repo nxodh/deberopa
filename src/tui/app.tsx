@@ -21,6 +21,9 @@ import { listFiles } from "../util/walk"
 import { mcpStatus } from "../mcp"
 import { lspStatus } from "../lsp"
 import { checkForUpdate } from "../update/update"
+import { loadConfig } from "../config/config"
+import { isTrusted, trustProject } from "../config/trust"
+import { reloadProjectState } from "../config/reload"
 import { app } from "./state"
 import { getTheme, THEMES } from "./theme"
 import { Header, MessageView, Muted, Plain, SPINNER } from "./view"
@@ -54,6 +57,7 @@ const BUILTIN_COMMANDS: Completion[] = [
   { label: "/rename", value: "/rename ", description: "rename this session" },
   { label: "/theme", value: "/theme", description: "switch theme" },
   { label: "/mcp", value: "/mcp", description: "MCP and LSP status" },
+  { label: "/trust", value: "/trust", description: "let this project's config run commands" },
   { label: "/help", value: "/help", description: "keys and commands" },
   { label: "/exit", value: "/exit", description: "quit" },
 ]
@@ -141,6 +145,11 @@ export function App(props: { options: AppOptions }) {
       setHistory(await fs.readFile(historyFile(), "utf8").then((t) => JSON.parse(t) as string[], () => []))
       await app.open(props.options.sessionID)
       setReady(true)
+      void loadConfig().then((loaded) => {
+        if (loaded.blocked.length) {
+          app.showToast(`This project's config wants to run commands (${loaded.blocked.length}); ignored until trusted. Review it, then /trust`, "info", 12000)
+        }
+      })
       void checkForUpdate().then((latest) => latest && app.showToast(`Vedecaps ${latest} is available. Run \`vedecaps upgrade\` to update.`, "info", 8000))
       if (props.options.initialPrompt) submit(props.options.initialPrompt)
     })()
@@ -320,6 +329,27 @@ export function App(props: { options: AppOptions }) {
       case "mcp":
       case "status":
         return status()
+      case "trust": {
+        const root = project().worktree
+        if (await isTrusted(root)) return app.showToast("This project is already trusted.")
+        if (args.trim().toLowerCase() === "yes") {
+          await trustProject(root)
+          await reloadProjectState()
+          app.epoch++
+          return app.showToast("Trusted. The project's config is active now.")
+        }
+        const loaded = await loadConfig()
+        if (!loaded.blocked.length) {
+          await trustProject(root)
+          return app.showToast("Trusted. Nothing in this project's config needed it.")
+        }
+        setDialog({
+          type: "text",
+          title: "Trust this project?",
+          markdown: `## ${root}\n\nIts config asks for:\n\n${loaded.blocked.map((b) => `- ${b}`).join("\n")}\n\nOnly trust a project whose config files you have read. Trusting lets them start programs and choose where requests are sent. Type \`/trust yes\` to confirm.`,
+        })
+        return
+      }
       case "details":
         app.details = !app.details
         app.epoch++

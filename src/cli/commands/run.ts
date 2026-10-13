@@ -53,6 +53,15 @@ export async function main(argv: string[]): Promise<number> {
   const json = values.format === "json"
   await bootstrap({ directory: values.dir ? path.resolve(values.dir) : undefined, printLogs: values["print-logs"], mcp: true })
 
+  const loaded = await (await import("../../config/config")).loadConfig()
+  if (loaded.blocked.length) {
+    process.stderr.write(
+      `Note: ${loaded.blocked.length} part${loaded.blocked.length === 1 ? "" : "s"} of this project's config ${loaded.blocked.length === 1 ? "was" : "were"} ignored because the project is not trusted (${loaded.blocked
+        .map((b) => b.split(": ").pop()!.split(" (")[0])
+        .join(", ")}). Run \`vedecaps trust\` after reviewing it, or set VEDECAPS_TRUST_PROJECT=1 in CI.\n`,
+    )
+  }
+
   let message = positionals.join(" ").trim()
   const piped = (await readStdin({ firstByteTimeoutMs: message ? 400 : 3000 })).trim()
   if (piped) message = message ? `${message}\n\n${piped}` : piped

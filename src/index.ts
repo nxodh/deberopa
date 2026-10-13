@@ -49,6 +49,10 @@ const COMMANDS: Record<string, () => Promise<Entry>> = {
     const m = await import("./cli/commands/debug")
     return { spec: m.spec, run: m.main }
   },
+  trust: async () => {
+    const m = await import("./cli/commands/trust")
+    return { spec: m.spec, run: m.main }
+  },
   acp: async () => {
     const m = await import("./cli/commands/acp")
     return { spec: m.spec, run: m.main }
@@ -82,6 +86,7 @@ const SUMMARY: [string, string][] = [
   ["vedecaps acp", "run as an Agent Client Protocol server (editors)"],
   ["vedecaps upgrade [version]", "update vedecaps to the latest release"],
   ["vedecaps uninstall", "remove vedecaps from this machine"],
+  ["vedecaps trust [path]", "allow a project's config to run commands"],
   ["vedecaps debug", "show paths, config and tooling"],
 ]
 

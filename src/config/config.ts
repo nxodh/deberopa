@@ -7,6 +7,7 @@ import { project } from "../project"
 import { exists, findUp } from "../util/fs"
 import { createLogger } from "../util/log"
 import type { McpServerConfig } from "../mcp/client"
+import { isTrusted, stripUntrusted } from "./trust"
 
 const log = createLogger("config")
 
@@ -89,6 +90,8 @@ export interface Config {
   snapshot?: boolean
   /** false stops Vedecaps from offering to install missing language servers. */
   lsp_install?: boolean
+  /** Local plugin files (paths relative to the config file's project, or absolute). */
+  plugin?: string[]
   /** Web search through Exa. A key lifts the shared free-tier limit. */
   websearch?: { enabled?: boolean; apiKey?: string }
   /** false skips probing localhost for Ollama, LM Studio, llama.cpp and vLLM at startup. */
@@ -117,6 +120,11 @@ export interface LoadedConfig {
   /** Files that were actually read, lowest precedence first. */
   files: string[]
   errors: string[]
+  /** Parts of project config that were ignored because the project is not trusted. */
+  blocked: string[]
+  /** The project folder the trust decision is about. */
+  trustRoot: string
+  trusted: boolean
 }
 
 const FILE_NAMES = [`${NAME}.jsonc`, `${NAME}.json`]
@@ -143,12 +151,19 @@ async function load(): Promise<LoadedConfig> {
   const { directory, worktree } = project()
   const errors: string[] = []
   const files: string[] = []
+  const blocked: string[] = []
   let config: Config = {}
+  const trusted = await isTrusted(worktree)
 
-  const merge = async (file: string) => {
+  const merge = async (file: string, fromProject = false) => {
     if (!(await exists(file))) return
     try {
-      const parsed = await readConfigFile(file)
+      let parsed = await readConfigFile(file)
+      if (fromProject && !trusted) {
+        const stripped = stripUntrusted(parsed)
+        parsed = stripped.config
+        blocked.push(...stripped.blocked.map((b) => `${path.relative(worktree, file) || file}: ${b}`))
+      }
       config = mergeConfig(config, parsed)
       files.push(file)
     } catch (err) {
@@ -163,10 +178,10 @@ async function load(): Promise<LoadedConfig> {
 
   // Project files apply root → cwd so the nearest file wins.
   const projectFiles = (await findUp(FILE_NAMES, directory, worktree)).reverse()
-  for (const file of projectFiles) await merge(file)
+  for (const file of projectFiles) await merge(file, true)
 
   const dotDirs = (await findUp([`.${NAME}`], directory, worktree)).reverse()
-  for (const dir of dotDirs) for (const name of FILE_NAMES) await merge(path.join(dir, name))
+  for (const dir of dotDirs) for (const name of FILE_NAMES) await merge(path.join(dir, name), true)
 
   if (process.env.VEDECAPS_CONFIG_CONTENT) {
     try {
@@ -176,7 +191,8 @@ async function load(): Promise<LoadedConfig> {
     }
   }
 
-  return { config, directories: [Paths.config, ...dotDirs], files, errors }
+  if (blocked.length) log.warn("ignored untrusted project config", blocked)
+  return { config, directories: [Paths.config, ...dotDirs], files, errors, blocked, trustRoot: worktree, trusted }
 }
 
 function parseText(text: string, label: string): Config {
