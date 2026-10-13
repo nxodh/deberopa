@@ -51,6 +51,30 @@ You have reached the maximum number of steps for this turn, and tools are now di
 
 export { PLAN_REMINDER, BUILD_SWITCH }
 
+/** Short prompt for small context windows, where the full prompt and tool list would eat most of it. */
+const COMPACT_PROMPT = `You are Vedecaps, a coding agent running in the user's terminal. Help with software engineering tasks.
+
+- Do what was asked, no more. Read files before changing them and follow the project's existing style.
+- Use the tools to look at the code and to make changes; do not guess file contents.
+- Make small, focused edits, then check them (run tests or the build when the project has them).
+- Never run destructive commands or commit unless asked.
+- Be brief. Reply in the user's language. Refer to code as path:line.`
+
+/** Context windows at or below this get the compact prompt on local servers. */
+export const SMALL_CONTEXT = 16_384
+
+export function useCompactPrompt(provider: { local?: boolean }, model: Model): boolean {
+  const explicit = (model.options as Record<string, unknown> | undefined)?.compact_prompt
+  if (typeof explicit === "boolean") return explicit
+  return !!provider.local && model.limit.context > 0 && model.limit.context <= SMALL_CONTEXT
+}
+
+/** First paragraph of a tool description, for compact mode. */
+export function shortenDescription(text: string, max = 280): string {
+  const first = text.split(/\n\s*\n/)[0]!.replace(/\s+/g, " ").trim()
+  return first.length > max ? first.slice(0, max - 1) + "…" : first
+}
+
 function environment(model: Model): string {
   const p = project()
   const shell = detectShell()
@@ -128,15 +152,14 @@ export async function instructionFiles(): Promise<{ path: string; content: strin
  * System prompt blocks, most stable first so the provider-side prompt cache keeps hitting:
  * the base (or agent) prompt, then environment and project instructions.
  */
-export async function systemPrompt(input: { agent: AgentInfo; model: Model }): Promise<string[]> {
-  const head = input.agent.prompt
-    ? input.agent.builtIn
-      ? `${BASE_PROMPT}\n\n# Your role\n${input.agent.prompt}`
-      : input.agent.prompt
-    : BASE_PROMPT
+export async function systemPrompt(input: { agent: AgentInfo; model: Model; compact?: boolean }): Promise<string[]> {
+  const base = input.compact ? COMPACT_PROMPT : BASE_PROMPT
+  const head = input.agent.prompt ? (input.agent.builtIn ? `${base}\n\n# Your role\n${input.agent.prompt}` : input.agent.prompt) : base
   const tail: string[] = [environment(input.model)]
   for (const file of await instructionFiles()) {
-    tail.push(`Instructions from: ${file.path}\n${file.content}`)
+    // a small window cannot afford a long rules file; keep the start, which holds the essentials
+    const content = input.compact && file.content.length > 3000 ? file.content.slice(0, 3000) + "\n[…truncated for the small context window]" : file.content
+    tail.push(`Instructions from: ${file.path}\n${content}`)
   }
   return [head, tail.join("\n\n")]
 }

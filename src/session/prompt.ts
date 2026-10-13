@@ -19,7 +19,7 @@ import { changedFiles, track } from "../snapshot/snapshot"
 import { project } from "../project"
 import { compact, shouldCompact } from "./compaction"
 import { toModelMessages } from "./convert"
-import { MAX_STEPS_REMINDER, systemPrompt } from "./system"
+import { MAX_STEPS_REMINDER, shortenDescription, systemPrompt, useCompactPrompt } from "./system"
 import {
   addMessage,
   createSession,
@@ -325,7 +325,8 @@ interface StepInput {
 async function runStep(input: StepInput): Promise<{ next: "continue" | "stop" | "compact"; message?: AssistantMessage }> {
   const { sessionID, agent, provider, model, signal } = input
   const tools = input.finalStep ? [] : model.toolCall ? await toolsFor(agent) : []
-  const system = await systemPrompt({ agent, model })
+  const compact = useCompactPrompt(provider, model)
+  const system = await systemPrompt({ agent, model, compact })
   const history = toModelMessages(await getMessages(sessionID))
   if (input.finalStep) history.push({ role: "user", content: [{ type: "text", text: MAX_STEPS_REMINDER }] })
 
@@ -422,7 +423,7 @@ async function runStep(input: StepInput): Promise<{ next: "continue" | "stop" | 
         model,
         system,
         messages: history,
-        tools: tools.map((t) => ({ name: t.id, description: t.description, parameters: t.parameters })),
+        tools: tools.map((t) => ({ name: t.id, description: compact ? shortenDescription(t.description) : t.description, parameters: t.parameters })),
         signal,
         temperature: agent.temperature,
         topP: agent.topP,

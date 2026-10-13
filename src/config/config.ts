@@ -29,7 +29,7 @@ export interface ModelConfig {
 export interface ProviderConfig {
   name?: string
   /** Wire protocol. Defaults to "openai" (chat completions) for anything that is not Anthropic. */
-  protocol?: "anthropic" | "openai"
+  protocol?: "anthropic" | "openai" | "ollama"
   /** Base URL of the API. */
   api?: string
   /** Environment variables that may hold the API key. */
@@ -87,6 +87,8 @@ export interface Config {
   username?: string
   autoupdate?: boolean | "notify"
   snapshot?: boolean
+  /** false skips probing localhost for Ollama, LM Studio, llama.cpp and vLLM at startup. */
+  local_detect?: boolean
   reasoning_effort?: "low" | "medium" | "high" | "xhigh" | "max"
   provider?: Record<string, ProviderConfig>
   disabled_providers?: string[]

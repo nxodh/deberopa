@@ -1,5 +1,6 @@
 import { getConfig, readState, type ModelConfig } from "../config/config"
 import { allCredentials } from "../auth/auth"
+import { detectLocalServers, discoverOpenAIModels, isLocalURL, type DetectedModel } from "./local"
 import { getCatalog, type CatalogModel, type CatalogProvider } from "./models"
 import { registerSecret } from "../util/redact"
 import type { Model, ProviderInfo } from "./types"
@@ -21,7 +22,7 @@ const KNOWN_BASE_URLS: Record<string, string> = {
 }
 
 /** Providers tried first when nothing has been chosen yet. */
-const PRIORITY = ["anthropic", "openai", "google", "openrouter", "xai", "groq", "deepseek", "mistral"]
+const PRIORITY = ["anthropic", "openai", "google", "openrouter", "xai", "groq", "deepseek", "mistral", "ollama", "lmstudio", "llamacpp", "vllm"]
 const PREFERRED_MODELS: Record<string, string[]> = {
   anthropic: ["claude-opus-5-5", "claude-sonnet-5-5"],
 }
@@ -71,10 +72,14 @@ async function build(): Promise<Record<string, ProviderInfo>> {
     const entry: CatalogProvider | undefined = catalog[id]
     const override = config.provider?.[id]
     const isAnthropic = override?.protocol === "anthropic" || (!override?.protocol && (id === "anthropic" || entry?.npm === "@ai-sdk/anthropic"))
-    const protocol = isAnthropic ? "anthropic" : "openai"
-    const baseURL = override?.options?.baseURL ?? override?.api ?? entry?.api ?? KNOWN_BASE_URLS[id]
+    let baseURL = override?.options?.baseURL ?? override?.api ?? entry?.api ?? KNOWN_BASE_URLS[id]
+    // An Ollama endpoint defaults to Ollama's own API: its OpenAI-compatible one cannot set the
+    // context window, so prompts silently get cut to 2-4K tokens. "protocol": "openai" opts out.
+    const looksLikeOllama = !isAnthropic && !override?.protocol && (id === "ollama" || /:11434(\/|$)/.test(baseURL ?? ""))
+    const protocol: ProviderInfo["protocol"] = isAnthropic ? "anthropic" : override?.protocol === "ollama" || looksLikeOllama ? "ollama" : "openai"
+    if (protocol === "ollama") baseURL = (baseURL ?? "http://127.0.0.1:11434").replace(/\/+$/, "").replace(/\/v1$/, "")
     // Without an endpoint we cannot talk to it (Bedrock, Vertex and friends need bespoke auth).
-    if (protocol === "openai" && !baseURL) continue
+    if (protocol !== "anthropic" && !baseURL) continue
 
     const env = override?.env ?? entry?.env ?? []
     const envKey = env.map((name) => process.env[name]).find((v) => v && v.trim() !== "")
@@ -116,9 +121,12 @@ async function build(): Promise<Record<string, ProviderInfo>> {
       headers: override?.options?.headers,
       timeout: override?.options?.timeout,
       source,
+      local: isLocalURL(baseURL),
       models,
     }
   }
+
+  await addLocalProviders(result, config)
 
   const disabled = new Set(config.disabled_providers ?? [])
   const enabled = config.enabled_providers ? new Set(config.enabled_providers) : undefined
@@ -126,6 +134,67 @@ async function build(): Promise<Record<string, ProviderInfo>> {
     if (disabled.has(id) || (enabled && !enabled.has(id))) delete result[id]
   }
   return result
+}
+
+function detectedToModel(providerID: string, d: DetectedModel, existing?: ModelConfig): Model {
+  const base: CatalogModel = {
+    id: d.id,
+    name: d.name,
+    reasoning: d.reasoning,
+    tool_call: d.toolCall,
+    attachment: d.attachment,
+    temperature: true,
+    cost: { input: 0, output: 0 },
+    limit: { context: d.context ?? 8192, output: d.reasoning ? 16_384 : 8192 },
+  }
+  const model = toModel(providerID, d.id, base, existing)
+  if (d.details) model.options = { ...model.options, details: d.details }
+  return model
+}
+
+/**
+ * Servers the user runs themselves. Found ones are added when not configured, and fill in
+ * models for ones that are. Config always wins, so a pinned `limit.context` is respected.
+ */
+async function addLocalProviders(result: Record<string, ProviderInfo>, config: Awaited<ReturnType<typeof getConfig>>) {
+  const configured = Object.entries(result).filter(([, p]) => p.local && p.protocol !== "anthropic")
+
+  // providers configured by URL only: ask the server what it has
+  await Promise.all(
+    configured.map(async ([id, provider]) => {
+      if (Object.keys(provider.models).length > 0 || !provider.baseURL || process.env.VEDECAPS_DISABLE_LOCAL_DETECT) return
+      if (provider.protocol === "ollama") return // filled in by detection below
+      const found = await discoverOpenAIModels(provider.baseURL, provider.headers, provider.apiKey)
+      for (const d of found) provider.models[d.id] = detectedToModel(id, d, config.provider?.[id]?.models?.[d.id])
+      if (found.length) provider.source = provider.source === "none" ? "config" : provider.source
+    }),
+  )
+
+  if (config.local_detect === false) return
+  for (const server of await detectLocalServers()) {
+    const existing = result[server.id]
+    if (existing && existing.source !== "none") {
+      // configured by the user: add any models they did not list
+      for (const d of Object.values(server.models)) {
+        if (!existing.models[d.id]) existing.models[d.id] = detectedToModel(server.id, d, config.provider?.[server.id]?.models?.[d.id])
+      }
+      continue
+    }
+    const models: Record<string, Model> = {}
+    for (const d of Object.values(server.models)) models[d.id] = detectedToModel(server.id, d, config.provider?.[server.id]?.models?.[d.id])
+    result[server.id] = {
+      id: server.id,
+      name: config.provider?.[server.id]?.name ?? server.name,
+      protocol: server.protocol,
+      baseURL: server.baseURL,
+      env: [],
+      headers: config.provider?.[server.id]?.options?.headers,
+      timeout: config.provider?.[server.id]?.options?.timeout,
+      source: "local",
+      local: true,
+      models: { ...models, ...Object.fromEntries(Object.entries(result[server.id]?.models ?? {})) },
+    }
+  }
 }
 
 /** Providers that can actually be called right now. */

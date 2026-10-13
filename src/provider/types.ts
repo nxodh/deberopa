@@ -19,14 +19,16 @@ export interface Model {
 export interface ProviderInfo {
   id: string
   name: string
-  protocol: "anthropic" | "openai"
+  protocol: "anthropic" | "openai" | "ollama"
+  /** A server on this machine or its network (loopback, private ranges). */
+  local?: boolean
   baseURL?: string
   env: string[]
   apiKey?: string
   headers?: Record<string, string>
   timeout?: number
   /** Where the credential came from; "none" means the provider is known but not usable yet. */
-  source: "env" | "auth" | "config" | "none"
+  source: "env" | "auth" | "config" | "local" | "none"
   models: Record<string, Model>
 }
 

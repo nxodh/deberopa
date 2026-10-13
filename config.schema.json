@@ -65,9 +65,10 @@
           "protocol": {
             "enum": [
               "anthropic",
-              "openai"
+              "openai",
+              "ollama"
             ],
-            "description": "Wire protocol; defaults to openai (chat completions) for everything except Anthropic"
+            "description": "Wire protocol. Defaults to openai (chat completions) except Anthropic; an Ollama endpoint defaults to ollama (its native API, which can set the context window)"
           },
           "api": {
             "type": "string",
@@ -161,7 +162,7 @@
                 },
                 "options": {
                   "type": "object",
-                  "description": "Extra fields merged into the request body"
+                  "description": "Extra request fields. Ollama: num_ctx, keep_alive, think, plus any sampling option. Any model: compact_prompt (true/false) forces or disables the short system prompt used for small context windows"
                 }
               }
             }
@@ -532,6 +533,10 @@
           "type": "string"
         }
       }
+    },
+    "local_detect": {
+      "type": "boolean",
+      "description": "false skips probing localhost for Ollama, LM Studio, llama.cpp and vLLM at startup"
     }
   }
 }
