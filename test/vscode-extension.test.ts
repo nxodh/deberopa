@@ -63,7 +63,10 @@ mock.module("vscode", () => ({
   },
 }))
 
-const ext = await import("../ide/vscode/src/extension")
+// The extension is typechecked in its own project (which has the vscode typings); a non-literal
+// specifier keeps this root project from trying to resolve them.
+const extensionPath = "../ide/vscode/src/extension"
+const ext: { activate(context: unknown): void; deactivate(): void } = await import(extensionPath)
 
 const editor = (file: string, start: [number, number], end: [number, number]) => ({
   document: { uri: { scheme: "file", fsPath: file } },
