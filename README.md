@@ -99,7 +99,7 @@ git diff | vedecaps run "이 변경에 대한 커밋 메시지를 써줘"
 
 디자인은 로고를 따라 흑백만 사용합니다. 강조는 굵기·흐림·반전으로만 표현합니다.
 
-현재 개발 브랜치의 TUI는 터미널 전체 화면을 사용합니다. 입력창과 상태줄은 아래에 고정되며, `PageUp`·`PageDown`으로 대화를 스크롤하고 `Ctrl+Home`·`Ctrl+End`로 처음·끝으로 이동합니다. 맨 아래에서는 새 응답을 따라가고, 이전 대화를 읽는 동안에는 화면을 고정합니다. 종료하면 원래 터미널 화면으로 돌아옵니다. 이 변경은 아직 0.1.2 공개 실행파일에 포함되지 않았습니다.
+0.1.3부터 TUI는 터미널 전체 화면을 사용합니다. 입력창과 상태줄은 아래에 고정되며, `PageUp`·`PageDown`으로 대화를 스크롤하고 `Ctrl+Home`·`Ctrl+End`로 처음·끝으로 이동합니다. 맨 아래에서는 새 응답을 따라가고, 이전 대화를 읽는 동안에는 화면을 고정합니다. 종료하면 원래 터미널 화면으로 돌아옵니다. 0.1.2 사용자는 `vedecaps upgrade`로 업데이트하세요.
 
 ## 모델 제공자
 
@@ -385,7 +385,7 @@ vedecaps pr 123 --no-ui > review.md   # UI 없이 결과만 출력
 ## GitHub Action
 
 ```yaml
-- uses: nxodh/vedecaps@v0.1.2
+- uses: nxodh/vedecaps@v0.1.3
   env:
     ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
   with:
@@ -411,7 +411,7 @@ vedecaps pr 123 --no-ui > review.md   # UI 없이 결과만 출력
 permissions: { contents: write, pull-requests: write }
 steps:
   - uses: actions/checkout@v4
-  - uses: nxodh/vedecaps@v0.1.2
+  - uses: nxodh/vedecaps@v0.1.3
     env: { ANTHROPIC_API_KEY: "${{ secrets.ANTHROPIC_API_KEY }}" }
     with:
       prompt: 의존성 경고를 고쳐줘

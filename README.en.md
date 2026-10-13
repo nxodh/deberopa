@@ -58,7 +58,7 @@ The full reference (configuration, permissions, commands, HTTP routes) is in the
 - **Language servers on request**: TypeScript, Pyright, gopls and rust-analyzer are offered for installation (with consent, into Vedecaps' own directory).
 - **Project trust**: an untrusted repository's config cannot start programs, route requests/keys elsewhere, or silence permission prompts until you run `vedecaps trust`.
 - **Plugins**: local JS/TS files adding tools and hooks (`tool.execute.before/after`, `chat.system`, `event`); work in the compiled binary without Node or Bun.
-- **SDK** (`sdk/js`), **ACP server** (`vedecaps acp`, for Zed and other editors), **VS Code extension** (`ide/vscode`), **GitHub Action** (`uses: nxodh/vedecaps@v0.1.2`).
+- **SDK** (`sdk/js`), **ACP server** (`vedecaps acp`, for Zed and other editors), **VS Code extension** (`ide/vscode`), **GitHub Action** (`uses: nxodh/vedecaps@v0.1.3`).
 - `@file#L10-20` mentions attach only those lines.
 
 The Korean README documents all of these in detail.
@@ -92,9 +92,11 @@ Pushing a `v*` tag that matches `package.json` builds and publishes a release.
 
 [MIT](LICENSE)
 
-## Added in 0.1.2
+## Added in 0.1.3
 
-The current development branch adds a full-screen terminal UI with a fixed prompt/status bar, PageUp/PageDown history navigation, Ctrl+Home/End, and terminal restoration on exit or external-editor handoff. This UI change is not in the published 0.1.2 binary yet.
+The terminal UI uses the full terminal screen with a fixed prompt/status bar, PageUp/PageDown history navigation, Ctrl+Home/End, and terminal restoration on exit or external-editor handoff. Update with `vedecaps upgrade`.
+
+## Added in 0.1.2
 
 - Configurable prompt key bindings under `keybinds`: comma-separated alternatives, ctrl/alt/shift modifiers, and `none` to disable. For example, `{"submit":"ctrl+g","newline":"enter","models":"ctrl+p"}`. `/help` shows the configured bindings; restart after editing config. User overrides win over conflicting defaults. Dialog selection keys retain their defaults.
 - Explicit, exact-version npm plugins: `vedecaps plugin install name@1.2.3`, `list`, and `remove`. Review the code first: plugins run with your full privileges. Non-interactive installs need `--yes`. Lifecycle scripts are disabled, lockfiles retained, and URL/file/git/range specs rejected. Config uses `npm:name@1.2.3`; startup never installs packages.
