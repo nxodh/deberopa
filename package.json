@@ -1,0 +1,33 @@
+{
+  "name": "vedecaps",
+  "version": "0.1.0",
+  "description": "Vedecaps — an AI coding agent for your terminal",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nxodh/vedecaps.git"
+  },
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "build": "bun run script/build.ts",
+    "build:all": "bun run script/build.ts --all"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.3",
+    "@types/react": "^19.3.0",
+    "bun": "^1.4.3",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
+    "diff": "^9.0.0",
+    "ignore": "^7.0.12",
+    "ink": "^8.0.0",
+    "jsonc-parser": "^3.3.1",
+    "react": "^19.3.0"
+  }
+}
