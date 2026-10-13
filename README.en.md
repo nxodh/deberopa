@@ -37,7 +37,7 @@ vedecaps run "explain what this repo does"     # non-interactive
 
 Run `/init` once per project to generate an `AGENTS.md` that is given to the agent at the start of every session.
 
-## What is in 0.1.0
+## What is in 0.1
 
 - **Terminal UI**: streamed Markdown, per-tool views (diffs, command output, todo lists, subagent activity), multi-line editor with correct CJK/emoji handling and IME cursor placement, `@file` and `/command` completion, `!shell` mode, model / session / agent / theme pickers, permission prompts, message queueing, monochrome themes.
 - **Agents**: `build`, read-only `plan`, subagents `general` and `explore`; your own agents as Markdown files or config.
@@ -51,9 +51,21 @@ Run `/init` once per project to generate an `AGENTS.md` that is given to the age
 
 The full reference (configuration, permissions, commands, HTTP routes) is in the [Korean README](README.md); every CLI command also documents itself with `--help`, and the config file has a JSON Schema at [`config.schema.json`](config.schema.json).
 
-## Not in 0.1.0
+## Also in 0.1.1
 
-Session sharing, subscription-account OAuth login, Bedrock / Vertex / Azure authentication, plugins, SDK, IDE extensions, GitHub Action, ACP, the `websearch` tool, automatic language-server installation, MCP OAuth, musl builds.
+- **Web search** through Exa (asks before sending a query; `EXA_API_KEY` lifts the shared free limit).
+- **`patch` tool**: multi-file create/update/move/delete in one atomic `*** Begin Patch` block.
+- **Language servers on request**: TypeScript, Pyright, gopls and rust-analyzer are offered for installation (with consent, into Vedecaps' own directory).
+- **Project trust**: an untrusted repository's config cannot start programs, route requests/keys elsewhere, or silence permission prompts until you run `vedecaps trust`.
+- **Plugins**: local JS/TS files adding tools and hooks (`tool.execute.before/after`, `chat.system`, `event`); work in the compiled binary without Node or Bun.
+- **SDK** (`sdk/js`), **ACP server** (`vedecaps acp`, for Zed and other editors), **VS Code extension** (`ide/vscode`), **GitHub Action** (`uses: nxodh/vedecaps@v0.1.1`).
+- `@file#L10-20` mentions attach only those lines.
+
+The Korean README documents all of these in detail.
+
+## Not yet
+
+Session sharing, subscription-account OAuth login (deliberately not implemented), Bedrock / Vertex / Azure authentication, npm-packaged plugins, SDKs for other languages, automatic installation of clangd / zls / ruby-lsp / lua-language-server, MCP OAuth, configurable key bindings, musl builds.
 
 ## Development
 

@@ -15,3 +15,6 @@ auth.json
 /data/
 /logs/
 state.json
+
+out/
+*.vsix

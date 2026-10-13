@@ -126,6 +126,15 @@ export async function resolveTarget(sessionID: string, input: { agent?: string; 
 
 const MENTION = /(?<![\w`/])@([^\s@`,;:!?()[\]{}<>"']+(?:\.[\w-]+)?)/g
 
+/** `src/a.ts#L10-20` (or `#L10`) -> the path and a 1-based inclusive line range. */
+export function splitLineRange(raw: string): { target: string; start?: number; end?: number } {
+  const m = /^(.*?)#L(\d+)(?:-L?(\d+))?$/.exec(raw)
+  if (!m) return { target: raw }
+  const start = Number(m[2])
+  const end = m[3] ? Number(m[3]) : start
+  return { target: m[1]!, start: Math.min(start, end), end: Math.max(start, end) }
+}
+
 /** Turn `@path` mentions into attached content, the same way the model would have fetched it. */
 async function resolveMentions(sessionID: string, text: string, agentName: string): Promise<Part[]> {
   const parts: Part[] = []
@@ -159,7 +168,8 @@ async function resolveMentions(sessionID: string, text: string, agentName: strin
       continue
     }
 
-    const target = path.isAbsolute(raw) ? raw : path.resolve(directory, raw)
+    const ranged = splitLineRange(raw)
+    const target = path.isAbsolute(ranged.target) ? ranged.target : path.resolve(directory, ranged.target)
     const stat = await fs.stat(target).catch(() => undefined)
     if (!stat) continue
     try {
@@ -173,7 +183,8 @@ async function resolveMentions(sessionID: string, text: string, agentName: strin
         })
         continue
       }
-      const result = await ReadTool.execute({ filePath: target }, ctx)
+      const readArgs = ranged.start ? { filePath: target, offset: ranged.start, limit: ranged.end! - ranged.start + 1 } : { filePath: target }
+      const result = await ReadTool.execute(readArgs, ctx)
       if (result.attachments?.length) {
         for (const file of result.attachments) {
           parts.push({ id: createID("part"), type: "file", mime: file.mime, filename: file.filename, data: file.data } satisfies FilePart)
@@ -183,7 +194,7 @@ async function resolveMentions(sessionID: string, text: string, agentName: strin
           id: createID("part"),
           type: "text",
           synthetic: true,
-          text: `Called the read tool with the following input: ${JSON.stringify({ filePath: target })}\n\n${result.output}`,
+          text: `Called the read tool with the following input: ${JSON.stringify(readArgs)}\n\n${result.output}`,
         })
       }
     } catch (err) {

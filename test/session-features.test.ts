@@ -120,3 +120,19 @@ test("export to JSON and markdown, import as a new session, fork", async () => {
 })
 
 afterAll(endProject)
+
+test("an @file#L2-3 mention attaches only those lines", async () => {
+  const file = path.join(dir, "ranged.txt")
+  fs.writeFileSync(file, ["one", "two", "three", "four"].join("\n") + "\n")
+  const session = await createSession()
+  mock.queue(reply.text("ok"))
+  await prompt({ sessionID: session.id, text: "look at @ranged.txt#L2-3" })
+  const user = (await getMessages(session.id)).find((m) => m.role === "user")!
+  const attached = user.parts.filter((p) => p.type === "text" && p.synthetic).map((p) => (p.type === "text" ? p.text : "")).join("\n")
+  expect(attached).toContain('"offset":2')
+  expect(attached).toContain('"limit":2')
+  expect(attached).toContain("two")
+  expect(attached).toContain("three")
+  expect(attached).not.toContain("one\n")
+  expect(attached).not.toContain("four")
+})

@@ -224,6 +224,8 @@ permission:
 | `bash` | 셸 명령 (패턴으로 세분화 가능) |
 | `read` | 파일 읽기 |
 | `webfetch` | URL 가져오기 |
+| `websearch` | 웹 검색(검색어가 Exa로 전송됨, 기본값 `ask`) |
+| `lsp_install` | 언어 서버 설치(기본값 `ask`) |
 | `task`, `skill` | 서브에이전트, 스킬 |
 | `external_directory` | 프로젝트 밖 경로 |
 | `doom_loop` | 같은 도구를 같은 입력으로 3회 연속 호출 |
@@ -241,11 +243,12 @@ permission:
 | `patch` | `*** Begin Patch` 형식으로 여러 파일을 한 번에 생성·수정·이동·삭제(전부 적용되거나 아무것도 적용되지 않음) |
 | `glob`, `grep`, `list` | 파일·내용 검색 (`.gitignore` 반영) |
 | `webfetch` | 웹 페이지를 Markdown으로 가져오기 |
+| `websearch` | 웹 검색([Exa](https://exa.ai) 경유). 처음 쓸 때 허락을 묻고, 검색어는 Exa로 전송됨 |
 | `todowrite`, `todoread` | 작업 목록 |
 | `task` | 서브에이전트에 위임 |
 | `skill` | 스킬 불러오기 |
 
-파일을 수정하면 프로젝트의 포매터(prettier, biome, gofmt, rustfmt, ruff 등)가 설치되어 있을 때 자동으로 실행되고, 설치된 언어 서버(TypeScript, gopls, pyright, rust-analyzer, clangd 등)의 오류가 에이전트에게 전달됩니다. 언어 서버와 포매터를 자동으로 설치하지는 않습니다.
+파일을 수정하면 프로젝트의 포매터(prettier, biome, gofmt, rustfmt, ruff 등)가 설치되어 있을 때 자동으로 실행되고, 설치된 언어 서버(TypeScript, gopls, pyright, rust-analyzer, clangd 등)의 오류가 에이전트에게 전달됩니다. 언어 서버가 없으면 TypeScript, Pyright, gopls, rust-analyzer에 한해 **설치할지 물어봅니다**(허락한 경우에만, Vedecaps의 데이터 디렉터리 안에 설치하고 전역 설치는 하지 않음). `"lsp_install": false`로 끌 수 있습니다. 포매터는 자동 설치하지 않습니다.
 
 ## 커스텀 명령
 
@@ -278,6 +281,98 @@ vedecaps mcp list
 
 로컬(stdio) 서버와 원격(Streamable HTTP, 구형 SSE) 서버를 지원합니다. 도구는 `서버이름_도구이름`으로 노출됩니다. OAuth 인증이 필요한 서버는 아직 지원하지 않으며, 헤더로 토큰을 전달해야 합니다.
 
+## 웹 검색
+
+`websearch` 도구는 [Exa](https://exa.ai)의 호스팅 MCP 서버를 사용합니다. 키 없이도 쓸 수 있지만 무료 한도가 공유됩니다. 한도에 걸리면 [API 키](https://dashboard.exa.ai/api-keys)를 만들어 `EXA_API_KEY` 환경 변수 또는 설정의 `websearch.apiKey`에 넣으세요. 검색어가 외부(Exa)로 나가므로 처음 쓸 때 허락을 묻습니다. 끄려면 `"websearch": { "enabled": false }`.
+
+## 프로젝트 신뢰
+
+저장소 안의 `vedecaps.json`은 "시작할 때 이 프로그램을 실행해라"(MCP·포매터·LSP·플러그인)나 "요청을 이 주소로 보내라"(프로바이더 `api`/`baseURL`/`env`/`headers`, API 키가 함께 전송됨) 같은 내용을 담을 수 있습니다. 그래서 **신뢰하지 않은 프로젝트의 이런 항목은 무시**하고, "묻지 않고 허용"하는 `permission` 규칙도 무시합니다. 나머지(모델, 에이전트, 명령 등)는 그대로 적용됩니다.
+
+```sh
+vedecaps trust --status   # 무엇이 무시되고 있는지
+vedecaps trust            # 설정 파일을 읽어 본 뒤 이 프로젝트를 신뢰
+vedecaps trust --revoke
+```
+
+TUI에서는 `/trust`를 씁니다. CI에서는 `VEDECAPS_TRUST_PROJECT=1`로 체크아웃을 보증할 수 있습니다. 사용자 전역 설정과 `VEDECAPS_CONFIG_CONTENT`는 필터링하지 않습니다.
+
+## 플러그인
+
+플러그인은 ES 모듈 파일(`.js`, `.mjs`, `.ts`)이며, 함수를 default export하면 됩니다. 컴파일된 실행 파일에서도 Node나 Bun 없이 동작합니다.
+
+```js
+// ~/.config/vedecaps/plugin/hello.js   (Windows: %APPDATA%\vedecaps\plugin\hello.js)
+/** @type {import("@vedecaps/sdk").Plugin} */
+export default async ({ directory }) => ({
+  // 모델에게 주는 도구
+  tool: {
+    shout: {
+      description: "문자열을 대문자로 바꿉니다",
+      parameters: { type: "object", required: ["text"], properties: { text: { type: "string" } } },
+      execute: async ({ text }) => text.toUpperCase(),
+    },
+  },
+  // 도구 실행 전: 인자 수정 또는 throw로 차단
+  "tool.execute.before": async ({ tool }, output) => {
+    if (tool === "bash" && /rm -rf/.test(output.args.command)) throw new Error("rm -rf 는 허용되지 않습니다")
+  },
+  // 도구 실행 후: 결과 수정
+  "tool.execute.after": async ({ tool }, output) => {},
+  // 시스템 프롬프트에 블록 추가
+  "chat.system": async ({ agent }, output) => { output.system.push("항상 한국어로 답하세요.") },
+  // 모든 이벤트(메시지, 권한 요청, 파일 수정 ...)
+  event: async (event) => {},
+})
+```
+
+로드 위치: 전역 설정 디렉터리의 `plugin/`, 설정의 `"plugin": ["./경로.js"]`, 그리고 **신뢰한** 프로젝트의 `.vedecaps/plugin/`. 플러그인은 사용자 권한으로 실행되므로 직접 읽어 본 것만 설치하세요. `vedecaps debug`에서 로드된 플러그인과 실패 원인을 볼 수 있습니다. 훅이 예외를 던져도 에이전트는 멈추지 않으며(`tool.execute.before`는 의도된 차단으로 취급), npm 패키지 형태의 플러그인은 아직 지원하지 않습니다.
+
+## SDK
+
+[`sdk/js`](sdk/js)의 `@vedecaps/sdk`는 HTTP API용 의존성 없는 TypeScript 클라이언트입니다(npm에는 아직 게시하지 않았습니다).
+
+```ts
+import { startServer, messageText } from "@vedecaps/sdk"
+
+const { client, close } = await startServer({ cwd: "/path/to/project" }) // `vedecaps serve`를 띄움
+const session = await client.session.create({ title: "demo" })
+const reply = await client.session.prompt(session.id, { text: "README.md를 요약해줘" })
+console.log(messageText(reply))
+for await (const event of client.event.subscribe()) { /* message.part.updated, permission.asked ... */ }
+await close()
+```
+
+## 에디터 연동
+
+**ACP (Zed 등)**: `vedecaps acp`는 [Agent Client Protocol](https://agentclientprotocol.com) 서버로 stdin/stdout에서 동작합니다. 스트리밍 응답, 도구 호출 표시, 권한 요청(허용/항상 허용/거부), 취소, 세션 불러오기, build/plan 모드 전환을 지원합니다. Zed 설정 예:
+
+```json
+{ "agent_servers": { "Vedecaps": { "command": "vedecaps", "args": ["acp"] } } }
+```
+
+한 `vedecaps acp` 프로세스는 하나의 프로젝트 디렉터리만 다룹니다. 모델은 설정의 `model`을 따릅니다.
+
+**VS Code**: [`ide/vscode`](ide/vscode)의 확장은 편집기 옆 터미널에서 Vedecaps를 열고, 선택 영역을 `@경로#L10-20`으로 프롬프트에 넣어 줍니다(`Ctrl+Alt+V` 열기, `Ctrl+Alt+K` 선택 영역 추가). 릴리스 페이지의 `.vsix`를 `code --install-extension vedecaps-vscode-<버전>.vsix`로 설치합니다.
+
+프롬프트에서 `@파일#L10-20`처럼 줄 범위를 지정하면 그 줄만 첨부됩니다.
+
+## GitHub Action
+
+```yaml
+- uses: nxodh/vedecaps@v0.1.1
+  env:
+    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  with:
+    model: anthropic/claude-sonnet-5-5
+    agent: plan            # 읽기 전용
+    prompt: 이 변경을 리뷰해줘
+```
+
+출력 `response`에 최종 답변이 들어갑니다. 입력은 `prompt`, `model`, `agent`, `version`, `working-directory`, `config`(JSON), `allow-all`입니다. PR 리뷰와 `/vedecaps` 댓글 응답 예시는 [`examples/github`](examples/github)에 있습니다.
+
+> **주의**: 에이전트는 워크플로 권한으로 명령을 실행할 수 있고, 이슈·PR 본문은 신뢰할 수 없는 입력(프롬프트 인젝션)입니다. 신뢰하는 사용자의 트리거에만 반응하게 하고, `permissions`를 최소로 하며, 읽기만 필요하면 `config: '{"permission":{"bash":"deny","edit":"deny"}}'`로 막으세요.
+
 ## CLI
 
 | 명령 | 설명 |
@@ -292,6 +387,8 @@ vedecaps mcp list
 | `vedecaps mcp list\|add\|remove` | MCP 서버 관리 |
 | `vedecaps stats` | 토큰 사용량·비용 |
 | `vedecaps serve` | HTTP API 서버 |
+| `vedecaps acp` | ACP 서버(에디터용) |
+| `vedecaps trust [경로]` | 프로젝트 설정 신뢰 (`--status`, `--revoke`, `--list`) |
 | `vedecaps upgrade [버전]` | 업데이트 (`--check`) |
 | `vedecaps uninstall` | 제거 (`--dry-run`, `--keep-config`, `--keep-data`) |
 | `vedecaps debug [config\|local]` | 경로·설정·제공자·도구 상태, 로컬 모델 서버 진단 |
@@ -320,15 +417,14 @@ vedecaps mcp list
 
 ## OpenCode와의 차이
 
-구조와 사용법은 OpenCode를 따랐습니다. 0.1.0에 **없는** 기능은 다음과 같습니다.
+구조와 사용법은 OpenCode를 따랐습니다. 아직 **없는** 기능은 다음과 같습니다.
 
 - 세션 공유(`/share`): 호스팅 서비스가 필요합니다. `/export`를 쓰세요.
-- 구독 계정 OAuth 로그인: API 키만 지원합니다.
+- 구독 계정 OAuth 로그인: API 키만 지원합니다(의도적으로 구현하지 않았습니다).
 - Amazon Bedrock, Google Vertex AI, Azure 전용 인증
-- 플러그인 시스템, SDK, IDE 확장, GitHub Action, ACP
-- `websearch` 도구
-- 언어 서버 자동 설치, MCP OAuth
-- musl(Alpine) 빌드
+- npm 패키지 형태의 플러그인, Python 등 다른 언어 SDK
+- clangd·zls·ruby-lsp·lua-language-server 자동 설치, MCP OAuth
+- 키 바인딩 설정, musl(Alpine) 빌드
 
 ## 개발
 
@@ -345,7 +441,7 @@ npx bun run script/smoke.ts dist/<플랫폼>/vedecaps   # 실행 파일 스모�
 python3 script/tui-pty.py           # 가짜 모델로 터미널 UI 확인 (POSIX)
 ```
 
-릴리스는 `package.json`의 버전과 같은 `v*` 태그를 푸시하면 GitHub Actions가 빌드해 게시합니다.
+릴리스는 `package.json`의 버전과 같은 `v*` 태그를 푸시하면 GitHub Actions가 빌드해 게시합니다(실행 파일, 체크섬, VS Code `.vsix`).
 
 ## 라이선스
 

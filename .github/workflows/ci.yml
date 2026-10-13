@@ -144,3 +144,29 @@ jobs:
           } finally {
             Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
           }
+
+  vscode-extension:
+    name: VS Code extension and SDK build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Extension typecheck and package
+        working-directory: ide/vscode
+        run: |
+          npm ci
+          npm run typecheck
+          npm run package
+          test -s vedecaps.vsix
+      - name: SDK build
+        working-directory: sdk/js
+        run: |
+          npm install --no-save typescript@5 @types/node@22
+          npx tsc -p tsconfig.json
+          test -s dist/index.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vedecaps-vscode
+          path: ide/vscode/vedecaps.vsix

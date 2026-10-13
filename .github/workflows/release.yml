@@ -36,6 +36,14 @@ jobs:
           npx bun build --compile --target=bun-linux-x64 script/smoke.ts --outfile dist/smoke-linux-x64
           dist/smoke-linux-x64 dist/linux-x64/vedecaps
           docker run --rm -v "$PWD/dist:/s:ro" debian:13 /s/smoke-linux-x64 /s/linux-x64/vedecaps
+      - name: Build the VS Code extension
+        working-directory: ide/vscode
+        run: |
+          npm ci
+          npm run typecheck
+          npm run package
+          test -s vedecaps.vsix
+          cp vedecaps.vsix "../../dist/vedecaps-vscode-$VERSION.vsix"
       - name: Release notes from the changelog
         run: |
           awk -v v="$VERSION" '
@@ -66,4 +74,4 @@ jobs:
           gh release create "$GITHUB_REF_NAME" --title "Vedecaps $VERSION" --notes-file notes.md \
             dist/vedecaps-linux-x64.tar.gz dist/vedecaps-linux-arm64.tar.gz \
             dist/vedecaps-darwin-arm64.tar.gz dist/vedecaps-darwin-x64.tar.gz \
-            dist/vedecaps-windows-x64.zip dist/checksums.txt
+            dist/vedecaps-windows-x64.zip dist/checksums.txt "dist/vedecaps-vscode-$VERSION.vsix"
