@@ -504,10 +504,106 @@
     },
     "keybinds": {
       "type": "object",
-      "additionalProperties": {
-        "type": "string"
-      },
-      "description": "Reserved; key bindings are not configurable yet"
+      "additionalProperties": false,
+      "description": "Prompt shortcuts. Comma-separated alternatives, ctrl/alt/shift modifiers; none disables an action. User config and trusted projects only.",
+      "properties": {
+        "interrupt": {
+          "type": "string",
+          "description": "Default: escape"
+        },
+        "clear_exit": {
+          "type": "string",
+          "description": "Default: ctrl+c"
+        },
+        "quit": {
+          "type": "string",
+          "description": "Default: ctrl+d"
+        },
+        "agent_next": {
+          "type": "string",
+          "description": "Default: tab"
+        },
+        "submit": {
+          "type": "string",
+          "description": "Default: enter"
+        },
+        "newline": {
+          "type": "string",
+          "description": "Default: shift+enter,alt+enter,ctrl+j"
+        },
+        "up": {
+          "type": "string",
+          "description": "Default: up"
+        },
+        "down": {
+          "type": "string",
+          "description": "Default: down"
+        },
+        "left": {
+          "type": "string",
+          "description": "Default: left,ctrl+b"
+        },
+        "right": {
+          "type": "string",
+          "description": "Default: right,ctrl+f"
+        },
+        "word_left": {
+          "type": "string",
+          "description": "Default: ctrl+left,alt+left,alt+b"
+        },
+        "word_right": {
+          "type": "string",
+          "description": "Default: ctrl+right,alt+right,alt+f"
+        },
+        "line_start": {
+          "type": "string",
+          "description": "Default: home,ctrl+a"
+        },
+        "line_end": {
+          "type": "string",
+          "description": "Default: end,ctrl+e"
+        },
+        "backspace": {
+          "type": "string",
+          "description": "Default: backspace"
+        },
+        "delete": {
+          "type": "string",
+          "description": "Default: delete"
+        },
+        "delete_word": {
+          "type": "string",
+          "description": "Default: ctrl+w,alt+backspace"
+        },
+        "delete_line_start": {
+          "type": "string",
+          "description": "Default: ctrl+u"
+        },
+        "delete_line_end": {
+          "type": "string",
+          "description": "Default: ctrl+k"
+        },
+        "models": {
+          "type": "string",
+          "description": "Default: none"
+        },
+        "sessions": {
+          "type": "string",
+          "description": "Default: none"
+        },
+        "new_session": {
+          "type": "string",
+          "description": "Default: none"
+        },
+        "help": {
+          "type": "string",
+          "description": "Default: none"
+        },
+        "editor": {
+          "type": "string",
+          "description": "Default: none"
+        }
+      }
     },
     "compaction": {
       "type": "object",

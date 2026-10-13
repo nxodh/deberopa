@@ -1,6 +1,7 @@
 import { VERSION } from "./global"
 import { helpText, UsageError, type CommandSpec } from "./cli/args"
 import { runAndExit } from "./cli/bootstrap"
+import { redact } from "./util/redact"
 
 interface Entry {
   spec: CommandSpec
@@ -9,6 +10,14 @@ interface Entry {
 
 /** Subcommands, loaded lazily so `vedecaps --version` and `run` never pay for the TUI. */
 const COMMANDS: Record<string, () => Promise<Entry>> = {
+  share: async () => {
+    const m = await import("./cli/commands/share")
+    return { spec: m.spec, run: m.main }
+  },
+  plugin: async () => {
+    const m = await import("./cli/commands/plugin")
+    return { spec: m.spec, run: m.main }
+  },
   run: async () => {
     const m = await import("./cli/commands/run")
     return { spec: m.spec, run: m.main }
@@ -76,6 +85,8 @@ const COMMANDS: Record<string, () => Promise<Entry>> = {
 }
 
 const SUMMARY: [string, string][] = [
+  ["vedecaps share [id]", "export HTML or serve an expiring read-only conversation"],
+  ["vedecaps plugin list|install|remove", "manage version-pinned npm plugins"],
   ["vedecaps [project]", "start the terminal UI (default)"],
   ["vedecaps run [message..]", "run a prompt non-interactively"],
   ["vedecaps auth login|list|logout", "manage provider credentials"],
@@ -164,7 +175,7 @@ void runAndExit(async () => {
     return await main(process.argv.slice(2))
   } catch (err) {
     if (err instanceof UsageError) {
-      process.stderr.write(`${err.message}\n\nRun \`vedecaps --help\` for usage.\n`)
+      process.stderr.write(`${redact(err.message)}\n\nRun \`vedecaps --help\` for usage.\n`)
       return 2
     }
     throw err

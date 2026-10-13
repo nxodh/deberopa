@@ -3,7 +3,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { spawnSync } from "node:child_process"
 import { formatStatus, gitStatus, isIgnored, parseStatus } from "../src/git/git"
-import { snapshotStatus } from "../src/snapshot/snapshot"
+import { revertFiles, snapshotStatus, track } from "../src/snapshot/snapshot"
 import { endProject, tmpDir, useProject } from "./helpers"
 
 afterAll(endProject)
@@ -49,6 +49,22 @@ test("outside a repository there is no status", async () => {
   expect(await gitStatus(tmpDir())).toBeUndefined()
 })
 
+test("automatic status does not execute a repository's fsmonitor program", async () => {
+  const script = path.join(repo, "monitor.cjs")
+  const marker = path.join(repo, "monitor-ran")
+  fs.writeFileSync(script, `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "executed")`)
+  const command = `"${process.execPath.replace(/\\/g, "/")}" "${script.replace(/\\/g, "/")}"`
+  spawnSync("git", ["config", "core.fsmonitor", command], { cwd: repo })
+  try {
+    expect(await gitStatus(repo)).toBeDefined()
+    expect(fs.existsSync(marker)).toBe(false)
+  } finally {
+    spawnSync("git", ["config", "--unset", "core.fsmonitor"], { cwd: repo })
+    fs.rmSync(script, { force: true })
+    fs.rmSync(marker, { force: true })
+  }
+})
+
 test("ignored files are recognised", async () => {
   fs.writeFileSync(path.join(repo, "ignored.txt"), "x")
   expect(await isIgnored(repo, "ignored.txt")).toBe(true)
@@ -62,4 +78,19 @@ test("snapshot status explains why undo cannot restore files", async () => {
   expect(await snapshotStatus()).toMatchObject({ available: false, reason: expect.stringContaining("not a git repository") })
   useProject(repo, {})
   expect(await snapshotStatus()).toEqual({ available: true })
+})
+
+test("snapshot deletion cannot follow a parent symlink outside the project", async () => {
+  useProject(repo, {})
+  const hash = (await track())!
+  expect(hash).toBeDefined()
+  const outside = tmpDir()
+  const victim = path.join(outside, "keep.txt")
+  fs.writeFileSync(victim, "preserve")
+  const link = path.join(repo, "linked-directory")
+  fs.symlinkSync(outside, link, "junction")
+  try {
+    await expect(revertFiles(hash, [path.join(link, "keep.txt")])).rejects.toThrow("outside")
+    expect(fs.readFileSync(victim, "utf8")).toBe("preserve")
+  } finally { fs.unlinkSync(link) }
 })

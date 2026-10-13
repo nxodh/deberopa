@@ -1,6 +1,6 @@
 import fs from "node:fs/promises"
 import path from "node:path"
-import { assertInsideProject, defineTool, resolvePath, ToolInputError } from "./tool"
+import { assertInsideProject, defineTool, realPath, resolvePath, ToolInputError } from "./tool"
 import { markRead } from "./filetime"
 
 const DEFAULT_LIMIT = 2000
@@ -68,7 +68,7 @@ Usage:
     const file = resolvePath(ctx, args.filePath)
     const title = path.relative(ctx.worktree, file) || file
     await assertInsideProject(ctx, file)
-    await ctx.ask({ permission: "read", patterns: [file], always: ["*"], title: `Read ${title}`, metadata: { path: file } })
+    await ctx.ask({ permission: "read", patterns: [...new Set([file, await realPath(file)])], always: ["*"], title: `Read ${title}`, metadata: { path: file } })
 
     const stat = await fs.stat(file).catch(() => undefined)
     if (!stat) {

@@ -4,14 +4,14 @@ import { gunzipSync } from "node:zlib"
 import { spawn } from "node:child_process"
 import { Paths, VERSION } from "../global"
 import { createLogger } from "../util/log"
-import { launchSpec, which } from "../util/shell"
+import { killTree, launchSpec, which } from "../util/shell"
+import { downloadServer } from "./download"
 
 const log = createLogger("lsp-install")
 
 /**
  * Language servers Vedecaps can fetch itself, always into its own data directory (never a
- * global install), and only after the user said yes. Servers not listed here (clangd, zls,
- * ruby-lsp, lua-language-server) have to be installed by the user.
+ * global install), and only after the user said yes. Official platform availability and the required toolchain are checked before installation.
  */
 export interface Installer {
   id: string
@@ -25,6 +25,7 @@ export interface Installer {
   size: string
   /** Path of the launcher inside the install directory, plus its arguments. */
   command(dir: string): string[]
+  marker?(dir: string): string
   install(dir: string, say: (message: string) => void, signal?: AbortSignal): Promise<void>
 }
 
@@ -42,13 +43,14 @@ function exec(command: string[], opts: { cwd?: string; env?: Record<string, stri
       env: { ...process.env, ...opts.env, npm_config_update_notifier: "false", npm_config_fund: "false", npm_config_audit: "false" },
       windowsHide: true,
       windowsVerbatimArguments: spec.verbatim,
+      detached: process.platform !== "win32",
       stdio: ["ignore", "pipe", "pipe"],
     })
-    const timer = setTimeout(() => child.kill(), opts.timeoutMs)
-    const abort = () => child.kill()
+    const timer = setTimeout(() => killTree(child.pid), opts.timeoutMs)
+    const abort = () => killTree(child.pid)
     opts.signal?.addEventListener("abort", abort, { once: true })
-    child.stdout?.on("data", (d) => (output += d.toString()))
-    child.stderr?.on("data", (d) => (output += d.toString()))
+    child.stdout?.on("data", (d) => (output = (output + d.toString()).slice(-10_000)))
+    child.stderr?.on("data", (d) => (output = (output + d.toString()).slice(-10_000)))
     const done = (code: number | null) => {
       clearTimeout(timer)
       opts.signal?.removeEventListener("abort", abort)
@@ -83,6 +85,27 @@ function rustAnalyzerAsset(): { name: string; zip: boolean } {
 }
 
 export const INSTALLERS: Installer[] = [
+  ...(["clangd", "zls", "lua-language-server"] as const).map((id): Installer => ({
+    id, label: id, requires: id === "zls" ? "zig" : "tar", size: id === "clangd" ? "up to 120 MB" : "about 5 MB",
+    how: "download an official release with SHA-256 verification; retain its license files",
+    command: (dir) => [path.join(dir, "payload", "bin", exe(id))],
+    install: (dir, say, signal) => downloadServer(id, dir, say, signal),
+  })),
+  {
+    id: "ruby-lsp", label: "Ruby LSP", requires: "gem", size: "about 30 MB plus native build dependencies",
+    how: "gem install ruby-lsp into Vedecaps' directory (dependencies may compile native code)",
+    command: (dir) => [which("ruby") ?? "ruby", path.join(dir, "ruby-lsp.rb")],
+    marker: (dir) => path.join(dir, "ruby-lsp.rb"),
+    async install(dir, _say, signal) {
+      const gem = which("gem")
+      if (!gem || !which("ruby")) throw new Error("Ruby and RubyGems are required")
+      const gems = path.join(dir, "gems")
+      await fs.mkdir(dir, { recursive: true })
+      const result = await exec([gem, "install", "ruby-lsp", "--install-dir", gems, "--bindir", path.join(dir, "bin"), "--no-document"], { timeoutMs: 8 * 60_000, signal })
+      if (result.code !== 0) throw new Error(`Ruby LSP installation failed: ${result.output.trim()}`)
+      await fs.writeFile(path.join(dir, "ruby-lsp.rb"), `ENV["GEM_HOME"] = ${JSON.stringify(gems)}\nENV["GEM_PATH"] = ${JSON.stringify(gems)}\nrequire "rubygems"\nGem.clear_paths\nload Gem.bin_path("ruby-lsp", "ruby-lsp")\n`)
+    },
+  },
   {
     id: "typescript",
     label: "TypeScript language server",
@@ -156,8 +179,18 @@ export function installerFor(id: string): Installer | undefined {
 export async function installedCommand(id: string): Promise<string[] | undefined> {
   const installer = installerFor(id)
   if (!installer) return undefined
+  if (["clangd", "zls", "lua-language-server"].includes(id)) {
+    try {
+      const data = JSON.parse(await fs.readFile(path.join(installDir(id), "launch.json"), "utf8"))
+      const command: string[] = data.command
+      if (!Array.isArray(command) || command.length !== 1 || typeof command[0] !== "string") return undefined
+      const { isInside } = await import("../util/fs")
+      const bin = await fs.realpath(command[0])
+      return isInside(await fs.realpath(installDir(id)), bin) ? [bin] : undefined
+    } catch { return undefined }
+  }
   const command = installer.command(installDir(id))
-  return (await fs.stat(command[0]!).then(() => true, () => false)) ? command : undefined
+  return (await fs.stat(installer.marker?.(installDir(id)) ?? command[0]!).then(() => true, () => false)) ? command : undefined
 }
 
 export async function runInstaller(id: string, say: (message: string) => void, signal?: AbortSignal): Promise<string[]> {

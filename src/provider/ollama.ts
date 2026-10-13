@@ -158,6 +158,7 @@ export async function* streamOllama(input: StreamInput): AsyncGenerator<StreamEv
   let response: Response
   try {
     response = await fetch(`${baseURL}/api/chat`, {
+      redirect: "error",
       method: "POST",
       headers,
       body: JSON.stringify(body),

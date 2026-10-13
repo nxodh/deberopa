@@ -16,6 +16,7 @@ import { createSession, deleteSession, listSessions, updateSession } from "../se
 import { cancel, compactSession, NoModelError, prompt, shell } from "../session/prompt"
 import { redo, undo } from "../session/revert"
 import { exportMarkdown, forkSession } from "../session/export"
+import { shareHTML } from "../session/share"
 import { totalTokens, type AssistantMessage, type Message } from "../session/message"
 import { listFiles } from "../util/walk"
 import { mcpStatus } from "../mcp"
@@ -27,6 +28,7 @@ import { reloadProjectState } from "../config/reload"
 import { formatStatus } from "../git/git"
 import { snapshotStatus } from "../snapshot/snapshot"
 import { app } from "./state"
+import { DEFAULT_KEYBINDS } from "./keybinds"
 import { getTheme, THEMES } from "./theme"
 import { Header, MessageView, Muted, Plain, SPINNER } from "./view"
 import { Prompt, type Completion } from "./prompt"
@@ -54,6 +56,7 @@ const BUILTIN_COMMANDS: Completion[] = [
   { label: "/compact", value: "/compact", description: "summarise the conversation to free up context" },
   { label: "/details", value: "/details", description: "toggle full tool output and reasoning" },
   { label: "/export", value: "/export", description: "save the conversation as Markdown" },
+  { label: "/share", value: "/share", description: "save a read-only HTML conversation to review and share" },
   { label: "/editor", value: "/editor", description: "write the prompt in $EDITOR" },
   { label: "/fork", value: "/fork", description: "continue in a copy of this session" },
   { label: "/rename", value: "/rename ", description: "rename this session" },
@@ -117,6 +120,7 @@ export function App(props: { options: AppOptions }) {
   const [dialog, setDialog] = useState<Dialog | undefined>()
   const [frame, setFrame] = useState(0)
   const [ready, setReady] = useState(false)
+  const [keybinds, setKeybinds] = useState<Record<string, string>>()
   const [history, setHistory] = useState<string[]>([])
   const [agents, setAgents] = useState<string[]>(["build", "plan"])
   const [customCommands, setCustomCommands] = useState<Completion[]>([])
@@ -133,7 +137,9 @@ export function App(props: { options: AppOptions }) {
     app.start()
     void (async () => {
       const state = await readState()
-      const configured = (await getConfig()).theme
+      const config = await getConfig()
+      const configured = config.theme
+      setKeybinds(config.keybinds)
       const themeName = state.theme ?? configured
       if (themeName && THEMES[themeName]) app.theme = themeName
       const primaries = (await primaryAgents()).map((a) => a.name)
@@ -338,7 +344,7 @@ export function App(props: { options: AppOptions }) {
         setItems(Object.values(THEMES).map((t) => ({ value: t.name, label: t.name, hint: t.description })))
         return setDialog({ type: "themes" })
       case "help":
-        return setDialog({ type: "text", title: `Vedecaps ${VERSION}`, markdown: HELP })
+        return setDialog({ type: "text", title: `Vedecaps ${VERSION}`, markdown: HELP.replace(/## Keys[\s\S]*?## Prompt/, `## Keys\n\n${Object.entries(DEFAULT_KEYBINDS).map(([action, binding]) => `- **${keybinds?.[action] ?? binding}** ${action}`).join("\n")}\n\n## Prompt`) })
       case "mcp":
       case "status":
         return status()
@@ -348,6 +354,9 @@ export function App(props: { options: AppOptions }) {
         if (args.trim().toLowerCase() === "yes") {
           await trustProject(root)
           await reloadProjectState()
+          setKeybinds((await getConfig()).keybinds)
+          setAgents((await primaryAgents()).map((a) => a.name))
+          setCustomCommands(Object.values(await listCommands()).map((c) => ({ label: "/" + c.name, value: "/" + c.name + " ", description: c.description ?? "custom command" })))
           app.epoch++
           return app.showToast("Trusted. The project's config is active now.")
         }
@@ -374,14 +383,17 @@ export function App(props: { options: AppOptions }) {
       case "quit":
       case "q":
         return exit()
-      case "share":
-        return app.showToast("Sharing needs a hosted service and is not available. Use /export instead.")
     }
     if (!app.session) {
-      if (["undo", "redo", "compact", "export", "fork", "rename"].includes(name)) return app.showToast("There is no conversation yet.")
+      if (["undo", "redo", "compact", "export", "share", "fork", "rename"].includes(name)) return app.showToast("There is no conversation yet.")
     }
     const sessionID = app.session?.id
     switch (name) {
+      case "share": {
+        const target = path.resolve(project().directory, args.trim() || `vedecaps-${sessionID!.slice(-8)}.html`)
+        await fs.writeFile(target, await shareHTML(sessionID!), { mode: 0o600 })
+        return app.showToast(`Saved ${target}. Review private content before sharing.`, "info", 9000)
+      }
       case "undo": {
         const result = await undo(sessionID!)
         const text = result.message.parts.find((p) => p.type === "text" && !p.synthetic)
@@ -697,6 +709,7 @@ export function App(props: { options: AppOptions }) {
           {bottom ?? null}
           <Box display={bottom ? "none" : "flex"} flexDirection="column">
             <Prompt
+              keybinds={keybinds}
               theme={theme}
               width={width}
               offsetTop={metrics.hasMeasured ? metrics.top : 0}

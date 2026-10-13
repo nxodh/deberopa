@@ -8,6 +8,7 @@ import { subscribe, type BusEvent } from "../util/bus"
 import { createLogger } from "../util/log"
 import { redact } from "../util/redact"
 import { defineTool, type JSONSchema, type ToolContext, type ToolDefinition, type ToolResult } from "../tool/tool"
+import { packageEntry } from "./package"
 
 const log = createLogger("plugin")
 
@@ -95,7 +96,12 @@ async function discover(): Promise<LoadedPlugin[]> {
 
   for (const file of await filesIn(path.join(Paths.config, "plugin"))) found.push({ file, source: "user" })
   for (const entry of loaded.config.plugin ?? []) {
-    const candidates = path.isAbsolute(entry) ? [entry] : [path.resolve(worktree, entry), path.resolve(Paths.config, entry)]
+    if (entry.startsWith("npm:")) {
+      try { found.push({ file: await packageEntry(entry), source: "config" }) }
+      catch (err) { failures.push({ file: entry, error: redact(err instanceof Error ? err.message : String(err)) }) }
+      continue
+    }
+    const candidates = path.isAbsolute(entry) ? [entry] : loaded.trusted ? [path.resolve(worktree, entry), path.resolve(Paths.config, entry)] : [path.resolve(Paths.config, entry)]
     let resolved: string | undefined
     for (const c of candidates) if (await fs.stat(c).then((s) => s.isFile(), () => false)) resolved = c
     if (resolved) found.push({ file: resolved, source: "config" })

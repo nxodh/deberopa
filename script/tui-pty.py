@@ -35,6 +35,9 @@ config = {"model": "mock/m", "snapshot": False,
                                 "models": {"m": {"name": "Mock Model", "tool_call": True, "limit": {"context": 100000, "output": 4000}}}}}}
 if os.environ.get("ASK_EDIT"):
     config["permission"] = {"edit": "ask"}
+submit_key = "\x07" if os.environ.get("CUSTOM_KEYS") else "\r"
+if os.environ.get("CUSTOM_KEYS"):
+    config["keybinds"] = {"submit": "ctrl+g"}
 env = dict(os.environ, VEDECAPS_HOME=home, VEDECAPS_DISABLE_MODELS_FETCH="1", VEDECAPS_CONFIG_CONTENT=json.dumps(config), TERM="xterm-256color")
 env.pop("CI", None)
 
@@ -85,8 +88,9 @@ try:
     if os.environ.get("GIT_REPO"):
         expect("⎇ trunk", 10)
     expect("Ask anything")
+    expect("ctrl+g to send") if os.environ.get("CUSTOM_KEYS") else expect("enter to send")
     send("안녕 read the file")
-    send("\r", 0.2)
+    send(submit_key, 0.2)
     expect("Read")
     expect("완료", 10)
     expect("second item")
@@ -94,10 +98,12 @@ try:
     expect("/sessions")
     send("\x1b", 0.3)
     send("\x7f", 0.2)
-    send("/help\r", 0.6)
+    send("/help", 0.2)
+    send(submit_key, 0.6)
     expect("Keys")
     send("\x1b", 0.4)
-    send("edit the notes\r", 0.5)
+    send("edit the notes", 0.2)
+    send(submit_key, 0.5)
     expect("Permission required", 10) if os.environ.get("ASK_EDIT") else expect("Write", 10)
     send("y", 0.5)
     if os.environ.get("GIT_REPO"):

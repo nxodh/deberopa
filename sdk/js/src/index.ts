@@ -115,6 +115,9 @@ const modelBody = (model: ModelRef | undefined) => model
 
 export function createClient(options: ClientOptions = {}) {
   const base = (options.baseUrl ?? "http://127.0.0.1:4096").replace(/\/+$/, "")
+  const address = new URL(base)
+  if (!["http:", "https:"].includes(address.protocol) || address.username || address.password || address.search || address.hash) throw new Error("Invalid server URL")
+  if (address.protocol === "http:" && !["127.0.0.1", "localhost", "[::1]"].includes(address.hostname)) throw new Error("Remote servers require HTTPS")
   const doFetch = options.fetch ?? globalThis.fetch.bind(globalThis)
   const auth: Record<string, string> = options.password ? { authorization: "Basic " + btoa(`vedecaps:${options.password}`) } : {}
 
@@ -124,6 +127,7 @@ export function createClient(options: ClientOptions = {}) {
       headers: { ...auth, ...(body !== undefined ? { "content-type": "application/json" } : {}) },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal,
+      redirect: "error",
     })
     const text = await res.text()
     let data: unknown = text
@@ -190,7 +194,7 @@ export function createClient(options: ClientOptions = {}) {
        * changes. Ends when `signal` aborts or the connection closes.
        */
       async *subscribe(signal?: AbortSignal): AsyncGenerator<Event> {
-        const res = await doFetch(base + "/event", { headers: { ...auth, accept: "text/event-stream" }, signal })
+        const res = await doFetch(base + "/event", { headers: { ...auth, accept: "text/event-stream" }, signal, redirect: "error" })
         if (!res.ok || !res.body) throw new VedecapsError(`HTTP ${res.status}`, res.status)
         const decoder = new TextDecoder()
         const reader = res.body.getReader()
@@ -252,9 +256,10 @@ export interface StartServerOptions extends Omit<ClientOptions, "baseUrl"> {
 /** Spawn `vedecaps serve` on a free port and return a client for it. Node/Bun only. */
 export async function startServer(options: StartServerOptions = {}): Promise<{ client: Client; url: string; close(): Promise<void> }> {
   const { spawn } = await import("node:child_process")
+  const password = options.password ?? options.env?.VEDECAPS_SERVER_PASSWORD ?? process.env.VEDECAPS_SERVER_PASSWORD
   const child = spawn(options.command ?? "vedecaps", ["serve", "--port", String(options.port ?? 0), "--hostname", "127.0.0.1"], {
     cwd: options.cwd,
-    env: { ...process.env, ...options.env, VEDECAPS_SERVER_PASSWORD: options.password ?? process.env.VEDECAPS_SERVER_PASSWORD },
+    env: { ...process.env, ...options.env, VEDECAPS_SERVER_PASSWORD: password },
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   })
@@ -283,7 +288,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<{ c
       reject(new Error(`vedecaps serve exited with code ${code}:\n${output.trim()}`))
     })
   })
-  const client = createClient({ baseUrl: url, password: options.password, fetch: options.fetch })
+  const client = createClient({ baseUrl: url, password, fetch: options.fetch })
   return {
     client,
     url,

@@ -8,6 +8,7 @@ import { exists, findUp } from "../util/fs"
 import { createLogger } from "../util/log"
 import type { McpServerConfig } from "../mcp/client"
 import { isTrusted, stripUntrusted } from "./trust"
+import { registerConfigSecrets } from "../util/redact"
 
 const log = createLogger("config")
 
@@ -90,7 +91,7 @@ export interface Config {
   snapshot?: boolean
   /** false stops Vedecaps from offering to install missing language servers. */
   lsp_install?: boolean
-  /** Local plugin files (paths relative to the config file's project, or absolute). */
+  /** Local files, or explicitly installed npm:name@version plugins. */
   plugin?: string[]
   /** Web search through Exa. A key lifts the shared free-tier limit. */
   websearch?: { enabled?: boolean; apiKey?: string }
@@ -158,7 +159,10 @@ async function load(): Promise<LoadedConfig> {
   const merge = async (file: string, fromProject = false) => {
     if (!(await exists(file))) return
     try {
-      let parsed = await readConfigFile(file)
+      let parsed = await readConfigFile(file, !fromProject || trusted)
+      if (fromProject && !trusted && /\{(?:env|file):/.test(await fs.readFile(file, "utf8"))) {
+        blocked.push(`${path.relative(worktree, file)}: substitutions (environment and file access)`)
+      }
       if (fromProject && !trusted) {
         const stripped = stripUntrusted(parsed)
         parsed = stripped.config
@@ -186,6 +190,10 @@ async function load(): Promise<LoadedConfig> {
   // A project's plugin folder is code that would run in this process.
   if (!trusted) {
     for (const dir of dotDirs) {
+      for (const folder of ["agent", "agents", "command", "commands"]) {
+        const names = await fs.readdir(path.join(dir, folder)).catch(() => [] as string[])
+        if (names.length) blocked.push(`${path.relative(worktree, path.join(dir, folder))}/ (project definitions need trust)`)
+      }
       const entries = await fs.readdir(path.join(dir, "plugin")).catch(() => [] as string[])
       const scripts = entries.filter((n) => /\.(js|mjs|cjs|ts|mts)$/.test(n) && !n.endsWith(".d.ts") && !n.startsWith("."))
       if (scripts.length) blocked.push(`${path.relative(worktree, path.join(dir, "plugin")) || "plugin"}/ (${scripts.length} plugin file${scripts.length === 1 ? "" : "s"} that would run in this process)`)
@@ -200,6 +208,7 @@ async function load(): Promise<LoadedConfig> {
     }
   }
 
+  registerConfigSecrets(config)
   if (blocked.length) log.warn("ignored untrusted project config", blocked)
   return { config, directories: [Paths.config, ...dotDirs], files, errors, blocked, trustRoot: worktree, trusted }
 }
@@ -216,8 +225,10 @@ function parseText(text: string, label: string): Config {
   return value as Config
 }
 
-async function readConfigFile(file: string): Promise<Config> {
+async function readConfigFile(file: string, expand = true): Promise<Config> {
   let text = await fs.readFile(file, "utf8")
+  // Do not read local credentials before deciding whether the repository is trusted.
+  if (!expand) return parseText(text, path.basename(file))
   // {env:NAME} → environment variable (empty when unset)
   text = text.replace(/\{env:([^}]+)\}/g, (_, name: string) => JSON.stringify(process.env[name.trim()] ?? "").slice(1, -1))
   // {file:path} → file contents, relative to the config file; ~ expands to home
@@ -245,6 +256,7 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 export function mergeConfig<T extends Record<string, any>>(a: T, b: T, pathKey = ""): T {
   const out: Record<string, any> = { ...a }
   for (const [key, value] of Object.entries(b)) {
+    if (["__proto__", "constructor", "prototype"].includes(key)) throw new Error("Unsafe configuration property")
     const existing = out[key]
     if (pathKey === "" && key === "instructions" && Array.isArray(existing) && Array.isArray(value)) {
       out[key] = [...new Set([...existing, ...value])]

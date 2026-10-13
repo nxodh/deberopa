@@ -5,6 +5,7 @@ import { parseModelRef } from "../provider/provider"
 import { DEFAULT_RULES, mergeRulesets, toRuleset, type Ruleset } from "../permission/permission"
 import { parseFrontmatter } from "../util/frontmatter"
 import type { Effort } from "../provider/types"
+import { Paths } from "../global"
 
 export interface AgentInfo {
   name: string
@@ -24,31 +25,9 @@ export interface AgentInfo {
   permission: Ruleset
 }
 
-const READ_ONLY_BASH: Record<string, "allow" | "ask"> = {
-  "*": "ask",
-  "ls *": "allow",
-  "cat *": "allow",
-  "head *": "allow",
-  "tail *": "allow",
-  "wc *": "allow",
-  "pwd": "allow",
-  "which *": "allow",
-  "find *": "allow",
-  "grep *": "allow",
-  "rg *": "allow",
-  "tree *": "allow",
-  "git status *": "allow",
-  "git diff *": "allow",
-  "git log *": "allow",
-  "git show *": "allow",
-  "git branch": "allow",
-  "git branch -v": "allow",
-  "Get-ChildItem *": "allow",
-  "Get-Content *": "allow",
-  "Select-String *": "allow",
-  "find * -delete *": "ask",
-  "find * -exec *": "ask",
-}
+// Shell prefixes cannot prove read-only behaviour: flags, Git config and shell
+// expansion can execute code or expose files. Dedicated read tools enforce paths.
+const READ_ONLY_BASH = { "*": "ask" } as const
 
 const EXPLORE_PROMPT = `You are a file search specialist. You excel at thoroughly navigating and exploring codebases.
 
@@ -143,11 +122,12 @@ export function listAgents(): Promise<Record<string, AgentInfo>> {
 }
 
 async function load(): Promise<Record<string, AgentInfo>> {
-  const { config, directories } = await loadConfig()
+  const { config, directories, trusted } = await loadConfig()
   const agents: Record<string, AgentInfo | undefined> = builtIns()
 
   // Markdown agents: <config dir>/agent/*.md (also "agents/"), file name is the agent name.
   for (const dir of directories) {
+    if (!trusted && dir !== Paths.config) continue
     for (const sub of ["agent", "agents"]) {
       const folder = path.join(dir, sub)
       const files = await fs.readdir(folder).catch(() => [] as string[])

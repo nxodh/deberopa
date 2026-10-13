@@ -174,6 +174,7 @@ export async function* streamAnthropic(input: StreamInput): AsyncGenerator<Strea
     maxRetries: 0, // retries are handled (and surfaced to the user) by the session loop
     timeout: provider.timeout ?? 10 * 60 * 1000,
     defaultHeaders: { "User-Agent": `vedecaps/${VERSION}`, ...provider.headers },
+    fetch: (url, init) => fetch(url, { ...init, redirect: "error" }),
   })
 
   const wantFallbacks = FALLBACK_MODELS.has(model.id) && isFirstParty(provider.baseURL) && !fallbacksRejected

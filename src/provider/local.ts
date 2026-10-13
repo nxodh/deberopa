@@ -81,7 +81,7 @@ export function ollamaBaseURL(env = process.env.OLLAMA_HOST): string {
 
 async function getJSON(url: string, timeoutMs: number, init: RequestInit = {}): Promise<any | undefined> {
   try {
-    const res = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs), headers: { "User-Agent": `vedecaps/${VERSION}`, ...init.headers } })
+    const res = await fetch(url, { ...init, redirect: "error", signal: AbortSignal.timeout(timeoutMs), headers: { "User-Agent": `vedecaps/${VERSION}`, ...init.headers } })
     if (!res.ok) return undefined
     return await res.json()
   } catch {

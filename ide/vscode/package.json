@@ -2,7 +2,7 @@
   "name": "vedecaps",
   "displayName": "Vedecaps",
   "description": "Open the Vedecaps AI coding agent beside your editor and send it the file or selection you are looking at.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "nxodh",
   "license": "MIT",
   "icon": "icon.png",
@@ -50,7 +50,7 @@
   },
   "devDependencies": {
     "@types/vscode": "1.85.0",
-    "@vscode/vsce": "^3.0.0",
+    "@vscode/vsce": "^4.0.0",
     "esbuild": "^0.25.0",
     "typescript": "^5.6.0"
   }

@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   release:
@@ -13,10 +14,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Require successful CI for this exact commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          passed="$(gh run list --workflow ci.yml --commit "$GITHUB_SHA" --branch main --event push --status completed --json conclusion --jq 'any(.[]; .conclusion == "success")')"
+          test "$passed" = true || { echo "Full CI must pass for this commit before publishing."; exit 1; }
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: npm ci
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - name: Tag must match package.json
         run: |
           version="$(node -p "require('./package.json').version")"
@@ -36,6 +47,10 @@ jobs:
           npx bun build --compile --target=bun-linux-x64 script/smoke.ts --outfile dist/smoke-linux-x64
           dist/smoke-linux-x64 dist/linux-x64/vedecaps
           docker run --rm -v "$PWD/dist:/s:ro" debian:13 /s/smoke-linux-x64 /s/linux-x64/vedecaps
+      - name: Smoke test the Alpine musl binary
+        run: |
+          npx bun build --compile --target=bun-linux-x64-musl script/smoke.ts --outfile dist/smoke-linux-x64-musl
+          docker run --rm -v "$PWD/dist:/s:ro" alpine:3.22 sh -c 'apk add --no-cache libstdc++ libgcc >/dev/null && /s/smoke-linux-x64-musl /s/linux-x64-musl/vedecaps'
       - name: Build the VS Code extension
         working-directory: ide/vscode
         run: |
@@ -73,5 +88,6 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" --title "Vedecaps $VERSION" --notes-file notes.md \
             dist/vedecaps-linux-x64.tar.gz dist/vedecaps-linux-arm64.tar.gz \
+            dist/vedecaps-linux-x64-musl.tar.gz dist/vedecaps-linux-arm64-musl.tar.gz \
             dist/vedecaps-darwin-arm64.tar.gz dist/vedecaps-darwin-x64.tar.gz \
             dist/vedecaps-windows-x64.zip dist/checksums.txt "dist/vedecaps-vscode-$VERSION.vsix"

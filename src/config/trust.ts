@@ -53,6 +53,12 @@ export async function untrustProject(worktree: string): Promise<boolean> {
 export function stripUntrusted(input: Config): { config: Config; blocked: string[] } {
   const blocked: string[] = []
   const config: Config = structuredClone(input)
+  for (const key of ["command", "server", "keybinds"] as const) {
+    if (config[key] !== undefined) {
+      blocked.push(`${key} (execution or user controls)`)
+      delete config[key]
+    }
+  }
 
   for (const name of Object.keys(config.mcp ?? {})) {
     const server = config.mcp![name]!
@@ -117,7 +123,7 @@ export function stripUntrusted(input: Config): { config: Config; blocked: string
   return { config, blocked }
 }
 
-function dropAllow<T>(value: T): T | undefined {
+export function dropAllow<T>(value: T): T | undefined {
   if (value === "allow") return undefined
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {}

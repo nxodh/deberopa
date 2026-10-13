@@ -112,7 +112,8 @@ export function run(command: string, args: string[], opts: { cwd?: string; env?:
     }
     let child: ReturnType<typeof spawn>
     try {
-      child = spawn(command, args, { cwd: opts.cwd, env: { ...process.env, ...opts.env }, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] })
+      const spec = launchSpec([command, ...args])
+      child = spawn(spec.file, spec.args, { cwd: opts.cwd, env: { ...process.env, ...opts.env }, windowsHide: true, windowsVerbatimArguments: spec.verbatim, detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"] })
     } catch (err) {
       resolve({ stdout: "", stderr: String(err), code: -1 })
       return

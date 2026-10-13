@@ -293,14 +293,14 @@ class HttpWire implements Wire {
     const headers = this.headers({ "Content-Type": "application/json", Accept: "application/json, text/event-stream" })
 
     if (this.legacyEndpoint) {
-      const res = await fetch(this.legacyEndpoint, { method: "POST", headers, body, signal })
+      const res = await fetch(this.legacyEndpoint, { method: "POST", headers, body, signal, redirect: "error" })
       if (!res.ok) throw await this.httpError(res)
       // The reply for a legacy POST arrives on the event stream, not in this response.
       await res.body?.cancel().catch(() => {})
       return
     }
 
-    const res = await fetch(this.config.url, { method: "POST", headers, body, signal })
+    const res = await fetch(this.config.url, { method: "POST", headers, body, signal, redirect: "error" })
     const sessionId = res.headers.get("mcp-session-id")
     if (sessionId) this.sessionId = sessionId
 
@@ -335,7 +335,7 @@ class HttpWire implements Wire {
   private async openLegacyStream(): Promise<string> {
     const abort = new AbortController()
     this.legacyStream = abort
-    const res = await fetch(this.config.url, { headers: this.headers({ Accept: "text/event-stream" }), signal: abort.signal })
+    const res = await fetch(this.config.url, { headers: this.headers({ Accept: "text/event-stream" }), signal: abort.signal, redirect: "error" })
     if (!res.ok || !res.body) throw await this.httpError(res)
     const body = res.body
     return new Promise<string>((resolve, reject) => {
@@ -347,7 +347,13 @@ class HttpWire implements Wire {
       readSse(body, (ev) => {
         if (ev.event === "endpoint") {
           clearTimeout(this.endpointTimer)
-          resolve(new URL(ev.data.trim(), this.config.url).toString())
+          const endpoint = new URL(ev.data.trim(), this.config.url)
+          if (endpoint.origin !== new URL(this.config.url).origin) {
+            reject(new McpError("A legacy MCP endpoint must have the same origin as its server"))
+            abort.abort()
+            return
+          }
+          resolve(endpoint.toString())
         } else if (ev.event === "message") {
           this.rpc.receiveRaw(ev.data)
         }
@@ -380,7 +386,7 @@ class HttpWire implements Wire {
     clearTimeout(this.endpointTimer)
     this.legacyStream?.abort()
     if (this.sessionId) {
-      await fetch(this.config.url, { method: "DELETE", headers: this.headers({}), signal: AbortSignal.timeout(5000) }).catch(() => {})
+      await fetch(this.config.url, { method: "DELETE", headers: this.headers({}), signal: AbortSignal.timeout(5000), redirect: "error" }).catch(() => {})
     }
   }
 }

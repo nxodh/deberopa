@@ -9,6 +9,7 @@ import path from "node:path"
 import { createHash } from "node:crypto"
 import { spawnSync } from "node:child_process"
 import pkg from "../package.json"
+import { targetName } from "../src/update/update"
 
 interface Target {
   name: string
@@ -20,6 +21,8 @@ interface Target {
 const TARGETS: Target[] = [
   { name: "linux-x64", bun: "bun-linux-x64", exe: "vedecaps", archive: "tar.gz" },
   { name: "linux-arm64", bun: "bun-linux-arm64", exe: "vedecaps", archive: "tar.gz" },
+  { name: "linux-x64-musl", bun: "bun-linux-x64-musl", exe: "vedecaps", archive: "tar.gz" },
+  { name: "linux-arm64-musl", bun: "bun-linux-arm64-musl", exe: "vedecaps", archive: "tar.gz" },
   { name: "darwin-arm64", bun: "bun-darwin-arm64", exe: "vedecaps", archive: "tar.gz" },
   { name: "darwin-x64", bun: "bun-darwin-x64", exe: "vedecaps", archive: "tar.gz" },
   { name: "windows-x64", bun: "bun-windows-x64", exe: "vedecaps.exe", archive: "zip" },
@@ -37,7 +40,7 @@ const dist = path.resolve(option("outdir") ?? path.join(root, "dist"))
 
 function currentTarget(): Target {
   const os = process.platform === "win32" ? "windows" : process.platform
-  const found = TARGETS.find((t) => t.name === `${os}-${process.arch}`)
+  const found = TARGETS.find((t) => t.name === targetName())
   if (!found) throw new Error(`No build target for ${process.platform}/${process.arch}`)
   return found
 }
@@ -77,7 +80,7 @@ for (const target of selected) {
   const started = Date.now()
   const result = await Bun.build({
     entrypoints: [path.join(root, "src", "index.ts")],
-    compile: { target: target.bun as any, outfile },
+    compile: { target: target.bun as any, outfile, autoloadDotenv: false, autoloadBunfig: false },
     minify: true,
     plugins: [stubDevtools],
   })

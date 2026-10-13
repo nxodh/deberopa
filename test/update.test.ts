@@ -27,6 +27,8 @@ test("version comparison", () => {
 })
 
 test("release asset names per platform", () => {
+  expect(targetName("linux", "x64", "musl")).toBe("linux-x64-musl")
+  expect(assetName("linux-arm64-musl")).toBe("vedecaps-linux-arm64-musl.tar.gz")
   expect(assetName(targetName("linux", "x64"))).toBe("vedecaps-linux-x64.tar.gz")
   expect(assetName(targetName("linux", "arm64"))).toBe("vedecaps-linux-arm64.tar.gz")
   expect(assetName(targetName("win32", "x64"))).toBe("vedecaps-windows-x64.zip")

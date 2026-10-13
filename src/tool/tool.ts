@@ -1,4 +1,5 @@
 import path from "node:path"
+import fs from "node:fs/promises"
 import { isInside } from "../util/fs"
 
 export type JSONSchema = Record<string, any>
@@ -112,15 +113,26 @@ export function resolvePath(ctx: Pick<ToolContext, "directory">, input: string):
 
 /** Paths outside the project need explicit consent. */
 export async function assertInsideProject(ctx: ToolContext, target: string, kind: "file" | "directory" = "file") {
-  if (isInside(ctx.worktree, target) || isInside(ctx.directory, target)) return
-  const dir = kind === "directory" ? target : path.dirname(target)
+  const resolved = await realPath(target)
+  const roots = await Promise.all([realPath(ctx.worktree), realPath(ctx.directory)])
+  if (roots.some((root) => isInside(root, resolved))) return
+  const dir = kind === "directory" ? resolved : path.dirname(resolved)
   await ctx.ask({
     permission: "external_directory",
-    patterns: [target],
+    patterns: [resolved],
     always: [path.join(dir, "*")],
     title: `Access ${kind} outside the project: ${target}`,
     metadata: { path: target },
   })
+}
+
+/** Resolve symlinks, including the existing parent of a file that has not been created yet. */
+export async function realPath(target: string): Promise<string> {
+  try { return await fs.realpath(target) } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err
+    const parent = path.dirname(target)
+    return parent === target ? target : path.join(await realPath(parent), path.basename(target))
+  }
 }
 
 /**

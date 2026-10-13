@@ -100,17 +100,34 @@ export function parseExport(text: string): SessionExport {
   if (data?.format !== "vedecaps-session" || !data.info || !Array.isArray(data.messages)) {
     throw new ImportError("This is not a Vedecaps session export (expected the JSON written by `vedecaps export`).")
   }
+  if (data.version !== 1) throw new ImportError("Unsupported session export version.")
+  if (typeof data.info.title !== "string" || data.messages.some((m: any) =>
+    !m || typeof m.id !== "string" || typeof m.agent !== "string" || !Number.isFinite(m.time?.created) ||
+    !["user", "assistant"].includes(m.role) || !Array.isArray(m.parts) ||
+    (m.role === "user" && (typeof m.model?.providerID !== "string" || typeof m.model?.modelID !== "string")) ||
+    (m.role === "assistant" && (typeof m.providerID !== "string" || typeof m.modelID !== "string" ||
+      ["input", "output", "cacheRead", "cacheWrite"].some((key) => !Number.isFinite(m.tokens?.[key]) || m.tokens[key] < 0))) ||
+    m.parts.some((p: any) => !p || !["text", "reasoning", "file", "tool", "patch", "step-start"].includes(p.type) ||
+      (["text", "reasoning"].includes(p.type) && typeof p.text !== "string") ||
+      (p.type === "file" && (typeof p.mime !== "string" || typeof p.data !== "string")) ||
+      (p.type === "tool" && (typeof p.tool !== "string" || typeof p.callID !== "string" || !["pending", "running", "completed", "error"].includes(p.state?.status) ||
+        (p.state.status === "completed" && typeof p.state.output !== "string") || (p.state.status === "error" && typeof p.state.error !== "string")))
+    )
+  )) throw new ImportError("The session contains malformed messages.")
   return data as SessionExport
 }
 
 /** Import under a fresh session id so the same export can be imported twice. */
 export async function importExport(data: SessionExport): Promise<SessionInfo> {
+  data = parseExport(JSON.stringify(data))
   const id = createID("session")
   const idMap = new Map<string, string>()
   const messages = data.messages.map((m) => {
     const newID = createID("message")
     idMap.set(m.id, newID)
-    return { ...m, id: newID, sessionID: id } as Message
+    const parts = m.parts.filter((p) => p.type !== "patch" && p.type !== "step-start")
+      .map((p) => ({ ...p, id: createID("part") }))
+    return { ...m, id: newID, sessionID: id, parts, ...(m.role === "assistant" ? { raw: undefined } : {}) } as Message
   })
   for (const m of messages) if (m.role === "assistant") m.parentID = idMap.get(m.parentID) ?? m.parentID
   const now = Date.now()
@@ -120,6 +137,7 @@ export async function importExport(data: SessionExport): Promise<SessionInfo> {
     projectID: project().id,
     directory: project().directory,
     revert: undefined,
+    parentID: undefined,
     time: { created: now, updated: now },
   }
   const stored = await importSession({ info, messages })

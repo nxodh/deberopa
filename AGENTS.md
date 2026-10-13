@@ -20,7 +20,8 @@ An AI coding agent for the terminal, written in TypeScript and compiled to singl
 - `src/mcp/`, `src/lsp/`, `src/format/`, `src/snapshot/`, `src/update/`
 - `src/git/` git status for the status bar, pull request checkout (`pr.ts` takes injected `gh`/`git` runners, so tests need no GitHub)
 - `src/plugin/` plugin loader and hooks; `src/acp/` Agent Client Protocol server; `src/config/trust.ts` project trust
-- `sdk/js/` HTTP API client; `ide/vscode/` VS Code extension (own package.json); `action.yml` GitHub Action
+- `sdk/js/`, `sdk/python/`, `sdk/go/` HTTP API clients; `ide/vscode/` VS Code extension (own package.json); `action.yml` GitHub Action
+- `src/tui/keybinds.ts` terminal key mappings; `src/plugin/package.ts` explicitly installed npm packages; `src/session/share.ts` reviewed, read-only session sharing
 - `test/helpers.ts` has the mock OpenAI-compatible server every loop test uses; call `endProject()` in `afterAll` after `useProject()` so config does not leak into the next test file
 
 ## Rules

@@ -1,4 +1,5 @@
 import fs from "node:fs/promises"
+import fsSync from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { createHash } from "node:crypto"
@@ -15,12 +16,21 @@ const releaseBase = () => (process.env.VEDECAPS_RELEASE_URL || `https://github.c
 
 export class UpdateError extends Error {}
 
-export function targetName(platform = process.platform, arch = process.arch): string {
+export function runtimeLibc(): "glibc" | "musl" {
+  if (process.platform !== "linux") return "glibc"
+  try {
+    if ((process.report?.getReport() as any)?.header?.glibcVersionRuntime) return "glibc"
+    if (fsSync.existsSync("/etc/alpine-release") || fsSync.readdirSync("/lib").some((n) => n.startsWith("ld-musl-"))) return "musl"
+  } catch {}
+  return "glibc"
+}
+
+export function targetName(platform = process.platform, arch = process.arch, libc = runtimeLibc()): string {
   const system = platform === "win32" ? "windows" : platform
   if (!["linux", "darwin", "windows"].includes(system) || !["x64", "arm64"].includes(arch) || (system === "windows" && arch !== "x64")) {
     throw new UpdateError(`No prebuilt binary for ${platform}/${arch}. Build from source: https://github.com/${REPO}`)
   }
-  return `${system}-${arch}`
+  return `${system}-${arch}${system === "linux" && libc === "musl" ? "-musl" : ""}`
 }
 
 export function assetName(target = targetName()): string {

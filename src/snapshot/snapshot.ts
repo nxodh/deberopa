@@ -4,6 +4,8 @@ import { Paths } from "../global"
 import { project } from "../project"
 import { getConfig } from "../config/config"
 import { run, which } from "../util/shell"
+import { isInside } from "../util/fs"
+import { realPath } from "../tool/tool"
 import { createLogger } from "../util/log"
 
 const log = createLogger("snapshot")
@@ -23,6 +25,7 @@ async function gitDir(): Promise<string | undefined> {
     const dir = path.join(Paths.snapshot, p.id)
     try {
       await fs.mkdir(dir, { recursive: true })
+      await fs.writeFile(path.join(dir, "global-empty-config"), "")
       const exists = await fs.stat(path.join(dir, "HEAD")).then(() => true, () => false)
       if (!exists) {
         const init = await git(dir, ["init", "--quiet"])
@@ -44,7 +47,7 @@ function git(dir: string, args: string[], timeout = 60_000) {
   return run("git", ["--git-dir", dir, "--work-tree", worktree, ...args], {
     cwd: worktree,
     timeout,
-    env: { GIT_OPTIONAL_LOCKS: "0", GIT_TERMINAL_PROMPT: "0" },
+    env: { GIT_OPTIONAL_LOCKS: "0", GIT_TERMINAL_PROMPT: "0", GIT_CONFIG_NOSYSTEM: "1", GIT_ATTR_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: path.join(dir, "global-empty-config"), GIT_CONFIG_COUNT: "0" },
   })
 }
 
@@ -96,7 +99,11 @@ export async function revertFiles(hash: string, files: string[]) {
   const dir = await gitDir()
   if (!dir) return
   const worktree = project().worktree
+  const root = await realPath(worktree)
   for (const file of files) {
+    if (!isInside(worktree, file) || !isInside(root, await realPath(path.dirname(file)))) {
+      throw new Error("A snapshot cannot restore files outside its project.")
+    }
     const rel = path.relative(worktree, file).split(path.sep).join("/")
     const result = await git(dir, ["checkout", hash, "--", rel])
     if (result.code === 0) continue

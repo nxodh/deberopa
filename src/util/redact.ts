@@ -34,7 +34,31 @@ export function maskKey(key: string): string {
   return `${key.slice(0, 3)}…${key.slice(-4)}`
 }
 
-const SECRET_KEY = /^(apikey|api_key|token|secret|password|authorization|access|refresh|key)$/i
+export const SECRET_KEY = /^(apikey|api_key|token|secret|password|authorization|access|refresh|key)$|(?:^|[_-])(?:api[_-]?key|token|secret|password|authorization)(?:$|[_-])/i
+
+/** Register credential fields and secret URL parameters before anything logs the configuration. */
+export function registerConfigSecrets(value: unknown, field = "") {
+  if (typeof value === "string") {
+    if (SECRET_KEY.test(field)) {
+      registerSecret(value)
+      registerSecret(value.replace(/^Bearer\s+/i, ""))
+    }
+    if (/^https?:\/\//i.test(value)) {
+      try {
+        const url = new URL(value)
+        registerSecret(url.password)
+        for (const [key, item] of url.searchParams) if (SECRET_KEY.test(key)) registerSecret(item)
+      } catch {}
+    }
+  } else if (Array.isArray(value)) {
+    for (const item of value) registerConfigSecrets(item, field)
+  } else if (value && typeof value === "object") {
+    for (const [key, item] of Object.entries(value)) {
+      if (field === "headers" && typeof item === "string") registerSecret(item)
+      registerConfigSecrets(item, key)
+    }
+  }
+}
 
 /** Deep copy with credential-looking fields masked (used for config dumps and API responses). */
 export function redactDeep<T>(value: T): T {

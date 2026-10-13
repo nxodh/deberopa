@@ -38,7 +38,7 @@ irm https://raw.githubusercontent.com/nxodh/vedecaps/main/install.ps1 | iex
 | Linux / macOS | `~/.vedecaps/bin` | `VEDECAPS_INSTALL_DIR` |
 | Windows | `%LOCALAPPDATA%\vedecaps\bin` | `VEDECAPS_INSTALL_DIR` |
 
-특정 버전은 `VEDECAPS_VERSION=0.1.0`으로 지정합니다. PATH를 건드리지 않으려면 `VEDECAPS_NO_MODIFY_PATH=1`을 설정하세요. Alpine 같은 musl 기반 배포판은 아직 지원하지 않습니다.
+특정 버전은 `VEDECAPS_VERSION=0.1.0`으로 지정합니다. PATH를 건드리지 않으려면 `VEDECAPS_NO_MODIFY_PATH=1`을 설정하세요. 0.1.2부터 Alpine용 musl 빌드를 제공합니다. Alpine에는 `libstdc++`·`libgcc`가 필요합니다(`apk add --no-cache libstdc++ libgcc`).
 
 업데이트는 `vedecaps upgrade`, 제거는 `vedecaps uninstall`입니다.
 
@@ -248,7 +248,7 @@ permission:
 | `task` | 서브에이전트에 위임 |
 | `skill` | 스킬 불러오기 |
 
-파일을 수정하면 프로젝트의 포매터(prettier, biome, gofmt, rustfmt, ruff 등)가 설치되어 있을 때 자동으로 실행되고, 설치된 언어 서버(TypeScript, gopls, pyright, rust-analyzer, clangd 등)의 오류가 에이전트에게 전달됩니다. 언어 서버가 없으면 TypeScript, Pyright, gopls, rust-analyzer에 한해 **설치할지 물어봅니다**(허락한 경우에만, Vedecaps의 데이터 디렉터리 안에 설치하고 전역 설치는 하지 않음). `"lsp_install": false`로 끌 수 있습니다. 포매터는 자동 설치하지 않습니다.
+파일을 수정하면 프로젝트의 포매터(prettier, biome, gofmt, rustfmt, ruff 등)가 설치되어 있을 때 자동으로 실행되고, 설치된 언어 서버(TypeScript, gopls, pyright, rust-analyzer, clangd 등)의 오류가 에이전트에게 전달됩니다. 언어 서버가 없으면 TypeScript, Pyright, gopls, rust-analyzer, clangd, zls, ruby-lsp, lua-language-server에 대해 **설치할지 물어봅니다**(허락한 경우에만, Vedecaps의 데이터 디렉터리 안에 설치하고 전역 설치는 하지 않음). `"lsp_install": false`로 끌 수 있습니다. 포매터는 자동 설치하지 않습니다.
 
 ## 커스텀 명령
 
@@ -326,7 +326,7 @@ export default async ({ directory }) => ({
 })
 ```
 
-로드 위치: 전역 설정 디렉터리의 `plugin/`, 설정의 `"plugin": ["./경로.js"]`, 그리고 **신뢰한** 프로젝트의 `.vedecaps/plugin/`. 플러그인은 사용자 권한으로 실행되므로 직접 읽어 본 것만 설치하세요. `vedecaps debug`에서 로드된 플러그인과 실패 원인을 볼 수 있습니다. 훅이 예외를 던져도 에이전트는 멈추지 않으며(`tool.execute.before`는 의도된 차단으로 취급), npm 패키지 형태의 플러그인은 아직 지원하지 않습니다.
+로드 위치: 전역 설정 디렉터리의 `plugin/`, 설정의 `"plugin": ["./경로.js"]`, 그리고 **신뢰한** 프로젝트의 `.vedecaps/plugin/`. 플러그인은 사용자 권한으로 실행되므로 직접 읽어 본 것만 설치하세요. `vedecaps debug`에서 로드된 플러그인과 실패 원인을 볼 수 있습니다. 훅이 예외를 던져도 에이전트는 멈추지 않으며(`tool.execute.before`는 의도된 차단으로 취급), npm 패키지는 정확한 버전을 지정해 `vedecaps plugin install @scope/plugin@1.2.3`으로 명시적으로 설치합니다. 설치 스크립트는 실행하지 않고 잠금 파일을 보관합니다. 설정에는 `"npm:@scope/plugin@1.2.3"`을 넣으며, 시작할 때 자동 설치하지 않습니다. 패키지는 Vedecaps 플러그인 형식의 default export를 제공해야 합니다.
 
 ## SDK
 
@@ -383,7 +383,7 @@ vedecaps pr 123 --no-ui > review.md   # UI 없이 결과만 출력
 ## GitHub Action
 
 ```yaml
-- uses: nxodh/vedecaps@v0.1.1
+- uses: nxodh/vedecaps@v0.1.2
   env:
     ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
   with:
@@ -409,7 +409,7 @@ vedecaps pr 123 --no-ui > review.md   # UI 없이 결과만 출력
 permissions: { contents: write, pull-requests: write }
 steps:
   - uses: actions/checkout@v4
-  - uses: nxodh/vedecaps@v0.1.1   # 이 옵션들은 다음 릴리스부터 태그에 포함됩니다
+  - uses: nxodh/vedecaps@v0.1.2
     env: { ANTHROPIC_API_KEY: "${{ secrets.ANTHROPIC_API_KEY }}" }
     with:
       prompt: 의존성 경고를 고쳐줘
@@ -464,16 +464,65 @@ PR 리뷰와 `/vedecaps` 댓글 응답 예시는 [`examples/github`](examples/gi
 | `GET /agent`, `/provider`, `/command`, `/config`, `/project` | 정보 조회 (키는 포함되지 않음) |
 | `GET /find/file?query=` | 파일 퍼지 검색 |
 
+## 0.1.2에 추가된 기능
+
+0.1.1 사용자는 `vedecaps upgrade`로 업데이트할 수 있습니다. 다음 기능은 0.1.2부터 지원합니다.
+
+### 키 바인딩
+
+사용자 설정 또는 신뢰한 프로젝트의 `vedecaps.json`에서 지정합니다. 쉼표는 대체 키를 뜻하며 `none`은 해당 동작을 끕니다. 사용자 지정 키는 충돌하는 기본 키보다 우선합니다. 변경 후 재시작하면 적용되며 `/help`에 설정된 키가 표시됩니다.
+
+```json
+{
+  "keybinds": {
+    "submit": "ctrl+g",
+    "newline": "enter,alt+enter",
+    "models": "ctrl+p",
+    "sessions": "ctrl+o"
+  }
+}
+```
+
+편집 동작: `up`, `down`, `left`, `right`, `word_left`, `word_right`, `line_start`, `line_end`, `backspace`, `delete`, `delete_word`, `delete_line_start`, `delete_line_end`. 화면 동작: `submit`, `newline`, `interrupt`, `clear_exit`, `quit`, `agent_next`, `models`, `sessions`, `new_session`, `help`, `editor`. 특수 키는 enter/escape/tab/backspace/delete/방향키/home/end를 지원하며 ctrl/alt/shift를 조합할 수 있습니다. 대화상자의 선택 키는 기존 기본값을 사용합니다.
+
+### npm 플러그인·SDK
+
+- `vedecaps plugin install <이름@정확한버전>`: 검토한 패키지를 명시적으로 설치하고 활성화합니다. 비대화형 설치에는 `--yes`가 필요합니다. URL·Git·파일·버전 범위는 허용하지 않습니다.
+- `vedecaps plugin list`, `vedecaps plugin remove <이름@버전>`: 상태 확인과 비활성화. 플러그인은 사용자 권한으로 실행되므로 패키지의 코드를 먼저 검토하세요. 제거는 캐시를 지우지 않습니다.
+- [Python SDK](sdk/python/README.md): Python 3.10+, HTTP API·이벤트·권한·서버 실행. `python -m pip install ./sdk/python`으로 체크아웃에서 설치합니다.
+- [Go SDK](sdk/go/README.md): Go 1.22+, HTTP API·이벤트·권한. 외부 런타임 의존성이 없습니다.
+- Python SDK는 PyPI에 게시하지 않았고 Go SDK는 별도 모듈 태그가 없습니다. JavaScript SDK도 현재 npm 미게시 상태입니다.
+
+### 추가 언어 서버·Alpine
+
+언어 서버 설치는 프로젝트를 신뢰하고 해당 설치를 승인한 뒤에만 이루어집니다. clangd·ZLS·LuaLS는 공식 GitHub 배포본의 SHA-256을 검증하며 라이선스와 보조 파일도 유지합니다. 검증 가능한 체크섬이 없는 배포본은 거부합니다. clangd의 공식 Linux/Windows arm64 배포본이 없으면 시스템 패키지 설치를 안내합니다. ZLS는 설치된 안정 Zig의 major/minor 버전에 맞춰 다운로드합니다. Ruby LSP는 Ruby·RubyGems가 필요하며 의존성 설치 중 네이티브 코드를 빌드할 수 있습니다. LuaLS·clangd의 공식 Linux 바이너리가 glibc를 요구하는 Alpine 환경에서는 시스템 패키지를 사용하세요.
+
+musl용 x64·arm64 실행파일, 설치기의 libc 감지, 자체 업데이트가 추가됐습니다. Alpine에는 `libstdc++`·`libgcc`가 필요합니다. 시스템 패키지를 몰래 설치하지 않습니다.
+
+### 세션 공유
+
+`/share [파일.html]` 또는 `vedecaps share [id] -o session.html`은 실행 가능한 HTML을 이스케이프한 읽기 전용 대화 파일을 만듭니다. 도구 출력·추론·첨부 내용은 제외하며 알려진 비밀 값을 가립니다. 자동 가리기만 믿지 말고 개인적인 대화 내용을 직접 검토한 뒤 공유하세요.
+
+```sh
+vedecaps share ses_example -o session.html
+# 파일을 검토한 뒤 로컬 임시 링크를 만들기
+vedecaps share ses_example --serve --yes --ttl 3600
+```
+
+뷰어는 에이전트 API와 별개이며 읽기만 제공합니다. 주소는 loopback으로 제한하고 1시간 후 종료되며 Ctrl+C로 즉시 중단할 수 있습니다. 링크를 아는 사람은 읽을 수 있습니다. 다른 기기의 접근은 별도로 구성한 HTTPS 역방향 프록시가 필요합니다. 평문 HTTP로 대화를 네트워크에 직접 공개하는 기능은 제공하지 않습니다. 외부 호스팅 서비스로 자동 업로드하지 않습니다.
+
+### 신뢰·인증
+
+신뢰하지 않은 프로젝트의 명령·에이전트 Markdown, 환경변수·파일 치환, 자동 포매터·LSP 실행은 적용하지 않습니다. 셸 치환은 세션의 권한 규칙을 거칩니다. 네트워크에 공개하는 에이전트 API는 암호가 필수이며 SDK의 원격 연결은 HTTPS를 요구합니다. 구독 OAuth·MCP OAuth의 보류 근거는 [인증 정책 검토](docs/oauth-policy.md)를 참고하세요.
+
 ## OpenCode와의 차이
 
 구조와 사용법은 OpenCode를 따랐습니다. 아직 **없는** 기능은 다음과 같습니다.
 
-- 세션 공유(`/share`): 호스팅 서비스가 필요합니다. `/export`를 쓰세요.
+- 중앙 호스팅 세션 공유: HTML 파일과 만료되는 자가 호스팅 뷰어는 제공하지만 중앙 업로드 서비스는 없습니다.
 - 구독 계정 OAuth 로그인: API 키만 지원합니다(의도적으로 구현하지 않았습니다).
 - Amazon Bedrock, Google Vertex AI, Azure 전용 인증
-- npm 패키지 형태의 플러그인, Python 등 다른 언어 SDK
-- clangd·zls·ruby-lsp·lua-language-server 자동 설치, MCP OAuth
-- 키 바인딩 설정, musl(Alpine) 빌드
+- MCP OAuth: 연결 대상의 이용 조건·클라이언트 등록 허용 여부를 확인하기 전에는 보수적으로 제외합니다.
 
 ## 개발
 

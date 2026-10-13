@@ -11,6 +11,7 @@ import { messageText, type AssistantMessage, type Part, type ToolPart } from "..
 import { parse, type CommandSpec, UsageError } from "../args"
 import { readStdin } from "../input"
 import { bootstrap } from "../bootstrap"
+import { redact } from "../../util/redact"
 
 export const spec: CommandSpec = {
   usage: "vedecaps run [message..] [options]",
@@ -100,7 +101,7 @@ export async function main(argv: string[]): Promise<number> {
 
   const skip = !!values["dangerously-skip-permissions"]
   let denied = 0
-  const stderr = (line: string) => process.stderr.write(line + "\n")
+  const stderr = (line: string) => process.stderr.write(redact(line) + "\n")
   const emitted = new Set<string>()
   const emit = (type: string, extra: Record<string, unknown>) => {
     process.stdout.write(JSON.stringify({ type, timestamp: Date.now(), sessionID, ...extra }) + "\n")

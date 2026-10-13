@@ -1,7 +1,7 @@
 import fs from "node:fs/promises"
 import path from "node:path"
 import { spawn, type ChildProcess } from "node:child_process"
-import { getConfig, type FormatterConfig } from "../config/config"
+import { getConfig, loadConfig, type FormatterConfig } from "../config/config"
 import { project } from "../project"
 import { exists, findUp, readJSON } from "../util/fs"
 import { createLogger } from "../util/log"
@@ -284,6 +284,7 @@ async function runFormatter(info: FormatterInfo, abs: string, ctx: Ctx): Promise
 /** Formats `file` in place. Returns the formatter name used, or undefined when none applied. Never throws. */
 export async function formatFile(file: string): Promise<string | undefined> {
   try {
+    if (!(await loadConfig()).trusted) return undefined
     const config = await getConfig()
     if (config.formatter === false) return undefined
     const cfg: Record<string, FormatterConfig> = config.formatter || {}

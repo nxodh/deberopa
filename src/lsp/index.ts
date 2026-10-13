@@ -1,5 +1,5 @@
 import path from "node:path"
-import { getConfig } from "../config/config"
+import { getConfig, loadConfig } from "../config/config"
 import { project } from "../project"
 import { exists, findUp, isInside } from "../util/fs"
 import { createLogger } from "../util/log"
@@ -223,6 +223,7 @@ export interface InstallPrompt {
  */
 export async function offerInstall(file: string, prompt: InstallPrompt): Promise<string | undefined> {
   try {
+    if (!(await loadConfig()).trusted) return undefined
     const config = await getConfig()
     if (config.lsp === false || config.lsp_install === false) return undefined
     const ext = path.extname(file).toLowerCase()
@@ -264,6 +265,7 @@ export async function offerInstall(file: string, prompt: InstallPrompt): Promise
 /** Tell the right server(s) about a changed file. When `wait` is true, waits (bounded) for fresh diagnostics. Never throws. */
 export async function touchFile(file: string, wait = false): Promise<void> {
   try {
+    if (!(await loadConfig()).trusted) return
     const abs = path.resolve(file)
     const ext = path.extname(abs).toLowerCase()
     const matches = (await activeServers()).filter((spec) => spec.extensions.includes(ext))

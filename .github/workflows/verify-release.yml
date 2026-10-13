@@ -11,6 +11,17 @@ permissions:
   contents: read
 
 jobs:
+  alpine:
+    name: curl installer on Alpine
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    container: alpine:3.22
+    steps:
+      - run: |
+          apk add --no-cache curl ca-certificates libstdc++ libgcc
+          curl -fsSL https://raw.githubusercontent.com/nxodh/vedecaps/main/install.sh | sh
+          "$HOME/.vedecaps/bin/vedecaps" --version
+          "$HOME/.vedecaps/bin/vedecaps" upgrade --check
   debian:
     name: curl | sh on Debian 13
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}

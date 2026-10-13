@@ -24,7 +24,7 @@ Do not call any tools. Respond with the summary only.`
 export function shouldCompact(tokens: Usage, model: Model, reserved?: number): boolean {
   const context = model.limit.context
   if (!context) return false
-  const reserve = reserved ?? Math.min(model.limit.output || 8192, 32_000)
+  const reserve = Math.max(1, Math.min(reserved ?? (model.limit.output || 8192), 32_000, Math.floor(context / 4)))
   return totalTokens(tokens) >= context - reserve
 }
 

@@ -5,6 +5,7 @@ import { flush } from "../session/store"
 import { shutdownLsp } from "../lsp"
 import { shutdownMcp, startMcp } from "../mcp"
 import { cancel, busySessions } from "../session/prompt"
+import { redact } from "../util/redact"
 
 export interface BootstrapOptions {
   directory?: string
@@ -49,7 +50,7 @@ export async function runAndExit(fn: () => Promise<number | void>): Promise<neve
   try {
     code = (await fn()) ?? 0
   } catch (err) {
-    process.stderr.write(`Error: ${err instanceof Error ? err.message : String(err)}\n`)
+    process.stderr.write(`Error: ${redact(err instanceof Error ? err.message : String(err))}\n`)
     code = 1
   }
   await shutdown()

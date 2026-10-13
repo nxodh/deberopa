@@ -5,6 +5,7 @@ import { parse, UsageError, type CommandSpec } from "../args"
 import { bootstrap } from "../bootstrap"
 import fs from "node:fs/promises"
 import { parse as parseJsonc } from "jsonc-parser"
+import { redact } from "../../util/redact"
 
 export const spec: CommandSpec = {
   usage: "vedecaps mcp <list|add|remove> [name] [-- command args..]",
@@ -40,7 +41,7 @@ export async function main(argv: string[]): Promise<number> {
       const s = status.get(n)
       const server = config.mcp![n]!
       const where = server.type === "remote" ? server.url : server.command.join(" ")
-      process.stdout.write(`${n.padEnd(16)} ${(s?.status ?? "unknown").padEnd(10)} ${s ? `${s.tools} tools`.padEnd(10) : "".padEnd(10)} ${where}${s?.error ? `\n    ${s.error.split("\n")[0]}` : ""}\n`)
+      process.stdout.write(redact(`${n.padEnd(16)} ${(s?.status ?? "unknown").padEnd(10)} ${s ? `${s.tools} tools`.padEnd(10) : "".padEnd(10)} ${where}${s?.error ? `\n    ${s.error.split("\n")[0]}` : ""}\n`))
     }
     return 0
   }

@@ -106,6 +106,9 @@ Usage:
     if (args.workdir) await assertInsideProject(ctx, cwd, "directory")
     const timeout = Math.min(Math.max(1000, args.timeout ?? DEFAULT_TIMEOUT), MAX_TIMEOUT)
     const commands = splitCommands(args.command)
+    // A prefix allow-rule must never authorize nested shell execution or file redirection.
+    // Literal matches can ask unnecessarily, which is safer than guessing shell grammar.
+    if (/\$\(|`|[<>]|(?:^|\s)(?:--output|--ext-diff|--textconv)(?:[=\s]|$)/.test(args.command)) commands.push("[shell expansion or redirection]")
     await ctx.ask({
       permission: "bash",
       patterns: commands.length ? commands : [args.command],

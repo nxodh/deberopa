@@ -144,7 +144,7 @@ export async function* streamOpenAI(input: StreamInput): AsyncGenerator<StreamEv
 
   let response: Response
   try {
-    response = await fetch(url, { method: "POST", headers, body: JSON.stringify(buildBody(input)), signal: input.signal })
+    response = await fetch(url, { method: "POST", headers, body: JSON.stringify(buildBody(input)), signal: input.signal, redirect: "error" })
   } catch (err) {
     if (input.signal?.aborted || (err instanceof Error && err.name === "AbortError")) {
       const abort = new Error("Aborted")

@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 0.1.2
+
+- Update VS Code packaging to vsce 4, removing the vulnerable braces dependency chain; extension packaging requires Node.js 22+.
+
+- Automatic Git status disables repository fsmonitor execution; plan/explore shell commands require permission instead of relying on command-name allowlists.
+
+- Fix project trust bypasses in Markdown agents/commands, file/env substitutions, relative global plugins, and automatic formatters/LSPs. Shell substitutions follow session permissions and cannot be introduced through arguments.
+- Harden server origins, hosts, body limits, response redaction and non-local authentication; prevent credential-bearing redirects and legacy MCP cross-origin endpoints.
+- Resolve symlinks for external-path and sensitive-file permissions. Imported sessions discard machine-local snapshots/native replay data and receive fresh part IDs; snapshot restores are project-bounded and ignore global Git hooks/filters.
+- Fix automatic compaction when the configured output limit fills a small context window.
+- Configurable terminal prompt key bindings, including model/session shortcuts.
+- Explicit version-pinned npm plugins with installation confirmation, disabled lifecycle scripts, lockfiles and no automatic startup installation.
+- Dependency-free Python and Go HTTP/SSE SDKs. Fix JavaScript SDK server password propagation.
+- Additional consent-based LSP installers: clangd, ZLS, Ruby LSP and LuaLS. Official binary downloads verify published SHA-256 and reject unsafe archive entries.
+- Linux musl x64/arm64 executables, libc-aware installers/upgrade, Alpine CI and release verification. Alpine requires libstdc++/libgcc.
+- Read-only HTML session sharing and separate expiring self-hosted viewers, with no third-party uploads.
+- Subscription-account OAuth and MCP OAuth remain unimplemented under the conservative service-policy review. Bedrock, Vertex and Azure remain outside this change.
+
 - Status bar shows the git branch, number of changed files and ahead/behind counts.
 - `/undo` now says when it cannot restore files (not a git repository, git missing, snapshots off) and warns once when an edited file is git-ignored.
 - `vedecaps pr <number|url> [message]` checks out a GitHub pull request through `gh` and reviews it read-only, or works on it when given a message. Refuses uncommitted changes; the PR description is passed as untrusted text.

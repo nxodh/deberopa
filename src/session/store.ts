@@ -22,6 +22,7 @@ const dirty = new Map<string, Message>()
 let flushTimer: ReturnType<typeof setTimeout> | undefined
 
 async function locate(sessionID: string): Promise<string | undefined> {
+  if (!/^ses_[a-z0-9]+$/i.test(sessionID)) return undefined
   const cached = infoCache.get(sessionID)
   if (cached) return sessionDir(cached.projectID, sessionID)
   const here = sessionDir(project().id, sessionID)

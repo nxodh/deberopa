@@ -6,6 +6,8 @@
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
+import { targetName } from "../src/update/update"
+import { createHash } from "node:crypto"
 
 const bin = path.resolve(process.argv[2] ?? "")
 if (!process.argv[2] || !fs.existsSync(bin)) {
@@ -77,6 +79,22 @@ const withTool = await vedecaps(["run", "read hello.txt"])
 const toolReply = seen.at(-1)?.messages?.find((m: any) => m.role === "tool")?.content ?? ""
 check("run: tool round trip", withTool.code === 0 && withTool.stdout.includes("greeting") && String(toolReply).includes("greetings from the smoke test"), JSON.stringify(withTool))
 
+// An installed package resolves in the compiled runtime without npm, Node, or Bun on PATH.
+{
+  const spec = "fixture-plugin@1.2.3"
+  const data = path.join(home, "data", "plugins", createHash("sha256").update(spec).digest("hex"))
+  const moduleDir = path.join(data, "node_modules", "fixture-plugin")
+  fs.mkdirSync(moduleDir, { recursive: true })
+  fs.writeFileSync(path.join(data, "package-lock.json"), "{}")
+  fs.writeFileSync(path.join(moduleDir, "package.json"), JSON.stringify({ name: "fixture-plugin", version: "1.2.3", type: "module", exports: "./index.js" }))
+  fs.writeFileSync(path.join(moduleDir, "index.js"), 'export default () => ({tool:{fixture:{description:"Fixture",parameters:{type:"object",properties:{}},execute:()=>"package plugin worked"}}})')
+  ;(config as any).plugin = ["npm:" + spec]
+  queue.push(tool("fixture", {}), text("plugin done"))
+  const result = await vedecaps(["run", "use the fixture plugin"])
+  check("npm plugin in compiled binary", result.code === 0 && seen.at(-1)?.messages?.some((m: any) => m.role === "tool" && String(m.content).includes("package plugin worked")), JSON.stringify(result))
+  delete (config as any).plugin
+}
+
 queue.push(text("from stdin"))
 const piped = await vedecaps(["run", "echo"], "piped input")
 check("run: piped stdin", piped.code === 0 && String(seen.at(-1)?.messages?.at(-1)?.content).includes("piped input"), JSON.stringify(piped))
@@ -127,7 +145,7 @@ check("debug", debug.code === 0 && debug.stdout.includes("Providers"), JSON.stri
   const { createHash } = await import("node:crypto")
   const windows = process.platform === "win32"
   const exe = windows ? "vedecaps.exe" : "vedecaps"
-  const target = `${windows ? "windows" : process.platform}-${process.arch}`
+  const target = targetName()
   const asset = `vedecaps-${target}.${windows ? "zip" : "tar.gz"}`
   const stage = fs.mkdtempSync(path.join(os.tmpdir(), "vdc-smoke-release-"))
   const installDir = fs.mkdtempSync(path.join(os.tmpdir(), "vdc-smoke-install-"))

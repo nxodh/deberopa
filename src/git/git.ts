@@ -57,7 +57,7 @@ export function parseStatus(output: string): GitStatus | undefined {
  * when git is slow. Read-only: optional locks are off so it never blocks the user's own git.
  */
 export async function gitStatus(cwd: string, timeoutMs = 4000): Promise<GitStatus | undefined> {
-  const result = await run("git", ["status", "--porcelain=v1", "-b", "--untracked-files=normal"], {
+  const result = await run("git", ["-c", "core.fsmonitor=false", "status", "--porcelain=v1", "-b", "--untracked-files=normal"], {
     cwd,
     timeout: timeoutMs,
     env: { GIT_OPTIONAL_LOCKS: "0", GIT_TERMINAL_PROMPT: "0", LC_ALL: "C" },

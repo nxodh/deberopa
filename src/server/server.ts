@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto"
 import { VERSION } from "../global"
 import { project } from "../project"
 import { subscribe } from "../util/bus"
-import { redactDeep } from "../util/redact"
+import { redactDeep, registerSecret } from "../util/redact"
 import { listFiles } from "../util/walk"
 import { getConfig } from "../config/config"
 import { listAgents } from "../agent/agent"
@@ -31,11 +31,25 @@ class HttpError extends Error {
   }
 }
 
-const json = (data: unknown, status = 200) => Response.json(data, { status })
+const json = (data: unknown, status = 200) => Response.json(redactDeep(data), { status })
 
 async function body(req: Request): Promise<Record<string, any>> {
   if (req.method === "GET" || req.method === "DELETE") return {}
-  const text = await req.text()
+  const reader = req.body?.getReader()
+  const chunks: Uint8Array[] = []
+  let size = 0
+  if (reader) {
+    try {
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        size += value.length
+        if (size > 1024 * 1024) { await reader.cancel(); throw new HttpError(413, "Request body is too large") }
+        chunks.push(value)
+      }
+    } finally { reader.releaseLock() }
+  }
+  const text = Buffer.concat(chunks).toString("utf8")
   if (text.trim() === "") return {}
   try {
     const parsed = JSON.parse(text)
@@ -227,11 +241,18 @@ async function route(req: Request): Promise<Response> {
 
 export function startServer(options: ServerOptions = {}) {
   const password = options.password ?? process.env.VEDECAPS_SERVER_PASSWORD
+  const hostname = options.hostname ?? "127.0.0.1"
+  if (!["127.0.0.1", "localhost", "::1"].includes(hostname) && !password) throw new Error("A non-local server requires VEDECAPS_SERVER_PASSWORD.")
+  registerSecret(password)
   return Bun.serve({
     port: options.port ?? 4096,
-    hostname: options.hostname ?? "127.0.0.1",
+    hostname,
     idleTimeout: 0,
     async fetch(req) {
+      const requestURL = new URL(req.url)
+      if (["127.0.0.1", "localhost", "::1"].includes(hostname) && !["127.0.0.1", "localhost", "::1", "[::1]"].includes(requestURL.hostname)) return new Response("Forbidden host", { status: 403 })
+      const origin = req.headers.get("origin")
+      if (origin && origin !== requestURL.origin) return new Response("Forbidden origin", { status: 403 })
       if (!authorized(req, password)) {
         return new Response("Unauthorized", { status: 401, headers: { "www-authenticate": 'Basic realm="vedecaps"' } })
       }

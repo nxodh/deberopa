@@ -5,6 +5,7 @@ import * as E from "./editor"
 import { fuzzyFilter } from "./fuzzy"
 import { Muted, Plain } from "./view"
 import type { Theme } from "./theme"
+import { boundAction, DEFAULT_KEYBINDS, type KeyAction } from "./keybinds"
 
 export interface Completion {
   /** Text shown in the list. */
@@ -23,6 +24,7 @@ export interface PromptProps {
   active: boolean
   busy: boolean
   history: string[]
+  keybinds?: Record<string, string>
   commands: Completion[]
   files: () => Promise<string[]>
   onSubmit(text: string): void
@@ -124,7 +126,11 @@ export function Prompt(props: PromptProps) {
 
   useInput(
     (input, key) => {
-      if (key.escape) {
+      const bound = (action: KeyAction) => boundAction(action, props.keybinds, input, key)
+      for (const [action, command] of [["models", "models"], ["sessions", "sessions"], ["new_session", "new"], ["help", "help"], ["editor", "editor"]] as const) {
+        if (bound(action)) return props.onCommand(command)
+      }
+      if (bound("interrupt")) {
         if (popup) return setDismissed(true)
         if (props.busy) {
           if (armedInterrupt) {
@@ -139,23 +145,24 @@ export function Prompt(props: PromptProps) {
         if (state.text !== "") update(E.empty())
         return
       }
-      if (key.ctrl && input === "c") {
+      if (bound("clear_exit")) {
         if (state.text !== "") return update(E.empty())
         if (armedExit) return props.onExit()
         setArmedExit(true)
         setTimeout(() => setArmedExit(false), 2500).unref?.()
         return
       }
-      if (key.ctrl && input === "d") {
+      if (bound("quit")) {
         if (state.text === "") return props.onExit()
         return update(E.deleteForward(state))
       }
-      if (key.tab) {
+      if (bound("agent_next")) {
         if (popup) return accept(false)
         if (!key.shift) return props.onCycleAgent()
         return
       }
-      if (key.return) {
+      if (bound("newline")) return update(E.insert(state, "\n"))
+      if (bound("submit")) {
         // Shift+Enter (terminals with the kitty protocol), Alt+Enter, or a trailing backslash add a line.
         if (key.shift || key.meta) return update(E.insert(state, "\n"))
         if (state.text[state.cursor - 1] === "\\") return update(E.insert(E.backspace(state), "\n"))
@@ -163,34 +170,33 @@ export function Prompt(props: PromptProps) {
         if (popup && token?.kind === "file") return accept(false)
         return submit()
       }
-      if (input === "\n" || (key.ctrl && input === "j")) return update(E.insert(state, "\n"))
-      if (key.upArrow) {
+      if (bound("up")) {
         if (popup) return setSelected((index - 1 + options.length) % options.length)
         const moved = E.vertical(state, inner, -1)
         return moved ? setState(moved) : history(-1)
       }
-      if (key.downArrow) {
+      if (bound("down")) {
         if (popup) return setSelected((index + 1) % options.length)
         const moved = E.vertical(state, inner, 1)
         return moved ? setState(moved) : history(1)
       }
-      if (key.leftArrow) return setState(key.meta || key.ctrl ? E.wordLeft(state) : E.left(state))
-      if (key.rightArrow) return setState(key.meta || key.ctrl ? E.wordRight(state) : E.right(state))
-      if (key.home || (key.ctrl && input === "a")) return setState(E.lineStart(state))
-      if (key.end || (key.ctrl && input === "e")) return setState(E.lineEnd(state))
-      if (key.backspace) return update(key.meta ? E.killWordBack(state) : E.backspace(state))
-      if (key.delete) return update(E.deleteForward(state))
-      if (key.ctrl && input === "w") return update(E.killWordBack(state))
-      if (key.ctrl && input === "u") return update(E.killToLineStart(state))
-      if (key.ctrl && input === "k") return update(E.killToLineEnd(state))
-      if (key.ctrl && input === "b") return setState(E.left(state))
-      if (key.ctrl && input === "f") return setState(E.right(state))
-      if (key.meta && input === "b") return setState(E.wordLeft(state))
-      if (key.meta && input === "f") return setState(E.wordRight(state))
+      if (bound("word_left")) return setState(E.wordLeft(state))
+      if (bound("word_right")) return setState(E.wordRight(state))
+      if (bound("left")) return setState(E.left(state))
+      if (bound("right")) return setState(E.right(state))
+      if (bound("line_start")) return setState(E.lineStart(state))
+      if (bound("line_end")) return setState(E.lineEnd(state))
+      if (bound("delete_word")) return update(E.killWordBack(state))
+      if (bound("backspace")) return update(E.backspace(state))
+      if (bound("delete")) return update(E.deleteForward(state))
+      if (bound("delete_line_start")) return update(E.killToLineStart(state))
+      if (bound("delete_line_end")) return update(E.killToLineEnd(state))
+      if (key.return || key.tab || key.escape || key.backspace || key.delete) return
       if (key.ctrl || key.meta || key.pageUp || key.pageDown) return
+      if (input === "\n") return
       // Several keystrokes can arrive in one chunk (fast typing, automation, terminals without
       // bracketed paste). A trailing Enter in such a chunk still means "send".
-      const sends = input.length > 1 && /[\r\n]$/.test(input)
+      const sends = input.length > 1 && /[\r\n]$/.test(input) && boundAction("submit", props.keybinds, "", { return: true })
       const body = sends ? input.replace(/[\r\n]+$/, "") : input
       // Drop stray control bytes; everything printable (including IME-composed text) is inserted.
       const printable = body.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "")
@@ -223,15 +229,16 @@ export function Prompt(props: PromptProps) {
   } else setCursorPosition(undefined)
 
   const labelWidth = popup ? Math.min(Math.max(...options.map((o) => stringWidth(o.label))) + 2, Math.max(12, Math.floor(props.width * 0.55))) : 0
+  const binding = (action: KeyAction) => props.keybinds?.[action] ?? DEFAULT_KEYBINDS[action]
   const hint = armedExit
-    ? "press ctrl+c again to exit"
+    ? `press ${binding("clear_exit")} again to exit`
     : armedInterrupt
-      ? "press esc again to interrupt"
+      ? `press ${binding("interrupt")} again to interrupt`
       : props.busy
-        ? "esc esc to interrupt"
+        ? `${binding("interrupt")} twice to interrupt`
         : shellMode
-          ? "shell mode · enter to run"
-          : "enter to send · \\ + enter for a new line · tab to switch agent"
+          ? `shell mode · ${binding("submit")} to run`
+          : `${binding("submit")} to send · ${binding("newline").split(",")[0]} for a new line · ${binding("agent_next")} to switch agent`
 
   return (
     <Box flexDirection="column" width={props.width}>
@@ -239,10 +246,15 @@ export function Prompt(props: PromptProps) {
         <Box flexDirection="column" borderStyle="round" borderColor={theme.border} borderDimColor={!theme.border} paddingX={1} width={props.width}>
           {options.slice(popupStart, popupStart + POPUP_ROWS).map((option, i) => {
             const active = popupStart + i === index
-            const label = option.label.length > labelWidth - 1 ? "…" + option.label.slice(-(labelWidth - 2)) : option.label
+            let label = option.label
+            if (stringWidth(label) > labelWidth - 1) {
+              const chars = [...label]
+              while (chars.length && stringWidth("…" + chars.join("")) > labelWidth - 1) chars.shift()
+              label = "…" + chars.join("")
+            }
             return (
               <Text key={option.label} wrap="truncate-end">
-                <Plain theme={theme} inverse={active} bold={active}>{" " + label.padEnd(labelWidth) }</Plain>
+                <Plain theme={theme} inverse={active} bold={active}>{" " + label + " ".repeat(Math.max(0, labelWidth - stringWidth(label)))}</Plain>
                 <Muted theme={theme}>{option.description ? "  " + option.description : ""}</Muted>
               </Text>
             )

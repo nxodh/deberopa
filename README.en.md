@@ -22,7 +22,7 @@ Windows (PowerShell):
 irm https://raw.githubusercontent.com/nxodh/vedecaps/main/install.ps1 | iex
 ```
 
-The installers verify the release's SHA-256 checksum, install to `~/.vedecaps/bin` (`%LOCALAPPDATA%\vedecaps\bin` on Windows) and add it to your PATH. Set `VEDECAPS_VERSION`, `VEDECAPS_INSTALL_DIR` or `VEDECAPS_NO_MODIFY_PATH=1` to change that. musl-based distributions (Alpine) are not supported yet.
+The installers verify the release's SHA-256 checksum, install to `~/.vedecaps/bin` (`%LOCALAPPDATA%\vedecaps\bin` on Windows) and add it to your PATH. Set `VEDECAPS_VERSION`, `VEDECAPS_INSTALL_DIR` or `VEDECAPS_NO_MODIFY_PATH=1` to change that. musl x64/arm64 builds are available from 0.1.2. Alpine requires libstdc++ and libgcc (apk add --no-cache libstdc++ libgcc).
 
 Update with `vedecaps upgrade`; remove with `vedecaps uninstall`.
 
@@ -58,7 +58,7 @@ The full reference (configuration, permissions, commands, HTTP routes) is in the
 - **Language servers on request**: TypeScript, Pyright, gopls and rust-analyzer are offered for installation (with consent, into Vedecaps' own directory).
 - **Project trust**: an untrusted repository's config cannot start programs, route requests/keys elsewhere, or silence permission prompts until you run `vedecaps trust`.
 - **Plugins**: local JS/TS files adding tools and hooks (`tool.execute.before/after`, `chat.system`, `event`); work in the compiled binary without Node or Bun.
-- **SDK** (`sdk/js`), **ACP server** (`vedecaps acp`, for Zed and other editors), **VS Code extension** (`ide/vscode`), **GitHub Action** (`uses: nxodh/vedecaps@v0.1.1`).
+- **SDK** (`sdk/js`), **ACP server** (`vedecaps acp`, for Zed and other editors), **VS Code extension** (`ide/vscode`), **GitHub Action** (`uses: nxodh/vedecaps@v0.1.2`).
 - `@file#L10-20` mentions attach only those lines.
 
 The Korean README documents all of these in detail.
@@ -73,7 +73,7 @@ The Korean README documents all of these in detail.
 
 ## Not yet
 
-Session sharing, subscription-account OAuth login (deliberately not implemented), Bedrock / Vertex / Azure authentication, npm-packaged plugins, SDKs for other languages, automatic installation of clangd / zls / ruby-lsp / lua-language-server, MCP OAuth, configurable key bindings, musl builds.
+Central hosted sharing, subscription-account OAuth and MCP OAuth (conservatively deferred pending service-specific authorization review), and Bedrock / Vertex / Azure authentication (outside the current scope). See [the authentication policy review](docs/oauth-policy.md).
 
 ## Development
 
@@ -91,3 +91,13 @@ Pushing a `v*` tag that matches `package.json` builds and publishes a release.
 ## License
 
 [MIT](LICENSE)
+
+## Added in 0.1.2
+
+- Configurable prompt key bindings under `keybinds`: comma-separated alternatives, ctrl/alt/shift modifiers, and `none` to disable. For example, `{"submit":"ctrl+g","newline":"enter","models":"ctrl+p"}`. `/help` shows the configured bindings; restart after editing config. User overrides win over conflicting defaults. Dialog selection keys retain their defaults.
+- Explicit, exact-version npm plugins: `vedecaps plugin install name@1.2.3`, `list`, and `remove`. Review the code first: plugins run with your full privileges. Non-interactive installs need `--yes`. Lifecycle scripts are disabled, lockfiles retained, and URL/file/git/range specs rejected. Config uses `npm:name@1.2.3`; startup never installs packages.
+- Dependency-free [Python SDK](sdk/python/README.md) and [Go SDK](sdk/go/README.md). These are checkout packages, not published registry releases. Remote SDK connections require HTTPS.
+- Consent-based installers for clangd, ZLS, Ruby LSP and LuaLS. Official binary downloads require a matching SHA-256; ZLS matches the installed stable Zig major/minor. Unsupported official platforms fall back to manual system installation. Ruby/RubyGems are required for Ruby LSP and dependencies may compile native code. clangd and LuaLS on Alpine should use system packages if upstream supplies only glibc builds.
+- Linux musl x64/arm64 builds, libc-aware installation and upgrade. Alpine needs libstdc++/libgcc, which the installer does not silently install.
+- `/share [file.html]` and `vedecaps share [id] -o session.html` export escaped, read-only HTML without tools, reasoning or attachment contents. Review private content yourself before sharing. `--serve --yes --ttl 3600` starts a separate expiring viewer on loopback; Non-loopback binding is rejected; remote access requires a separately configured HTTPS reverse proxy. Links grant read access to anyone possessing them; Ctrl+C revokes sharing. No hosted service upload occurs.
+- Untrusted projects cannot load executable command/agent definitions, expand local files/env vars, or auto-run formatters/LSPs. Shell substitutions follow session permissions. Non-local agent APIs require a password; cross-origin and redirect-based credential forwarding are rejected.

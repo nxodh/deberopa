@@ -5,6 +5,7 @@ import { expandTemplate, getCommand, listCommands, runCommand, splitArguments, C
 import { resetCommands } from "../src/command/command"
 import { createSession } from "../src/session/store"
 import { mockConfig, reply, startMockLLM, tmpDir, useProject, type MockLLM, endProject } from "./helpers"
+import { detectShell, run } from "../src/util/shell"
 
 let mock: MockLLM
 let dir: string
@@ -35,8 +36,12 @@ test("template placeholders", async () => {
 
 test("shell output injection runs in the project directory", async () => {
   fs.writeFileSync(path.join(dir, "marker.txt"), "x")
-  const out = await expandTemplate("Files: !`echo hello-from-shell`", "", dir)
+  const out = await expandTemplate("Files: !`echo hello-from-shell`", "", dir, async (command) => {
+    const shell = detectShell()
+    return (await run(shell.path, [...shell.args, command], { cwd: dir })).stdout
+  })
   expect(out).toBe("Files: hello-from-shell")
+  await expect(expandTemplate("!`echo never`", "", dir)).rejects.toThrow("permission checks")
 })
 
 test("commands load from config, command/*.md (nested) and built-ins", async () => {

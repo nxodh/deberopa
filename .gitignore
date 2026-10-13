@@ -18,3 +18,7 @@ state.json
 
 out/
 *.vsix
+__pycache__/
+*.py[cod]
+*.egg-info/
+/sdk/python/build/

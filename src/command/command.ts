@@ -4,7 +4,10 @@ import { loadConfig } from "../config/config"
 import { project } from "../project"
 import { parseModelRef } from "../provider/provider"
 import { parseFrontmatter } from "../util/frontmatter"
-import { detectShell, run } from "../util/shell"
+import { BashTool } from "../tool/bash"
+import { askPermission } from "../permission/permission"
+import { resolveTarget } from "../session/prompt"
+import { Paths } from "../global"
 import { toPosix } from "../util/fs"
 import { prompt, type PromptInput } from "../session/prompt"
 import { INIT_TEMPLATE, REVIEW_TEMPLATE } from "./builtin"
@@ -46,7 +49,7 @@ async function markdownFiles(dir: string): Promise<string[]> {
 }
 
 async function load(): Promise<Record<string, CommandInfo>> {
-  const { config, directories } = await loadConfig()
+  const { config, directories, trusted } = await loadConfig()
   const commands: Record<string, CommandInfo> = {
     init: {
       name: "init",
@@ -64,6 +67,7 @@ async function load(): Promise<Record<string, CommandInfo>> {
   }
 
   for (const dir of directories) {
+    if (!trusted && dir !== Paths.config) continue
     for (const sub of ["command", "commands"]) {
       const folder = path.join(dir, sub)
       for (const file of await markdownFiles(folder)) {
@@ -111,15 +115,14 @@ export function splitArguments(raw: string): string[] {
 
 const MAX_INJECTED = 30_000
 
-async function injectShell(template: string, cwd: string): Promise<string> {
+async function injectShell(template: string, execute?: (command: string) => Promise<string>): Promise<string> {
   const re = /!`([^`]+)`/g
   const matches = [...template.matchAll(re)]
   if (matches.length === 0) return template
-  const shell = detectShell()
+  if (!execute) throw new Error("Shell substitutions require a session and its permission checks.")
   const outputs = await Promise.all(
     matches.map(async (m) => {
-      const result = await run(shell.path, [...shell.args, m[1]!], { cwd, timeout: 30_000 })
-      const text = (result.stdout + (result.stderr && result.code !== 0 ? result.stderr : "")).trim()
+      const text = (await execute(m[1]!)).trim()
       return text.length > MAX_INJECTED ? text.slice(0, MAX_INJECTED) + "\n... (output truncated)" : text
     }),
   )
@@ -128,10 +131,11 @@ async function injectShell(template: string, cwd: string): Promise<string> {
 }
 
 /** Fill in `$ARGUMENTS`, `$1`..`$9` and `` !`cmd` `` output. `@file` mentions are resolved later by the prompt. */
-export async function expandTemplate(template: string, rawArguments: string, cwd = project().directory): Promise<string> {
+export async function expandTemplate(template: string, rawArguments: string, cwd = project().directory, execute?: (command: string) => Promise<string>): Promise<string> {
   const args = splitArguments(rawArguments)
   const usesPlaceholder = /\$ARGUMENTS|\$[1-9]/.test(template)
-  let text = template.replace(/\$ARGUMENTS/g, () => rawArguments.trim())
+  // Shell syntax introduced by arguments is data, never another executable substitution.
+  let text = (await injectShell(template, execute)).replace(/\$ARGUMENTS/g, () => rawArguments.trim())
   // The last positional placeholder swallows the remaining arguments, so `/cmd a b c` with only $1 $2 keeps "b c" together.
   const highest = Math.max(0, ...[...template.matchAll(/\$([1-9])/g)].map((m) => Number(m[1])))
   text = text.replace(/\$([1-9])/g, (_, d: string) => {
@@ -139,7 +143,6 @@ export async function expandTemplate(template: string, rawArguments: string, cwd
     if (n === highest) return args.slice(n - 1).join(" ")
     return args[n - 1] ?? ""
   })
-  text = await injectShell(text, cwd)
   if (!usesPlaceholder && rawArguments.trim()) text += `\n\n${rawArguments.trim()}`
   return text.trim()
 }
@@ -163,7 +166,15 @@ export class CommandNotFoundError extends Error {
 export async function runCommand(input: RunCommandInput) {
   const command = await getCommand(input.name)
   if (!command) throw new CommandNotFoundError(input.name)
-  const text = await expandTemplate(command.template, input.arguments ?? "")
+  const text = await expandTemplate(command.template, input.arguments ?? "", project().directory, async (script) => {
+    const { agent } = await resolveTarget(input.sessionID, { agent: command.agent ?? input.agent, model: command.model ?? input.model })
+    const result = await BashTool.execute({ command: script, timeout: 30_000 }, {
+      sessionID: input.sessionID, messageID: "", callID: "", agent: agent.name,
+      abort: AbortSignal.timeout(35_000), directory: project().directory, worktree: project().worktree,
+      metadata: () => {}, ask: (request) => askPermission({ ...request, sessionID: input.sessionID, ruleset: agent.permission }),
+    })
+    return result.output
+  })
   const request: PromptInput = {
     sessionID: input.sessionID,
     text,

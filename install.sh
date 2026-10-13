@@ -33,9 +33,8 @@ main() {
     *) fail "unsupported CPU architecture: $arch" ;;
   esac
 
-  if [ "$os" = linux ] && { [ -f /etc/alpine-release ] || (ldd --version 2>&1 | grep -qi musl); }; then
-    fail "musl-based systems (such as Alpine) are not supported yet; the Linux build needs glibc (Debian, Ubuntu, Fedora, ...)"
-  fi
+  libc=""
+  if [ "$os" = linux ] && { [ -f /etc/alpine-release ] || (ldd --version 2>&1 | grep -qi musl); }; then libc="-musl"; fi
 
   have tar || fail "tar is required"
   if have curl; then
@@ -56,12 +55,12 @@ main() {
   fi
   version=${version#v}
 
-  asset="vedecaps-$os-$arch.tar.gz"
+  asset="vedecaps-$os-$arch$libc.tar.gz"
   url="$BASE/download/v$version"
   tmp=$(mktemp -d 2>/dev/null || mktemp -d -t vedecaps)
   trap 'rm -rf "$tmp"' EXIT INT TERM
 
-  say "Downloading vedecaps $version ($os-$arch)"
+  say "Downloading vedecaps $version ($os-$arch$libc)"
   fetch "$url/$asset" "$tmp/$asset" || fail "download failed: $url/$asset"
   fetch "$url/checksums.txt" "$tmp/checksums.txt" || fail "download failed: $url/checksums.txt"
 
@@ -81,7 +80,10 @@ main() {
   tar -xzf "$tmp/$asset" -C "$tmp"
   [ -f "$tmp/vedecaps" ] || fail "the archive did not contain the vedecaps binary"
   chmod 755 "$tmp/vedecaps"
-  "$tmp/vedecaps" --version >/dev/null 2>&1 || fail "the downloaded binary does not run on this system"
+  if ! "$tmp/vedecaps" --version >/dev/null 2>&1; then
+    if [ -n "$libc" ]; then fail "musl requires libstdc++ and libgcc (Alpine: apk add --no-cache libstdc++ libgcc), then retry"; fi
+    fail "the downloaded binary does not run on this system"
+  fi
 
   mkdir -p "$INSTALL_DIR"
   # Move into place under a temporary name first so a running vedecaps is replaced atomically.
