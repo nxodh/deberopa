@@ -12,6 +12,8 @@ import { createSkillTool } from "./skill"
 import { createTaskTool } from "./task"
 import { TodoReadTool, TodoWriteTool } from "./todo"
 import { WebFetchTool } from "./webfetch"
+import { WebSearchTool } from "./websearch"
+import { getConfig } from "../config/config"
 import type { ToolDefinition } from "./tool"
 
 /** Tools that change files share the single "edit" permission. */
@@ -32,6 +34,7 @@ export const BUILTIN_TOOLS: ToolDefinition[] = [
   GrepTool,
   ListTool,
   WebFetchTool,
+  WebSearchTool,
   TodoWriteTool,
   TodoReadTool,
 ]
@@ -53,7 +56,9 @@ export async function toolsFor(agent: AgentInfo): Promise<ToolDefinition[]> {
   if (skill) tools.push(skill)
   tools.push(...mcpTools().sort((a, b) => a.id.localeCompare(b.id)))
 
+  const websearchOff = (await getConfig()).websearch?.enabled === false
   return tools.filter((tool) => {
+    if (tool.id === "websearch" && websearchOff) return false
     if (agent.tools[tool.id] === false) return false
     // "server_*": false style switches for whole MCP servers
     for (const [pattern, on] of Object.entries(agent.tools)) {

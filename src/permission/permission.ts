@@ -11,6 +11,8 @@ export const DEFAULT_RULES: Ruleset = {
   "*": { "*": "allow" },
   external_directory: { "*": "ask" },
   doom_loop: { "*": "ask" },
+  // the query is sent to a third party, so the first search asks
+  websearch: { "*": "ask" },
   read: { "*": "allow", "*.env": "ask", "*.env.*": "ask", "*.env.example": "allow", "*.env.sample": "allow" },
 }
 

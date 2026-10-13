@@ -74,7 +74,7 @@ export function useCompactPrompt(provider: { local?: boolean }, model: Model): b
 }
 
 /** Tools left out in compact mode: each schema costs tokens, and small models pick worse among many. */
-export const COMPACT_DROPPED_TOOLS = new Set(["multiedit", "patch", "todowrite", "todoread", "task", "skill", "webfetch"])
+export const COMPACT_DROPPED_TOOLS = new Set(["multiedit", "patch", "todowrite", "todoread", "task", "skill", "webfetch", "websearch"])
 
 /** First paragraph of a tool description, for compact mode. */
 export function shortenDescription(text: string, max = 280): string {

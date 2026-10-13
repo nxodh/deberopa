@@ -141,6 +141,8 @@ export function toolSummary(part: ToolPart): { name: string; detail: string } {
       return { name: "List", detail: relative(input.path) || "." }
     case "webfetch":
       return { name: "Fetch", detail: String(input.url ?? "") }
+    case "websearch":
+      return { name: "Search", detail: String(input.query ?? "") }
     case "todowrite":
       return { name: "Plan", detail: state.status === "completed" ? state.title : "" }
     case "todoread":

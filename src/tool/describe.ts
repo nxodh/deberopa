@@ -22,6 +22,8 @@ export function describeTool(part: ToolPart): { name: string; detail: string } {
       return { name: "edit", detail: rel(input.filePath) }
     case "write":
       return { name: "write", detail: rel(input.filePath) }
+    case "websearch":
+      return { name: "websearch", detail: String(input.query ?? "") }
     case "patch":
       return { name: "patch", detail: String(title ?? "") }
     case "glob":
