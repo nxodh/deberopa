@@ -13,6 +13,8 @@ export const DEFAULT_RULES: Ruleset = {
   doom_loop: { "*": "ask" },
   // the query is sent to a third party, so the first search asks
   websearch: { "*": "ask" },
+  // downloads and runs third-party code, so always asks
+  lsp_install: { "*": "ask" },
   read: { "*": "allow", "*.env": "ask", "*.env.*": "ask", "*.env.example": "allow", "*.env.sample": "allow" },
 }
 

@@ -5,7 +5,7 @@ import { assertInsideProject, defineTool, resolvePath, ToolInputError, type Tool
 import { assertFresh, markRead } from "./filetime"
 import { publish } from "../util/bus"
 import { formatFile } from "../format/format"
-import { formatDiagnostics, touchFile } from "../lsp"
+import { formatDiagnostics, offerInstall, touchFile } from "../lsp"
 
 /**
  * Find `find` in `content` and replace it. Models rarely reproduce whitespace perfectly, so after
@@ -114,9 +114,15 @@ export async function afterWrite(ctx: ToolContext, file: string): Promise<string
   await formatFile(file).catch(() => undefined)
   markRead(ctx.sessionID, file)
   publish("file.edited", { sessionID: ctx.sessionID, file })
+  const note = await offerInstall(file, {
+    ask: (request) => ctx.ask(request),
+    progress: (message) => ctx.metadata({ title: message }),
+    signal: ctx.abort,
+  })
   await touchFile(file, true).catch(() => {})
   const problems = formatDiagnostics(file)
-  return problems ? `\n\nThis file has errors, please fix them:\n<diagnostics file="${file}">\n${problems}\n</diagnostics>` : ""
+  const tail = problems ? `\n\nThis file has errors, please fix them:\n<diagnostics file="${file}">\n${problems}\n</diagnostics>` : ""
+  return note ? `\n\n${note}${tail}` : tail
 }
 
 export interface EditArgs {

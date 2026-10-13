@@ -4,7 +4,8 @@ import { project } from "../../project"
 import { loadConfig } from "../../config/config"
 import { allProviders } from "../../provider/provider"
 import { formatterStatus } from "../../format/format"
-import { BUILTIN_SERVERS } from "../../lsp"
+import { BUILTIN_SERVERS, resolveServer } from "../../lsp"
+import { installerFor } from "../../lsp/install"
 import { detectShell, which } from "../../util/shell"
 import { listAgents } from "../../agent/agent"
 import { listSkills } from "../../skill/skill"
@@ -90,8 +91,8 @@ export async function main(argv: string[]): Promise<number> {
   out()
   out("LSP servers (installed ones start on demand)")
   for (const s of BUILTIN_SERVERS) {
-    const cmd = await s.resolve(p.worktree)
-    out(`  ${s.id.padEnd(22)} ${cmd ? cmd[0] : "not installed"}`)
+    const cmd = await resolveServer(s.id, p.worktree)
+    out(`  ${s.id.padEnd(22)} ${cmd ? cmd[0] : installerFor(s.id) ? "not installed (offered automatically on first edit)" : "not installed"}`)
   }
   const mcpNames = Object.keys(loaded.config.mcp ?? {})
   if (mcpNames.length) {

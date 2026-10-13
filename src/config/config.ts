@@ -87,6 +87,8 @@ export interface Config {
   username?: string
   autoupdate?: boolean | "notify"
   snapshot?: boolean
+  /** false stops Vedecaps from offering to install missing language servers. */
+  lsp_install?: boolean
   /** Web search through Exa. A key lifts the shared free-tier limit. */
   websearch?: { enabled?: boolean; apiKey?: string }
   /** false skips probing localhost for Ollama, LM Studio, llama.cpp and vLLM at startup. */

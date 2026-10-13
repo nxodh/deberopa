@@ -5,6 +5,7 @@ import { exists, findUp, isInside } from "../util/fs"
 import { createLogger } from "../util/log"
 import { which } from "../util/shell"
 import { createLspClient, diagnosticKey, type Diagnostic, type LspClient } from "./client"
+import { installDir, installedCommand, installerFor, runInstaller } from "./install"
 
 const log = createLogger("lsp")
 
@@ -174,14 +175,88 @@ function ensureClient(spec: ActiveServer, root: string): Promise<LspClient | und
 
 async function connect(spec: ActiveServer, root: string): Promise<LspClient | undefined> {
   try {
-    const command = spec.command ?? (await spec.resolve(root))
+    const command = spec.command ?? (await spec.resolve(root)) ?? (await installedCommand(spec.id))
     if (!command?.length) {
       log.info(`${spec.id}: not installed, skipping ${root}`)
       return undefined
     }
-    return await createLspClient({ serverID: spec.id, command, root, env: spec.env, initialization: spec.initialization })
+    let initialization = spec.initialization
+    if (spec.id === "typescript") {
+      // typescript-language-server drives tsserver from the `typescript` package. Prefer the
+      // project's own copy (so editor and build agree), else the one installed beside the server.
+      const own = path.join(root, "node_modules", "typescript", "lib", "tsserver.js")
+      const installed = path.join(installDir("typescript"), "node_modules", "typescript", "lib", "tsserver.js")
+      const tsserver = (await exists(own)) ? own : (await exists(installed)) ? installed : undefined
+      if (tsserver) initialization = { ...initialization, tsserver: { path: tsserver, ...(initialization?.tsserver as object | undefined) } }
+    }
+    return await createLspClient({ serverID: spec.id, command, root, env: spec.env, initialization })
   } catch (err) {
     log.warn(`${spec.id}: could not start for ${root}`, err)
+    return undefined
+  }
+}
+
+/** How to launch a built-in server right now: what is on this machine, then what Vedecaps installed. */
+export async function resolveServer(id: string, root: string): Promise<string[] | undefined> {
+  const builtin = BUILTIN_SERVERS.find((s) => s.id === id)
+  return (await builtin?.resolve(root)) ?? (await installedCommand(id))
+}
+
+/** Servers already declined or failed to install in this process; they are not offered again. */
+const notOffered = new Set<string>()
+
+/** Forget which installs were already offered (tests, or after the user changes their mind in config). */
+export function resetInstallOffers() {
+  notOffered.clear()
+}
+
+export interface InstallPrompt {
+  ask(request: { permission: string; patterns: string[]; always: string[]; title: string; metadata?: Record<string, unknown> }): Promise<void>
+  progress?(message: string): void
+  signal?: AbortSignal
+}
+
+/**
+ * When a file of a language we have a server for is edited and that server is missing, offer to
+ * install it (with the user's consent) so diagnostics start working. Returns a note for the
+ * tool output when something worth saying happened. Never throws.
+ */
+export async function offerInstall(file: string, prompt: InstallPrompt): Promise<string | undefined> {
+  try {
+    const config = await getConfig()
+    if (config.lsp === false || config.lsp_install === false) return undefined
+    const ext = path.extname(file).toLowerCase()
+    const spec = (await activeServers()).find((s) => s.extensions.includes(ext) && !s.command && installerFor(s.id))
+    if (!spec || notOffered.has(spec.id)) return undefined
+    const installer = installerFor(spec.id)!
+    const root = await rootFor(path.resolve(file), spec.rootMarkers, project().worktree)
+    if (await resolveServer(spec.id, root)) return undefined
+    if (installer.requires && !which(installer.requires)) return undefined // nothing we could do
+
+    notOffered.add(spec.id) // one question per server per run, whatever the answer
+    try {
+      await prompt.ask({
+        permission: "lsp_install",
+        patterns: [spec.id],
+        always: [spec.id],
+        title: `Install the ${installer.label}? (${installer.how}, ${installer.size}). It gives the agent compiler errors right after each edit.`,
+        metadata: { server: spec.id, how: installer.how },
+      })
+    } catch {
+      return undefined // declined
+    }
+    try {
+      await runInstaller(spec.id, (m) => prompt.progress?.(m), prompt.signal)
+    } catch (err) {
+      const reason = (err instanceof Error ? err.message : String(err)).split("\n")[0]
+      log.warn(`install of ${spec.id} failed`, err)
+      return `(Could not install the ${installer.label}: ${reason})`
+    }
+    // the earlier "not installed" result was remembered; forget it so the new binary is used
+    for (const [key, entry] of entries) if (entry.id === spec.id && !entry.client) entries.delete(key)
+    return undefined
+  } catch (err) {
+    log.warn("offerInstall failed", err)
     return undefined
   }
 }
