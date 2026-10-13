@@ -1,6 +1,6 @@
 import { getConfig, readState, type ModelConfig } from "../config/config"
 import { allCredentials } from "../auth/auth"
-import { detectLocalServers, discoverOpenAIModels, isLocalURL, type DetectedModel } from "./local"
+import { detectLocalServers, discoverOpenAIModels, fetchDiparnuxInfo, isLocalURL, localAPIKey, type DetectedModel } from "./local"
 import { getCatalog, type CatalogModel, type CatalogProvider } from "./models"
 import { registerSecret } from "../util/redact"
 import type { Model, ProviderInfo } from "./types"
@@ -66,6 +66,8 @@ export function allProviders(): Promise<Record<string, ProviderInfo>> {
 async function build(): Promise<Record<string, ProviderInfo>> {
   const [config, catalog, credentials] = await Promise.all([getConfig(), getCatalog(), allCredentials()])
   const result: Record<string, ProviderInfo> = {}
+  /** `provider/model` keys whose context window is a guess (nothing in config, catalog or server said). */
+  const assumedContext = new Set<string>()
   const ids = new Set([...Object.keys(catalog), ...Object.keys(config.provider ?? {})])
 
   for (const id of ids) {
@@ -105,10 +107,13 @@ async function build(): Promise<Record<string, ProviderInfo>> {
     for (const [modelID, model] of Object.entries(entry?.models ?? {})) {
       if (model.status === "deprecated") continue
       models[modelID] = toModel(id, modelID, model, override?.models?.[modelID])
+      if (model.limit?.context === undefined && override?.models?.[modelID]?.limit?.context === undefined) assumedContext.add(`${id}/${modelID}`)
     }
     for (const [modelID, model] of Object.entries(override?.models ?? {})) {
       const realID = model.id ?? modelID
-      if (!models[modelID]) models[modelID] = toModel(id, realID, entry?.models?.[realID], model)
+      if (models[modelID]) continue
+      models[modelID] = toModel(id, realID, entry?.models?.[realID], model)
+      if (model.limit?.context === undefined && entry?.models?.[realID]?.limit?.context === undefined) assumedContext.add(`${id}/${modelID}`)
     }
 
     result[id] = {
@@ -126,7 +131,7 @@ async function build(): Promise<Record<string, ProviderInfo>> {
     }
   }
 
-  await addLocalProviders(result, config)
+  await addLocalProviders(result, config, assumedContext)
 
   const disabled = new Set(config.disabled_providers ?? [])
   const enabled = config.enabled_providers ? new Set(config.enabled_providers) : undefined
@@ -156,7 +161,7 @@ function detectedToModel(providerID: string, d: DetectedModel, existing?: ModelC
  * Servers the user runs themselves. Found ones are added when not configured, and fill in
  * models for ones that are. Config always wins, so a pinned `limit.context` is respected.
  */
-async function addLocalProviders(result: Record<string, ProviderInfo>, config: Awaited<ReturnType<typeof getConfig>>) {
+async function addLocalProviders(result: Record<string, ProviderInfo>, config: Awaited<ReturnType<typeof getConfig>>, assumedContext: Set<string>) {
   const configured = Object.entries(result).filter(([, p]) => p.local && p.protocol !== "anthropic")
 
   // providers configured by URL only: ask the server what it has
@@ -165,10 +170,32 @@ async function addLocalProviders(result: Record<string, ProviderInfo>, config: A
       if (Object.keys(provider.models).length > 0 || !provider.baseURL || process.env.VEDECAPS_DISABLE_LOCAL_DETECT) return
       if (provider.protocol === "ollama") return // filled in by detection below
       const found = await discoverOpenAIModels(provider.baseURL, provider.headers, provider.apiKey)
-      for (const d of found) provider.models[d.id] = detectedToModel(id, d, config.provider?.[id]?.models?.[d.id])
+      for (const d of found) {
+        provider.models[d.id] = detectedToModel(id, d, config.provider?.[id]?.models?.[d.id])
+        if (d.context === undefined && config.provider?.[id]?.models?.[d.id]?.limit?.context === undefined) assumedContext.add(`${id}/${d.id}`)
+      }
       if (found.length) provider.source = provider.source === "none" ? "config" : provider.source
     }),
   )
+
+  // A Diparnux gateway says how big each slot's context really is. Ask only addresses on this
+  // machine or its network (never a hosted API), without credentials, and only to fill in a guess:
+  // a window written in the config always wins.
+  if (config.local_detect !== false && !process.env.VEDECAPS_DISABLE_LOCAL_DETECT) {
+    await Promise.all(
+      configured.map(async ([id, provider]) => {
+        if (!provider.baseURL || provider.protocol === "ollama") return
+        const info = await fetchDiparnuxInfo(provider.baseURL)
+        if (!info) return
+        provider.diparnux = info
+        if (!info.ctxPerSlot) return
+        for (const [modelID, model] of Object.entries(provider.models)) {
+          if (!assumedContext.has(`${id}/${modelID}`)) continue
+          model.limit = { ...model.limit, context: info.ctxPerSlot }
+        }
+      }),
+    )
+  }
 
   if (config.local_detect === false) return
   for (const server of await detectLocalServers()) {
@@ -178,21 +205,27 @@ async function addLocalProviders(result: Record<string, ProviderInfo>, config: A
       for (const d of Object.values(server.models)) {
         if (!existing.models[d.id]) existing.models[d.id] = detectedToModel(server.id, d, config.provider?.[server.id]?.models?.[d.id])
       }
+      if (server.diparnux && !existing.diparnux) existing.diparnux = server.diparnux
       continue
     }
     const models: Record<string, Model> = {}
     for (const d of Object.values(server.models)) models[d.id] = detectedToModel(server.id, d, config.provider?.[server.id]?.models?.[d.id])
+    // llama-server (and Diparnux in front of it) can require a key; it is read from the environment
+    // and goes only to the address that was detected.
+    const key = server.id === "llamacpp" ? localAPIKey() : undefined
     result[server.id] = {
       id: server.id,
       name: config.provider?.[server.id]?.name ?? server.name,
       protocol: server.protocol,
       baseURL: server.baseURL,
-      env: [],
+      env: server.id === "llamacpp" ? ["DIPARNUX_API_KEY", "LLAMA_API_KEY"] : [],
+      apiKey: key,
       headers: config.provider?.[server.id]?.options?.headers,
       timeout: config.provider?.[server.id]?.options?.timeout,
-      source: "local",
+      source: key ? "env" : "local",
       local: true,
       models: { ...models, ...Object.fromEntries(Object.entries(result[server.id]?.models ?? {})) },
+      ...(server.diparnux ? { diparnux: server.diparnux } : {}),
     }
   }
 }

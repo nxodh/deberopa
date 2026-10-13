@@ -74,3 +74,13 @@ SDK는 레지스트리에 게시하지 않았고 Go SDK의 별도 모듈 태그�
 브랜치 검증에서는 테스트 293개와 Windows·Ubuntu·Debian·Alpine 실행파일, SDK 및
 확장의 전체 CI가 통과했습니다. 릴리스는 버전을 0.1.3으로 맞춘 main 커밋의 CI가
 성공한 뒤 생성하도록 검사합니다. 0.1.2 이전 구현 범위는 위 기록을 참고하세요.
+
+## 0.1.4 (개발 중): Diparnux 호환과 동시 요청 상한
+
+설계서 `vedecaps-repo-changes-design.md`의 VE1·VE4(PR A)와 VE3(PR B)를 구현합니다.
+VE2(`options.ca`)는 Diparnux의 TLS가 나올 때까지 미룹니다.
+
+**PR A (VE1 + VE4)**: 키가 필요한 서버 감지(`DIPARNUX_API_KEY`, `LLAMA_API_KEY`), 401/403 보고,
+Diparnux 표식과 `/diparnux/info` 인식(값 검증, 제어 문자 제거), 구성된 로컬 제공자의 컨텍스트
+보강, `debug local`의 슬롯 정보와 `--check-tools`. 호스팅 주소에는 요청하지 않고 리다이렉트는
+오류로 처리합니다. 모의 서버로 시험 23개를 추가했습니다(T1.1~T1.11, T4.1~T4.7).

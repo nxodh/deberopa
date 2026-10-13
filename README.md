@@ -133,6 +133,10 @@ API 키는 `vedecaps auth login`, TUI의 `/connect`, 또는 환경 변수로 등
 - **컨텍스트 사용량 보정**: Ollama가 캐시된 프롬프트를 사용량에서 빼고 보고해도 실제 크기를 추정해 자동 압축 시점과 상태 표시줄이 틀어지지 않게 합니다.
 - **친절한 오류**: 모델이 없을 때(`ollama pull …`), 도구를 지원하지 않을 때, 서버가 꺼져 있을 때 해결 방법을 알려 줍니다.
 
+**API 키가 있는 서버와 Diparnux 게이트웨이**: llama-server(`--api-key`)나 Diparnux처럼 키를 요구하는 서버는 환경 변수 `DIPARNUX_API_KEY`(없으면 `LLAMA_API_KEY`)에 키를 두면 감지되고 요청에도 쓰입니다. 키는 감지된 주소와 직접 적은 제공자 주소로만 보내며, 리다이렉트는 따르지 않고, 로그와 `debug` 출력에서는 가려집니다. 키가 필요한데 없으면 `vedecaps debug local`이 "이 서버는 API 키가 필요하다(401)"고 알려 줍니다. Diparnux는 `X-Diparnux` 헤더나 `GET /diparnux/info`(인증 없음)로 알아보며, 슬롯 수와 슬롯당 컨텍스트를 읽습니다. 설정에 컨텍스트를 적지 않은 로컬 제공자는 그 값을 쓰고, 적은 값이 항상 우선합니다. 호스팅 API에는 이 경로를 요청하지 않습니다.
+
+**도구 호출 시험**: `vedecaps debug local --check-tools`는 서버마다 모델 요청을 한 번 보내 도구 호출이 되는지 확인합니다(토큰이 소비되므로 기본은 꺼져 있습니다). 결과는 `ok`(구조화된 `tool_calls`), `recovered`(텍스트로 쓴 호출을 Vedecaps가 복구해서 동작), `failed`(에이전트가 파일을 읽거나 고칠 수 없음)입니다.
+
 감지를 끄려면 설정에 `"local_detect": false`를 넣습니다. 그 밖의 OpenAI 호환 서버(사내 프록시 등)는 직접 추가합니다. 모델을 적지 않으면 `/models` 엔드포인트에서 목록을 가져옵니다.
 
 ```jsonc

@@ -1,5 +1,6 @@
 import type { JSONSchema } from "../tool/tool"
 import { redact } from "../util/redact"
+import type { DiparnuxInfo } from "./local"
 
 export interface Model {
   id: string
@@ -33,6 +34,8 @@ export interface ProviderInfo {
   /** Where the credential came from; "none" means the provider is known but not usable yet. */
   source: "env" | "auth" | "config" | "local" | "none"
   models: Record<string, Model>
+  /** What a Diparnux gateway reported about itself; unset for every other server. */
+  diparnux?: DiparnuxInfo
 }
 
 export type UserContent = { type: "text"; text: string } | { type: "image"; mime: string; data: string }
