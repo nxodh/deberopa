@@ -94,6 +94,8 @@ Pushing a `v*` tag that matches `package.json` builds and publishes a release.
 
 ## Added in 0.1.2
 
+The current development branch adds a full-screen terminal UI with a fixed prompt/status bar, PageUp/PageDown history navigation, Ctrl+Home/End, and terminal restoration on exit or external-editor handoff. This UI change is not in the published 0.1.2 binary yet.
+
 - Configurable prompt key bindings under `keybinds`: comma-separated alternatives, ctrl/alt/shift modifiers, and `none` to disable. For example, `{"submit":"ctrl+g","newline":"enter","models":"ctrl+p"}`. `/help` shows the configured bindings; restart after editing config. User overrides win over conflicting defaults. Dialog selection keys retain their defaults.
 - Explicit, exact-version npm plugins: `vedecaps plugin install name@1.2.3`, `list`, and `remove`. Review the code first: plugins run with your full privileges. Non-interactive installs need `--yes`. Lifecycle scripts are disabled, lockfiles retained, and URL/file/git/range specs rejected. Config uses `npm:name@1.2.3`; startup never installs packages.
 - Dependency-free [Python SDK](sdk/python/README.md) and [Go SDK](sdk/go/README.md). These are checkout packages, not published registry releases. Remote SDK connections require HTTPS.

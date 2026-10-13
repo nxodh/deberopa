@@ -100,7 +100,7 @@ export function SelectDialog<T>(props: {
           <Box key={start + i} flexDirection="column">
             {heading ? <Muted theme={theme} bold>{heading}</Muted> : null}
             <Text wrap="truncate-end">
-              <Plain theme={theme} inverse={active} bold={active}>{` ${item.value === props.current ? "●" : " "} ${item.label.padEnd(labelWidth)}`}</Plain>
+              <Plain theme={theme} inverse={active} bold={active}>{` ${item.value === props.current ? "●" : " "} ${item.label}${" ".repeat(Math.max(0, labelWidth - stringWidth(item.label)))}`}</Plain>
               <Muted theme={theme}>{item.hint ? "  " + item.hint : ""}</Muted>
             </Text>
           </Box>
@@ -142,7 +142,7 @@ export function InputDialog(props: { theme: Theme; width: number; title: string;
 export function TextDialog(props: { theme: Theme; width: number; height: number; title: string; markdown: string; onClose(): void }) {
   const [offset, setOffset] = useState(0)
   const lines = useMemo(() => renderMarkdown(props.markdown, props.width - 4), [props.markdown, props.width])
-  const rows = Math.max(5, props.height)
+  const rows = Math.max(1, props.height)
   const max = Math.max(0, lines.length - rows)
   useInput((input, key) => {
     if (key.escape || key.return || input === "q" || (key.ctrl && input === "c")) return props.onClose()
@@ -159,7 +159,7 @@ export function TextDialog(props: { theme: Theme; width: number; height: number;
 }
 
 /** The question shown when a tool needs consent. */
-export function PermissionDialog(props: { theme: Theme; width: number; request: PendingPermission; queued: number; onReply(reply: PermissionReply): void }) {
+export function PermissionDialog(props: { theme: Theme; width: number; request: PendingPermission; queued: number; maxDetailRows?: number; onReply(reply: PermissionReply): void }) {
   const { theme, request } = props
   const [cursor, setCursor] = useState(0)
   const options: { reply: PermissionReply; label: string; key: string }[] = [
@@ -177,33 +177,33 @@ export function PermissionDialog(props: { theme: Theme; width: number; request: 
   })
 
   const meta = request.metadata as Record<string, any>
-  const inner = props.width - 4
+  const maxDetailRows = props.maxDetailRows ?? 16
   let detail: React.ReactNode = null
-  if (typeof meta.diff === "string" && meta.diff.trim() !== "") {
+  if (maxDetailRows > 0 && typeof meta.diff === "string" && meta.diff.trim() !== "") {
     const rows = meta.diff.split("\n").filter((l: string) => l !== "" && !l.startsWith("---") && !l.startsWith("+++") && !l.startsWith("==="))
     detail = (
       <Box flexDirection="column">
-        {rows.slice(0, 16).map((row: string, i: number) =>
+        {rows.slice(0, maxDetailRows).map((row: string, i: number) =>
           row.startsWith("+") ? (
             <Plain key={i} theme={theme} bold wrap="truncate-end">{row.replace(/\t/g, "  ")}</Plain>
           ) : (
             <Text key={i} color={theme.muted} dimColor={!theme.muted} strikethrough={row.startsWith("-")} wrap="truncate-end">{row.replace(/\t/g, "  ")}</Text>
           ),
         )}
-        {rows.length > 16 ? <Muted theme={theme}>{`… ${rows.length - 16} more lines`}</Muted> : null}
+        {rows.length > maxDetailRows ? <Muted theme={theme}>{`… ${rows.length - maxDetailRows} more lines`}</Muted> : null}
       </Box>
     )
-  } else if (typeof meta.command === "string") {
+  } else if (maxDetailRows > 0 && typeof meta.command === "string") {
     detail = (
       <Box flexDirection="column">
-        {meta.command.split("\n").slice(0, 8).map((row: string, i: number) => (
+        {meta.command.split("\n").slice(0, Math.min(8, maxDetailRows)).map((row: string, i: number) => (
           <Plain key={i} theme={theme} wrap="truncate-end">{(i === 0 ? "$ " : "  ") + row}</Plain>
         ))}
         {meta.description ? <Muted theme={theme}>{String(meta.description)}</Muted> : null}
       </Box>
     )
-  } else if (request.patterns.length) {
-    detail = <Muted theme={theme} wrap="truncate-middle">{request.patterns.join(", ").slice(0, inner * 2)}</Muted>
+  } else if (maxDetailRows > 0 && request.patterns.length) {
+    detail = <Muted theme={theme} wrap="truncate-middle">{request.patterns.join(", ")}</Muted>
   }
 
   const always = request.always.join(", ")
@@ -218,7 +218,7 @@ export function PermissionDialog(props: { theme: Theme; width: number; request: 
           </Box>
         ))}
       </Box>
-      <Muted theme={theme} wrap="truncate-end">{`"Always" covers ${always.length > inner - 20 ? always.slice(0, inner - 21) + "…" : always} for this session`}</Muted>
+      <Muted theme={theme} wrap="truncate-end">{`"Always" covers ${always} for this session`}</Muted>
     </Frame>
   )
 }

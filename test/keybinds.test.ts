@@ -14,3 +14,12 @@ test("a user binding takes precedence over conflicting defaults", () => {
   expect(boundAction("newline", config, "j", { ctrl: true })).toBe(false)
   expect(boundAction("submit", config, "", { return: true })).toBe(false)
 })
+
+test("conversation scrolling and editor movement have separate defaults", () => {
+  expect(boundAction("scroll_up", undefined, "", { pageUp: true })).toBe(true)
+  expect(boundAction("scroll_bottom", undefined, "", { end: true, ctrl: true })).toBe(true)
+  expect(boundAction("line_end", undefined, "", { end: true, ctrl: true })).toBe(false)
+  const config = { scroll_up: "ctrl+b" }
+  expect(boundAction("scroll_up", config, "b", { ctrl: true })).toBe(true)
+  expect(boundAction("left", config, "b", { ctrl: true })).toBe(false)
+})

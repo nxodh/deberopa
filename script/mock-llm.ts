@@ -19,6 +19,8 @@ const server = Bun.serve({
     let events: unknown[]
     if (system.startsWith("You generate short titles")) {
       events = [chunk({ content: "Mock session" }), chunk({}, "stop")]
+    } else if (last.role === "user" && lastText === "long fixture") {
+      events = [...Array.from({ length: 100 }, (_, i) => chunk({ content: `HISTORY ${String(i + 1).padStart(3, "0")} fixture line\n\n` })), chunk({}, "stop")]
     } else if (last.role === "user" && /\bedit\b/i.test(lastText)) {
       events = [
         chunk({ tool_calls: [{ index: 0, id: "call_w", type: "function", function: { name: "write", arguments: JSON.stringify({ filePath: "notes.txt", content: "line one\nline two\n" }) } }] }),

@@ -7,6 +7,7 @@ export const DEFAULT_KEYBINDS = {
   backspace: "backspace", delete: "delete", delete_word: "ctrl+w,alt+backspace",
   delete_line_start: "ctrl+u", delete_line_end: "ctrl+k",
   models: "none", sessions: "none", new_session: "none", help: "none", editor: "none",
+  scroll_up: "pageup", scroll_down: "pagedown", scroll_top: "ctrl+home", scroll_bottom: "ctrl+end",
 } as const
 
 export type KeyAction = keyof typeof DEFAULT_KEYBINDS
@@ -15,12 +16,14 @@ export interface InputKey {
   return?: boolean; escape?: boolean; tab?: boolean; backspace?: boolean; delete?: boolean
   upArrow?: boolean; downArrow?: boolean; leftArrow?: boolean; rightArrow?: boolean
   home?: boolean; end?: boolean
+  pageUp?: boolean; pageDown?: boolean
 }
 
 const aliases: Record<string, string> = { return: "enter", esc: "escape", meta: "alt", option: "alt", control: "ctrl", space: " " }
 const names: [keyof InputKey, string][] = [
   ["return", "enter"], ["escape", "escape"], ["tab", "tab"], ["backspace", "backspace"], ["delete", "delete"],
   ["upArrow", "up"], ["downArrow", "down"], ["leftArrow", "left"], ["rightArrow", "right"], ["home", "home"], ["end", "end"],
+  ["pageUp", "pageup"], ["pageDown", "pagedown"],
 ]
 
 export function matchesBinding(binding: string, input: string, key: InputKey): boolean {

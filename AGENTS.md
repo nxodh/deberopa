@@ -9,7 +9,7 @@ An AI coding agent for the terminal, written in TypeScript and compiled to singl
 - Tests: `npx bun test` (one file: `npx bun test test/loop.test.ts`)
 - Run from source: `npx bun run src/index.ts`
 - Build: `npx bun run script/build.ts` (`--all` for every target); smoke test a binary with `npx bun run script/smoke.ts <binary>`
-- Terminal UI check against a mock model (POSIX): `python3 script/tui-pty.py`
+- Terminal UI check against a mock model (POSIX): install `script/requirements-tui.txt` in a Python venv, then run `python script/tui-pty.py`
 - Secret scan (also runs in CI): `npx bun run script/scan-secrets.ts`
 
 ## Layout
