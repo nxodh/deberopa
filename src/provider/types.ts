@@ -36,6 +36,12 @@ export interface ProviderInfo {
   models: Record<string, Model>
   /** What a Diparnux gateway reported about itself; unset for every other server. */
   diparnux?: DiparnuxInfo
+  /** At most this many model requests to this server at once. Unset means no limit. */
+  maxConcurrency?: number
+  /** Where `maxConcurrency` came from: the user's `options.max_concurrency`, or the gateway's slot count. */
+  maxConcurrencySource?: "config" | "diparnux"
+  /** Set when `options.max_concurrency` was present but unusable (so `debug` can say why). */
+  maxConcurrencyIgnored?: string
 }
 
 export type UserContent = { type: "text"; text: string } | { type: "image"; mime: string; data: string }
@@ -82,6 +88,8 @@ export interface StreamInput {
   temperature?: number
   topP?: number
   effort?: Effort
+  /** Order in which waiting requests are served when the provider limits concurrency. Default "normal". */
+  priority?: "normal" | "low"
 }
 
 export interface Usage {

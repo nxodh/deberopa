@@ -3,7 +3,10 @@ import { allCredentials } from "../auth/auth"
 import { detectLocalServers, discoverOpenAIModels, fetchDiparnuxInfo, isLocalURL, localAPIKey, type DetectedModel } from "./local"
 import { getCatalog, type CatalogModel, type CatalogProvider } from "./models"
 import { registerSecret } from "../util/redact"
+import { createLogger } from "../util/log"
 import type { Model, ProviderInfo } from "./types"
+
+const log = createLogger("provider")
 
 /** Base URLs for providers whose catalog entry does not carry one. All speak OpenAI chat completions. */
 const KNOWN_BASE_URLS: Record<string, string> = {
@@ -132,6 +135,7 @@ async function build(): Promise<Record<string, ProviderInfo>> {
   }
 
   await addLocalProviders(result, config, assumedContext)
+  for (const [id, provider] of Object.entries(result)) applyConcurrency(id, provider, config.provider?.[id]?.options?.max_concurrency)
 
   const disabled = new Set(config.disabled_providers ?? [])
   const enabled = config.enabled_providers ? new Set(config.enabled_providers) : undefined
@@ -139,6 +143,30 @@ async function build(): Promise<Record<string, ProviderInfo>> {
     if (disabled.has(id) || (enabled && !enabled.has(id))) delete result[id]
   }
   return result
+}
+
+export const MAX_CONCURRENCY = 64
+
+/**
+ * `options.max_concurrency` wins when it is a usable integer. Otherwise a Diparnux gateway that
+ * reports a fixed slot count sets the limit (slots chosen by the server give no number to use).
+ * A value that cannot be used is ignored and recorded, never guessed at.
+ */
+function applyConcurrency(id: string, provider: ProviderInfo, raw: unknown) {
+  if (raw !== undefined && raw !== null) {
+    if (typeof raw === "number" && Number.isInteger(raw) && raw >= 1 && raw <= MAX_CONCURRENCY) {
+      provider.maxConcurrency = raw
+      provider.maxConcurrencySource = "config"
+      return
+    }
+    provider.maxConcurrencyIgnored = `options.max_concurrency must be a whole number from 1 to ${MAX_CONCURRENCY} (got ${JSON.stringify(raw)}); requests are not limited`
+    log.warn(`provider ${id}: ${provider.maxConcurrencyIgnored}`)
+  }
+  const slots = provider.diparnux?.slots
+  if (slots && !provider.diparnux?.slotsAuto && !provider.maxConcurrencyIgnored) {
+    provider.maxConcurrency = Math.min(slots, MAX_CONCURRENCY)
+    provider.maxConcurrencySource = "diparnux"
+  }
 }
 
 function detectedToModel(providerID: string, d: DetectedModel, existing?: ModelConfig): Model {

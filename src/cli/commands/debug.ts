@@ -59,7 +59,11 @@ export async function main(argv: string[]): Promise<number> {
   out("Providers with credentials")
   const providers = Object.values(await allProviders()).filter((x) => x.source !== "none")
   if (providers.length === 0) out("  none")
-  for (const x of providers) out(`  ${x.id.padEnd(14)} ${x.protocol.padEnd(9)} via ${x.source.padEnd(7)} ${Object.keys(x.models).length} models`)
+  for (const x of providers) {
+    const limit = x.maxConcurrency ? `  max ${x.maxConcurrency} at once${x.maxConcurrencySource === "diparnux" ? " (from the gateway's slots)" : ""}` : ""
+    out(`  ${x.id.padEnd(14)} ${x.protocol.padEnd(9)} via ${x.source.padEnd(7)} ${Object.keys(x.models).length} models${limit}`)
+    if (x.maxConcurrencyIgnored) out(`    ! ${x.maxConcurrencyIgnored}`)
+  }
   out()
   const { loadPlugins, pluginProblems } = await import("../../plugin")
   const plugins = await loadPlugins()

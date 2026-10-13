@@ -36,7 +36,14 @@ export interface ProviderConfig {
   api?: string
   /** Environment variables that may hold the API key. */
   env?: string[]
-  options?: { apiKey?: string; baseURL?: string; headers?: Record<string, string>; timeout?: number }
+  options?: {
+    apiKey?: string
+    baseURL?: string
+    headers?: Record<string, string>
+    timeout?: number
+    /** Integer 1-64: at most this many requests to the server at once. Unset: unlimited, or the gateway's slot count. */
+    max_concurrency?: number
+  }
   models?: Record<string, ModelConfig>
 }
 

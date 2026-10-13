@@ -84,3 +84,11 @@ VE2(`options.ca`)는 Diparnux의 TLS가 나올 때까지 미룹니다.
 Diparnux 표식과 `/diparnux/info` 인식(값 검증, 제어 문자 제거), 구성된 로컬 제공자의 컨텍스트
 보강, `debug local`의 슬롯 정보와 `--check-tools`. 호스팅 주소에는 요청하지 않고 리다이렉트는
 오류로 처리합니다. 모의 서버로 시험 23개를 추가했습니다(T1.1~T1.11, T4.1~T4.7).
+
+**PR B (VE3)**: `provider.<id>.options.max_concurrency`와 Diparnux 슬롯 수 자동값. 우선순위가 있는
+세마포어(`src/provider/limiter.ts`)를 `streamModel` 앞에 두며 취소, 오류, 소비자의 조기 종료에서
+자리를 반납합니다. 시험 22개(T3.1~T3.10, 수용 기준 4.7과 상한이 없을 때 429가 나는 대조군)를
+추가했습니다. `max_concurrency: 1`에서 서브에이전트 2개를 부르는 세션이 끝까지 가는 것을 확인했습니다.
+
+선택 사항이던 대기 중 상태 표시(TUI)는 넣지 않았습니다. `vedecaps debug`의 제공자 줄에 상한과
+그 출처가 표시됩니다.
