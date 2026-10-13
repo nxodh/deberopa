@@ -1,6 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
 import { Paths } from "../global"
+import { redact } from "./redact"
 
 let stream: fs.WriteStream | undefined
 let printToStderr = false
@@ -28,7 +29,7 @@ function write(level: string, service: string, message: string, extra?: unknown)
       tail = " [unserializable]"
     }
   }
-  const line = `${new Date().toISOString()} ${level.padEnd(5)} ${service} ${message}${tail}\n`
+  const line = redact(`${new Date().toISOString()} ${level.padEnd(5)} ${service} ${message}${tail}`) + "\n"
   stream?.write(line)
   if (printToStderr) process.stderr.write(line)
 }

@@ -119,13 +119,13 @@ test("--continue resumes the previous session", async () => {
 
 test("auth login via stdin, list, logout", async () => {
   const noCreds = { config: false as const }
-  const login = await cli(["auth", "login", "openrouter"], { ...noCreds, stdin: "sk-test-123\n" })
+  const login = await cli(["auth", "login", "openrouter"], { ...noCreds, stdin: "sk-test-not-a-real-key\n" })
   expect(login.code).toBe(0)
   const stored = JSON.parse(fs.readFileSync(path.join(home, "data", "auth.json"), "utf8"))
-  expect(stored.openrouter.key).toBe("sk-test-123")
+  expect(stored.openrouter.key).toBe("sk-test-not-a-real-key")
   const list = await cli(["auth", "list"], noCreds)
   expect(list.stdout).toContain("OpenRouter")
-  expect(list.stdout).not.toContain("sk-test-123")
+  expect(list.stdout).not.toContain("sk-test-not-a-real-key")
   const out = await cli(["auth", "logout", "openrouter"], noCreds)
   expect(out.code).toBe(0)
   expect((await cli(["auth", "logout", "openrouter"], noCreds)).code).toBe(1)

@@ -10,6 +10,7 @@ import { listAgents } from "../../agent/agent"
 import { listSkills } from "../../skill/skill"
 import { listCommands } from "../../command/command"
 import { startMcp, mcpStatus } from "../../mcp"
+import { redactDeep } from "../../util/redact"
 import { parse, type CommandSpec } from "../args"
 import { bootstrap } from "../bootstrap"
 
@@ -25,7 +26,7 @@ export async function main(argv: string[]): Promise<number> {
   const out = (s = "") => process.stdout.write(s + "\n")
   const loaded = await loadConfig()
   if (positionals[0] === "config") {
-    out(JSON.stringify(loaded.config, null, 2))
+    out(JSON.stringify(redactDeep(loaded.config), null, 2))
     return 0
   }
   const p = project()

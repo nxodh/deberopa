@@ -1,4 +1,5 @@
 import { createID } from "../util/id"
+import { redact } from "../util/redact"
 import { VERSION } from "../global"
 import { project } from "../project"
 import { importSession, requireSession, createSession, addMessage, updateSession, flush } from "./store"
@@ -16,7 +17,9 @@ export interface SessionExport {
 export async function exportJSON(sessionID: string): Promise<SessionExport> {
   const info = await requireSession(sessionID)
   const messages = await visibleMessages(sessionID)
-  return { format: "vedecaps-session", version: 1, exportedBy: `vedecaps ${VERSION}`, info: { ...info, revert: undefined }, messages }
+  const data: SessionExport = { format: "vedecaps-session", version: 1, exportedBy: `vedecaps ${VERSION}`, info: { ...info, revert: undefined }, messages }
+  // Tool output can contain whatever was on screen (an `env` dump, a .env file): scrub key shapes.
+  return JSON.parse(redact(JSON.stringify(data))) as SessionExport
 }
 
 function fence(text: string, lang = ""): string {
@@ -82,7 +85,7 @@ export async function exportMarkdown(sessionID: string, opts: { thinking?: boole
     }
     lines.push(body.join("\n\n"), "")
   }
-  return lines.join("\n").trimEnd() + "\n"
+  return redact(lines.join("\n").trimEnd() + "\n")
 }
 
 export class ImportError extends Error {}

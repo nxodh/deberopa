@@ -1,4 +1,5 @@
 import type { JSONSchema } from "../tool/tool"
+import { redact } from "../util/redact"
 
 export interface Model {
   id: string
@@ -101,7 +102,8 @@ export class ProviderError extends Error {
   retryAfterMs?: number
 
   constructor(message: string, opts: { status?: number; retryable?: boolean; kind?: ProviderError["kind"]; retryAfterMs?: number } = {}) {
-    super(message)
+    // Servers sometimes echo (part of) the key back in auth errors.
+    super(redact(message))
     this.name = "ProviderError"
     this.status = opts.status
     this.kind = opts.kind ?? classify(opts.status, message)

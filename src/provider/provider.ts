@@ -1,6 +1,7 @@
 import { getConfig, readState, type ModelConfig } from "../config/config"
 import { allCredentials } from "../auth/auth"
 import { getCatalog, type CatalogModel, type CatalogProvider } from "./models"
+import { registerSecret } from "../util/redact"
 import type { Model, ProviderInfo } from "./types"
 
 /** Base URLs for providers whose catalog entry does not carry one. All speak OpenAI chat completions. */
@@ -94,6 +95,7 @@ async function build(): Promise<Record<string, ProviderInfo>> {
       source = "config"
     }
 
+    registerSecret(apiKey)
     const models: Record<string, Model> = {}
     for (const [modelID, model] of Object.entries(entry?.models ?? {})) {
       if (model.status === "deprecated") continue

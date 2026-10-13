@@ -6,6 +6,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Test (${{ matrix.os }})
@@ -24,6 +27,8 @@ jobs:
         run: npx tsc --noEmit
       - name: Test
         run: npx bun test
+      - name: Secret scan (tracked files)
+        run: npx bun run script/scan-secrets.ts
 
   build:
     name: Build and smoke test (Linux, Debian 13)
@@ -42,6 +47,11 @@ jobs:
         run: dist/smoke-linux-x64 dist/linux-x64/vedecaps
       - name: Smoke test (clean debian:13 container, only the binaries inside)
         run: docker run --rm -v "$PWD/dist:/s:ro" debian:13 /s/smoke-linux-x64 /s/linux-x64/vedecaps
+      - name: Binaries must not embed build-machine paths
+        run: |
+          if strings -a dist/linux-x64/vedecaps | grep -E "/home/runner/|/Users/"; then
+            echo "build-machine path found in the binary"; exit 1
+          fi
       - name: Check release assets
         run: |
           ls -l dist
