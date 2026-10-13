@@ -48,6 +48,22 @@ function git(dir: string, args: string[], timeout = 60_000) {
   })
 }
 
+export interface SnapshotStatus {
+  available: boolean
+  /** Why snapshots (and so restoring files on undo) are not available, in a sentence. */
+  reason?: string
+}
+
+/** Whether `/undo` can restore files in this project, and if not, why. */
+export async function snapshotStatus(): Promise<SnapshotStatus> {
+  const config = await getConfig()
+  const p = project()
+  if (config.snapshot === false) return { available: false, reason: 'snapshots are turned off ("snapshot": false in the config)' }
+  if (p.vcs !== "git") return { available: false, reason: "this folder is not a git repository" }
+  if (!which("git")) return { available: false, reason: "git is not installed or not on PATH" }
+  return (await gitDir()) ? { available: true } : { available: false, reason: "the snapshot store could not be created (see the log)" }
+}
+
 /** Record the current working tree; returns a tree hash to diff or restore against. */
 export async function track(): Promise<string | undefined> {
   const dir = await gitDir()

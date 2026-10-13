@@ -24,6 +24,8 @@ import { checkForUpdate } from "../update/update"
 import { loadConfig } from "../config/config"
 import { isTrusted, trustProject } from "../config/trust"
 import { reloadProjectState } from "../config/reload"
+import { formatStatus } from "../git/git"
+import { snapshotStatus } from "../snapshot/snapshot"
 import { app } from "./state"
 import { getTheme, THEMES } from "./theme"
 import { Header, MessageView, Muted, Plain, SPINNER } from "./view"
@@ -161,6 +163,17 @@ export function App(props: { options: AppOptions }) {
     const timer = setInterval(() => setFrame((f) => f + 1), 100)
     return () => clearInterval(timer)
   }, [busy])
+
+  // branch and change count in the status bar: on start, after every turn, and now and then
+  // (the user may commit or switch branches in another terminal)
+  useEffect(() => {
+    if (!ready) return
+    app.refreshGit(0)
+    if (busy) return
+    app.refreshGit(300)
+    const timer = setInterval(() => app.refreshGit(0), 20_000)
+    return () => clearInterval(timer)
+  }, [ready, busy])
 
   useEffect(() => {
     let cancelled = false
@@ -373,7 +386,14 @@ export function App(props: { options: AppOptions }) {
         const result = await undo(sessionID!)
         const text = result.message.parts.find((p) => p.type === "text" && !p.synthetic)
         if (text?.type === "text") promptControl.current?.set(text.text)
-        return app.showToast(`Undone${result.files.length ? ` · ${result.files.length} file${result.files.length === 1 ? "" : "s"} restored` : ""}. /redo to bring it back.`)
+        const snapshot = await snapshotStatus()
+        app.refreshGit(0)
+        if (!snapshot.available) {
+          // be explicit: the conversation was rewound but nothing on disk changed
+          return app.showToast(`Undone in the conversation only. Files were not restored: ${snapshot.reason}.`, "error", 9000)
+        }
+        const n = result.files.length
+        return app.showToast(`Undone${n ? ` · ${n} file${n === 1 ? "" : "s"} restored` : " · no file changes to restore"}. /redo to bring it back.`)
       }
       case "redo": {
         const result = await redo(sessionID!)
@@ -701,7 +721,7 @@ export function App(props: { options: AppOptions }) {
           </Box>
         </Box>
         <Box paddingX={1} justifyContent="space-between" width={width}>
-          <Muted theme={theme} wrap="truncate-end">{`${modelLabel}${app.session ? " · " + app.session.title.slice(0, 40) : ""}`}</Muted>
+          <Muted theme={theme} wrap="truncate-end">{`${modelLabel}${app.session ? " · " + app.session.title.slice(0, 40) : ""}${app.git ? "  ⎇ " + formatStatus(app.git) : ""}`}</Muted>
           <Muted theme={theme}>{right}</Muted>
         </Box>
       </Box>

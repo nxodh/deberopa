@@ -5,6 +5,9 @@ import { visibleMessages } from "../session/revert"
 import { isBusy } from "../session/prompt"
 import { getTodos, type TodoItem } from "../tool/todo"
 import { mcpStatus } from "../mcp"
+import { gitStatus, isIgnored, type GitStatus } from "../git/git"
+import { snapshotStatus, type SnapshotStatus } from "../snapshot/snapshot"
+import { project } from "../project"
 import type { Message, SessionInfo } from "../session/message"
 
 export interface Toast {
@@ -35,6 +38,13 @@ class AppState {
   details = false
   theme = "mono"
   mcp: ReturnType<typeof mcpStatus> = []
+  git?: GitStatus
+  /** Whether /undo can restore files in this project (checked lazily on the first edit). */
+  undoSupport?: SnapshotStatus
+  private warnedIgnored = new Set<string>()
+  private warnedNoSnapshot = false
+  private gitTimer: ReturnType<typeof setTimeout> | undefined
+  private gitBusy = false
 
   private listeners = new Set<() => void>()
   private timer: ReturnType<typeof setTimeout> | undefined
@@ -140,15 +150,56 @@ class AppState {
     }
     on("permission.asked", permissions)
     on("permission.replied", permissions)
+    on<{ file: string }>("file.edited", ({ file }) => void this.onFileEdited(file))
     on("mcp.updated", () => {
       this.mcp = mcpStatus()
       this.notify()
     })
   }
 
+  /** Re-read branch and working-tree state. Coalesced: bursts of edits cost one `git status`. */
+  refreshGit(delayMs = 400) {
+    if (this.gitTimer) return
+    this.gitTimer = setTimeout(async () => {
+      this.gitTimer = undefined
+      if (this.gitBusy) return
+      this.gitBusy = true
+      try {
+        const next = await gitStatus(project().worktree)
+        if (JSON.stringify(next) !== JSON.stringify(this.git)) {
+          this.git = next
+          this.notify(true)
+        }
+      } finally {
+        this.gitBusy = false
+      }
+    }, delayMs)
+    this.gitTimer.unref?.()
+  }
+
+  /** Tell the user, once, about edits `/undo` will not be able to restore. */
+  private async onFileEdited(file: string) {
+    this.refreshGit()
+    this.undoSupport ??= await snapshotStatus()
+    if (!this.undoSupport.available) {
+      if (!this.warnedNoSnapshot) {
+        this.warnedNoSnapshot = true
+        this.showToast(`/undo will not restore files here: ${this.undoSupport.reason}.`, "info", 8000)
+      }
+      return
+    }
+    if (this.warnedIgnored.has(file)) return
+    if (await isIgnored(project().worktree, file).catch(() => false)) {
+      this.warnedIgnored.add(file)
+      const rel = file.startsWith(project().worktree) ? file.slice(project().worktree.length + 1) : file
+      this.showToast(`${rel} is git-ignored, so /undo cannot restore it.`, "info", 8000)
+    }
+  }
+
   stop() {
     for (const off of this.unsubscribers.splice(0)) off()
     if (this.timer) clearTimeout(this.timer)
+    if (this.gitTimer) clearTimeout(this.gitTimer)
   }
 }
 

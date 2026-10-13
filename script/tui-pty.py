@@ -26,6 +26,10 @@ sys.stderr.write(f"mock on {port}\n")
 home = tempfile.mkdtemp(prefix="vdc-tui-home-")
 work = os.path.realpath(tempfile.mkdtemp(prefix="vdc-tui-work-"))
 open(os.path.join(work, "hello.txt"), "w").write("greetings\n")
+if os.environ.get("GIT_REPO"):
+    for cmd_ in (["git", "init", "-q", "-b", "trunk"], ["git", "config", "user.email", "t@example.com"], ["git", "config", "user.name", "t"],
+                 ["git", "add", "-A"], ["git", "commit", "-qm", "init"]):
+        subprocess.run(cmd_, cwd=work, check=True)
 config = {"model": "mock/m", "snapshot": False,
           "provider": {"mock": {"name": "Mock", "api": f"http://127.0.0.1:{port}/v1",
                                 "models": {"m": {"name": "Mock Model", "tool_call": True, "limit": {"context": 100000, "output": 4000}}}}}}
@@ -78,6 +82,8 @@ def send(s, wait=0.4):
 
 try:
     expect("V E D E C A P S", 20)
+    if os.environ.get("GIT_REPO"):
+        expect("⎇ trunk", 10)
     expect("Ask anything")
     send("안녕 read the file")
     send("\r", 0.2)
@@ -94,6 +100,8 @@ try:
     send("edit the notes\r", 0.5)
     expect("Permission required", 10) if os.environ.get("ASK_EDIT") else expect("Write", 10)
     send("y", 0.5)
+    if os.environ.get("GIT_REPO"):
+        expect("1 changed", 10)  # the file the agent wrote shows up in the status bar
     if os.environ.get("ASK_EDIT"):
         expect("Write", 10)
     pump(1.5)
