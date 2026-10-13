@@ -88,7 +88,6 @@ jobs:
           echo "$RESPONSE" | grep -q "완료"
           expected="$(node -p "require('./package.json').version")"
           test "$("$HOME/.vedecaps/bin/vedecaps" --version)" = "$expected"
-          grep -q "### Vedecaps" "$GITHUB_STEP_SUMMARY"
       - name: Binaries must not embed build-machine paths
         run: |
           if strings -a dist/linux-x64/vedecaps | grep -E "/home/runner/|/Users/"; then

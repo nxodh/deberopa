@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, expect, test } from "bun:test"
 import fs from "node:fs"
 import path from "node:path"
 import { PassThrough } from "node:stream"
+import { pathToFileURL } from "node:url"
 import { fromContentBlocks, serveAcp } from "../src/acp/server"
 import { endProject, mockConfig, reply, startMockLLM, tmpDir, useProject, type MockLLM } from "./helpers"
 
@@ -178,16 +179,19 @@ test("session/new before initialize is refused", async () => {
 })
 
 test("prompt content blocks become text and attachments", () => {
+  // real editors send absolute file URLs for the platform they run on
+  const a = path.resolve(dir, "src", "a.ts")
+  const b = path.resolve(dir, "b.txt")
   const out = fromContentBlocks([
     { type: "text", text: "look at this" },
-    { type: "resource_link", uri: "file:///work/src/a.ts", name: "a.ts" },
-    { type: "resource", resource: { uri: "file:///work/b.txt", text: "bee" } },
+    { type: "resource_link", uri: pathToFileURL(a).href, name: "a.ts" },
+    { type: "resource", resource: { uri: pathToFileURL(b).href, text: "bee" } },
     { type: "image", data: "AAAA", mimeType: "image/png" },
     { type: "audio", data: "x", mimeType: "audio/wav" },
   ])
   expect(out.text).toContain("look at this")
-  expect(out.text).toContain("@/work/src/a.ts")
-  expect(out.text).toContain("Contents of /work/b.txt:")
+  expect(out.text).toContain(`@${a}`)
+  expect(out.text).toContain(`Contents of ${b}:`)
   expect(out.text).toContain("bee")
   expect(out.files).toEqual([{ mime: "image/png", data: "AAAA" }])
 })

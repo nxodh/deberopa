@@ -95,7 +95,12 @@ function toPath(uri: unknown): string | undefined {
     try {
       return fileURLToPath(uri)
     } catch {
-      return undefined
+      // Windows rejects a file URL without a drive letter; the path part is still the best answer
+      try {
+        return decodeURIComponent(new URL(uri).pathname)
+      } catch {
+        return undefined
+      }
     }
   }
   return path.isAbsolute(uri) ? uri : undefined
