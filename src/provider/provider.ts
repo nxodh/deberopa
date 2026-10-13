@@ -1,6 +1,6 @@
 import { getConfig, readState, type ModelConfig } from "../config/config"
 import { allCredentials } from "../auth/auth"
-import { detectLocalServers, discoverOpenAIModels, fetchDiparnuxInfo, isLocalURL, localAPIKey, type DetectedModel } from "./local"
+import { detectLocalServers, discoverOpenAIModels, fetchDiparnuxInfo, isLocalURL, lastDetectFailures, localAPIKey, type DetectedModel } from "./local"
 import { getCatalog, type CatalogModel, type CatalogProvider } from "./models"
 import { registerSecret } from "../util/redact"
 import { createLogger } from "../util/log"
@@ -292,6 +292,15 @@ export async function getModel(providerID: string, modelID: string): Promise<{ p
   const all = await allProviders()
   const provider = all[providerID]
   if (!provider) {
+    // a server that is running but refused the probe is not "unknown": say what is actually wrong
+    const refused = lastDetectFailures().find((f) => f.id === providerID)
+    if (refused) {
+      throw new ModelNotFoundError(
+        providerID,
+        modelID,
+        `The server at ${refused.baseURL} answered ${refused.status}: it needs an API key. Set DIPARNUX_API_KEY (or LLAMA_API_KEY) and try again.`,
+      )
+    }
     throw new ModelNotFoundError(providerID, modelID, `Unknown provider "${providerID}". Run \`vedecaps models\` to list what is available.`)
   }
   if (provider.source === "none") {

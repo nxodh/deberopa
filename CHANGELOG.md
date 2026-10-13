@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Local servers that need an API key are detected: `DIPARNUX_API_KEY` (then `LLAMA_API_KEY`) is sent as a bearer token to the detected llama.cpp address and to configured local providers. A 401/403 from a server that is there is now reported by `vedecaps debug local` instead of looking like nothing was found. Detection probes do not follow redirects.
+- Asking for a model on a server that refused the probe now says it needs an API key instead of "Unknown provider".
 - Diparnux gateways are recognised (`X-Diparnux` header or `GET /diparnux/info`, sent without credentials). Their slot count and per-slot context are read and validated; the smaller of the model's and the slot's window is used, and a `limit.context` in the config always wins. Hosted APIs are never asked.
 - `provider.<id>.options.max_concurrency` (1-64) limits simultaneous model requests per server. Waiting requests leave the queue when aborted, slots are always returned (success, error, early close), and titles/summaries are served after real work. A Diparnux gateway with a fixed slot count sets it automatically when the config does not; invalid values are ignored and shown by `vedecaps debug`. Unset means unlimited, as before.
 - `vedecaps debug local` shows server state, slots and context per slot, and `--check-tools` sends one request per server to see whether tool calling works (`ok`, `recovered` from text, or `failed`).

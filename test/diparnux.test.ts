@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from "bun:test"
 import { detectLocalServers, lastDetectFailures, localAPIKey, parseDiparnuxInfo, setDefaultEndpoints } from "../src/provider/local"
-import { allProviders } from "../src/provider/provider"
+import { allProviders, getModel } from "../src/provider/provider"
 import { checkToolCalling } from "../src/provider/toolcheck"
 import { runLocalDebug } from "../src/cli/commands/local-debug"
 import { redact } from "../src/util/redact"
@@ -230,6 +230,18 @@ test("a detected gateway gets the key from the environment as its credential", a
   expect(open.source).toBe("local")
 })
 
+test("asking for a model on a server that refused the probe explains why, not 'unknown provider'", async () => {
+  behaviour = { needKey: KEY }
+  setDefaultEndpoints({ llamacpp: base, ollama: dead, lmstudio: dead, vllm: dead })
+  useProject(tmpDir(), {})
+  const err = await getModel("llamacpp", "some-model.gguf").catch((e) => e)
+  expect(err.message).toContain("answered 401")
+  expect(err.message).toContain("DIPARNUX_API_KEY")
+  expect(err.message).not.toContain("Unknown provider")
+  // a different unknown provider is still just unknown
+  expect((await getModel("nope", "x").catch((e) => e)).message).toContain('Unknown provider "nope"')
+})
+
 test("T1.11 the key never appears in what debug prints or in redacted text", async () => {
   behaviour = { needKey: KEY, info: goodInfo, chat: () => json({ choices: [{ message: { tool_calls: [{ function: { name: "get_time", arguments: '{"city":"Seoul"}' } }] } }] }) }
   process.env.DIPARNUX_API_KEY = KEY
@@ -285,7 +297,6 @@ test("T4.5 without --check-tools no model request is made", async () => {
   await runLocalDebug({ endpoints: { llamacpp: base, ollama: dead, lmstudio: dead, vllm: dead }, out: (l = "") => void lines.push(l), timeoutMs: 1500 })
   expect(seen.some((s) => s.path === "/v1/chat/completions")).toBe(false)
   expect(lines.join("\n")).not.toContain("tool call check")
-  expect(lines.join("\n")).toContain("--check-tools")
 
   seen = []
   await runLocalDebug({ endpoints: { llamacpp: base, ollama: dead, lmstudio: dead, vllm: dead }, checkTools: true, out: () => {}, timeoutMs: 1500 })

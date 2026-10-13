@@ -109,6 +109,5 @@ export async function runLocalDebug(opts: LocalDebugOptions): Promise<number> {
   }
   out("")
   out("Use one with:  vedecaps -m <provider>/<model>   (e.g. " + `${servers[0]!.id}/${Object.keys(servers[0]!.models)[0] ?? "model"})`)
-  if (!opts.checkTools) out("Add --check-tools to send one request per server and see whether tool calls work.")
   return 0
 }
