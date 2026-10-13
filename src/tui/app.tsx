@@ -6,7 +6,7 @@ import { spawn } from "node:child_process"
 import { Box, Static, Text, useApp, useBoxMetrics, useWindowSize } from "ink"
 import { Paths, VERSION } from "../global"
 import { project } from "../project"
-import { readState, writeState } from "../config/config"
+import { getConfig, readState, writeState } from "../config/config"
 import { listAgents, primaryAgents } from "../agent/agent"
 import { allProviders, availableProviders, getModel, resetProviders } from "../provider/provider"
 import { setCredential } from "../auth/auth"
@@ -127,7 +127,9 @@ export function App(props: { options: AppOptions }) {
     app.start()
     void (async () => {
       const state = await readState()
-      if (state.theme && THEMES[state.theme]) app.theme = state.theme
+      const configured = (await getConfig()).theme
+      const themeName = state.theme ?? configured
+      if (themeName && THEMES[themeName]) app.theme = themeName
       const primaries = (await primaryAgents()).map((a) => a.name)
       setAgents(primaries)
       app.agent = props.options.agent ?? (state.agent && primaries.includes(state.agent) ? state.agent : (primaries[0] ?? "build"))

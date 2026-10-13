@@ -1,0 +1,537 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/nxodh/vedecaps/main/config.schema.json",
+  "title": "Vedecaps configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "theme": {
+      "enum": [
+        "mono",
+        "ink",
+        "paper"
+      ]
+    },
+    "model": {
+      "type": "string",
+      "description": "Default model as provider/model"
+    },
+    "small_model": {
+      "type": "string",
+      "description": "Cheap model for titles, as provider/model"
+    },
+    "default_agent": {
+      "type": "string"
+    },
+    "username": {
+      "type": "string"
+    },
+    "autoupdate": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "const": "notify"
+        }
+      ],
+      "description": "false disables the daily update check; updates are never installed automatically"
+    },
+    "snapshot": {
+      "type": "boolean",
+      "description": "Record file snapshots for undo (git repositories only)"
+    },
+    "reasoning_effort": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "protocol": {
+            "enum": [
+              "anthropic",
+              "openai"
+            ],
+            "description": "Wire protocol; defaults to openai (chat completions) for everything except Anthropic"
+          },
+          "api": {
+            "type": "string",
+            "description": "Base URL of the API, e.g. http://localhost:11434/v1"
+          },
+          "env": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Environment variables that may hold the API key"
+          },
+          "options": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "apiKey": {
+                "type": "string",
+                "description": "Prefer {env:NAME} over writing a key here"
+              },
+              "baseURL": {
+                "type": "string"
+              },
+              "headers": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "timeout": {
+                "type": "number",
+                "description": "Request timeout in milliseconds"
+              }
+            }
+          },
+          "models": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Model id sent to the API when it differs from the key"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "limit": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "context": {
+                      "type": "number"
+                    },
+                    "output": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "cost": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "description": "USD per million tokens",
+                  "properties": {
+                    "input": {
+                      "type": "number"
+                    },
+                    "output": {
+                      "type": "number"
+                    },
+                    "cache_read": {
+                      "type": "number"
+                    },
+                    "cache_write": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "reasoning": {
+                  "type": "boolean"
+                },
+                "tool_call": {
+                  "type": "boolean"
+                },
+                "attachment": {
+                  "type": "boolean"
+                },
+                "temperature": {
+                  "type": "boolean"
+                },
+                "options": {
+                  "type": "object",
+                  "description": "Extra fields merged into the request body"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "disabled_providers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "enabled_providers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "When set, only these providers are used"
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "primary",
+              "subagent",
+              "all"
+            ]
+          },
+          "model": {
+            "type": "string",
+            "description": "provider/model"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "temperature": {
+            "type": "number"
+          },
+          "top_p": {
+            "type": "number"
+          },
+          "steps": {
+            "type": "number",
+            "description": "Maximum agentic iterations before the agent must answer in text"
+          },
+          "tools": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "boolean"
+            }
+          },
+          "permission": {
+            "anyOf": [
+              {
+                "enum": [
+                  "allow",
+                  "ask",
+                  "deny"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "allow",
+                        "ask",
+                        "deny"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": {
+                        "enum": [
+                          "allow",
+                          "ask",
+                          "deny"
+                        ]
+                      },
+                      "description": "pattern -> action; later patterns win"
+                    }
+                  ]
+                }
+              }
+            ],
+            "description": "allow / ask / deny per permission key (edit, bash, read, webfetch, task, skill, external_directory, doom_loop, or an MCP tool id). A string applies to everything."
+          },
+          "disable": {
+            "type": "boolean"
+          },
+          "hidden": {
+            "type": "boolean"
+          },
+          "reasoning_effort": {
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ]
+          }
+        }
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "template"
+        ],
+        "properties": {
+          "template": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "agent": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "subtask": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "mcp": {
+      "type": "object",
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "command"
+            ],
+            "properties": {
+              "type": {
+                "const": "local"
+              },
+              "command": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "environment": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "cwd": {
+                "type": "string"
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "timeout": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "url"
+            ],
+            "properties": {
+              "type": {
+                "const": "remote"
+              },
+              "url": {
+                "type": "string"
+              },
+              "headers": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "timeout": {
+                "type": "number"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "permission": {
+      "anyOf": [
+        {
+          "enum": [
+            "allow",
+            "ask",
+            "deny"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "enum": [
+                  "allow",
+                  "ask",
+                  "deny"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "enum": [
+                    "allow",
+                    "ask",
+                    "deny"
+                  ]
+                },
+                "description": "pattern -> action; later patterns win"
+              }
+            ]
+          }
+        }
+      ],
+      "description": "allow / ask / deny per permission key (edit, bash, read, webfetch, task, skill, external_directory, doom_loop, or an MCP tool id). A string applies to everything."
+    },
+    "instructions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Extra instruction files: paths, globs or URLs"
+    },
+    "tools": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "boolean"
+      },
+      "description": "Turn tools off globally, e.g. {\"webfetch\": false}"
+    },
+    "formatter": {
+      "anyOf": [
+        {
+          "const": false
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "disabled": {
+                "type": "boolean"
+              },
+              "command": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "$FILE is replaced by the file path"
+              },
+              "extensions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "environment": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "lsp": {
+      "anyOf": [
+        {
+          "const": false
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "disabled": {
+                "type": "boolean"
+              },
+              "command": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "extensions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "env": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "initialization": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "keybinds": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Reserved; key bindings are not configurable yet"
+    },
+    "compaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "auto": {
+          "type": "boolean"
+        },
+        "reserved": {
+          "type": "number",
+          "description": "Tokens kept free for the reply before compaction triggers"
+        }
+      }
+    },
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "port": {
+          "type": "number"
+        },
+        "hostname": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

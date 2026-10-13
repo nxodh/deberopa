@@ -29,6 +29,8 @@ open(os.path.join(work, "hello.txt"), "w").write("greetings\n")
 config = {"model": "mock/m", "snapshot": False,
           "provider": {"mock": {"name": "Mock", "api": f"http://127.0.0.1:{port}/v1",
                                 "models": {"m": {"name": "Mock Model", "tool_call": True, "limit": {"context": 100000, "output": 4000}}}}}}
+if os.environ.get("ASK_EDIT"):
+    config["permission"] = {"edit": "ask"}
 env = dict(os.environ, VEDECAPS_HOME=home, VEDECAPS_DISABLE_MODELS_FETCH="1", VEDECAPS_CONFIG_CONTENT=json.dumps(config), TERM="xterm-256color")
 env.pop("CI", None)
 
@@ -92,6 +94,8 @@ try:
     send("edit the notes\r", 0.5)
     expect("Permission required", 10) if os.environ.get("ASK_EDIT") else expect("Write", 10)
     send("y", 0.5)
+    if os.environ.get("ASK_EDIT"):
+        expect("Write", 10)
     pump(1.5)
     send("\x04", 0.5)
     pump(1.5)
