@@ -49,6 +49,10 @@ const COMMANDS: Record<string, () => Promise<Entry>> = {
     const m = await import("./cli/commands/debug")
     return { spec: m.spec, run: m.main }
   },
+  acp: async () => {
+    const m = await import("./cli/commands/acp")
+    return { spec: m.spec, run: m.main }
+  },
   serve: async () => {
     const m = await import("./cli/commands/serve")
     return { spec: m.spec, run: m.main }
@@ -75,6 +79,7 @@ const SUMMARY: [string, string][] = [
   ["vedecaps mcp list|add|remove", "manage MCP servers"],
   ["vedecaps stats", "token usage and cost"],
   ["vedecaps serve", "start the HTTP API server"],
+  ["vedecaps acp", "run as an Agent Client Protocol server (editors)"],
   ["vedecaps upgrade [version]", "update vedecaps to the latest release"],
   ["vedecaps uninstall", "remove vedecaps from this machine"],
   ["vedecaps debug", "show paths, config and tooling"],

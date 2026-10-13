@@ -52,6 +52,25 @@ export function startMcp(): Promise<void> {
   })())
 }
 
+/** Connect one more server at runtime (for example one an editor passes to the agent). */
+export async function addMcpServer(name: string, server: Parameters<typeof connectMcp>[1]): Promise<McpStatus> {
+  if (entries.get(name)?.client) return entries.get(name)!.status
+  const entry: Entry = { status: { name, status: "connecting", tools: 0 }, tools: [] }
+  entries.set(name, entry)
+  try {
+    const client = await connectMcp(name, server)
+    entry.client = client
+    entry.tools = await client.listTools()
+    entry.status = { name, status: "connected", tools: entry.tools.length }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    log.error(`failed to connect to ${name}`, message)
+    entry.status = { name, status: "failed", error: message, tools: 0 }
+  }
+  publish("mcp.updated", { name })
+  return entry.status
+}
+
 export function mcpStatus(): McpStatus[] {
   return [...entries.values()].map((e) => e.status)
 }
