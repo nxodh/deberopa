@@ -1,0 +1,41 @@
+# Review every pull request with Vedecaps and post the result as a comment.
+# Pull requests from forks do not receive secrets, so they are skipped.
+name: vedecaps review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Review
+        id: review
+        uses: nxodh/vedecaps@v0.1.1
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        with:
+          model: anthropic/claude-sonnet-5-5
+          agent: plan
+          # deny shell access entirely: the review only needs to read the diff
+          config: '{"permission":{"bash":"deny","edit":"deny"}}'
+          prompt: >
+            Review the changes in this pull request against origin/${{ github.base_ref }}.
+            Use `git diff` style reading through the available tools. Report real problems only:
+            bugs, security issues, missing error handling and missing tests. Be concise.
+
+      - name: Comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEW: ${{ steps.review.outputs.response }}
+        run: gh pr comment "${{ github.event.pull_request.number }}" --body "$REVIEW"

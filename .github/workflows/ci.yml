@@ -63,6 +63,32 @@ jobs:
               sh /install.sh >/dev/null
               test "$(grep -c "# vedecaps" $HOME/.profile)" = 1
             '
+      - name: Start a local release host and a mock model for the action test
+        run: |
+          nohup npx bun run script/release-server.ts dist 48732 >/dev/null 2>&1 &
+          PORT=48733 nohup npx bun run script/mock-llm.ts >/dev/null 2>&1 &
+          sleep 3
+      - name: GitHub Action (composite) installs from the local release and runs the agent
+        id: action
+        uses: ./
+        env:
+          VEDECAPS_RELEASE_URL: http://127.0.0.1:48732
+          VEDECAPS_DISABLE_LOCAL_DETECT: "1"
+          VEDECAPS_DISABLE_MODELS_FETCH: "1"
+        with:
+          prompt: Summarise this repository
+          config: >-
+            {"model":"mock/m","snapshot":false,"provider":{"mock":{"name":"Mock","api":"http://127.0.0.1:48733/v1",
+            "models":{"m":{"name":"M","tool_call":true,"limit":{"context":100000,"output":4000}}}}}}
+      - name: Action output and installed version
+        env:
+          RESPONSE: ${{ steps.action.outputs.response }}
+        run: |
+          echo "$RESPONSE" | head -3
+          echo "$RESPONSE" | grep -q "완료"
+          expected="$(node -p "require('./package.json').version")"
+          test "$("$HOME/.vedecaps/bin/vedecaps" --version)" = "$expected"
+          grep -q "### Vedecaps" "$GITHUB_STEP_SUMMARY"
       - name: Binaries must not embed build-machine paths
         run: |
           if strings -a dist/linux-x64/vedecaps | grep -E "/home/runner/|/Users/"; then

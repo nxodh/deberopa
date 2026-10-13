@@ -38,7 +38,7 @@ async function cli(args: string[], opts: { stdin?: string; config?: Record<strin
 }
 
 test("--version and --help", async () => {
-  expect((await cli(["--version"])).stdout.trim()).toBe("0.1.0")
+  expect((await cli(["--version"])).stdout.trim()).toBe(require("../package.json").version)
   const help = await cli(["--help"])
   expect(help.code).toBe(0)
   expect(help.stdout).toContain("vedecaps run")

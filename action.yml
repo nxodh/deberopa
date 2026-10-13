@@ -1,0 +1,100 @@
+name: Vedecaps
+description: Run the Vedecaps AI coding agent in a workflow
+author: nxodh
+branding:
+  icon: terminal
+  color: gray-dark
+
+inputs:
+  prompt:
+    description: What the agent should do.
+    required: true
+  model:
+    description: Model as provider/model, for example anthropic/claude-sonnet-5-5. Default comes from your config.
+    required: false
+    default: ""
+  agent:
+    description: Agent to use. "plan" is read-only.
+    required: false
+    default: build
+  version:
+    description: Vedecaps version to install (for example 0.1.1). Default is the latest release.
+    required: false
+    default: ""
+  working-directory:
+    description: Directory to run in.
+    required: false
+    default: "."
+  config:
+    description: Configuration as JSON (merged over vedecaps.json). Use it to set permissions or providers.
+    required: false
+    default: ""
+  allow-all:
+    description: >
+      Approve every permission request automatically. Nobody can answer questions in a workflow, so
+      without this, anything configured as "ask" is refused. Only enable it for trusted input.
+    required: false
+    default: "false"
+
+outputs:
+  response:
+    description: The agent's final answer as text.
+    value: ${{ steps.run.outputs.response }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install Vedecaps (Linux and macOS)
+      if: runner.os != 'Windows'
+      shell: bash
+      env:
+        VEDECAPS_VERSION: ${{ inputs.version }}
+        VEDECAPS_NO_MODIFY_PATH: "1"
+      run: |
+        sh "${{ github.action_path }}/install.sh"
+        echo "$HOME/.vedecaps/bin" >> "$GITHUB_PATH"
+
+    - name: Install Vedecaps (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      env:
+        VEDECAPS_VERSION: ${{ inputs.version }}
+        VEDECAPS_NO_MODIFY_PATH: "1"
+      run: |
+        & "${{ github.action_path }}/install.ps1"
+        Add-Content -Path $env:GITHUB_PATH -Value (Join-Path $env:LOCALAPPDATA 'vedecaps\bin')
+
+    - name: Run
+      id: run
+      shell: bash
+      env:
+        # inputs reach the script through the environment, never by splicing them into the code
+        INPUT_PROMPT: ${{ inputs.prompt }}
+        INPUT_MODEL: ${{ inputs.model }}
+        INPUT_AGENT: ${{ inputs.agent }}
+        INPUT_DIR: ${{ inputs.working-directory }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_ALLOW_ALL: ${{ inputs.allow-all }}
+      run: |
+        set -euo pipefail
+        export PATH="$HOME/.vedecaps/bin:${LOCALAPPDATA:+$(cygpath -u "$LOCALAPPDATA" 2>/dev/null)/vedecaps/bin:}$PATH"
+        args=(run --agent "$INPUT_AGENT" --dir "$INPUT_DIR")
+        if [ -n "$INPUT_MODEL" ]; then args+=(-m "$INPUT_MODEL"); fi
+        if [ "$INPUT_ALLOW_ALL" = "true" ]; then args+=(--dangerously-skip-permissions); fi
+        if [ -n "$INPUT_CONFIG" ]; then export VEDECAPS_CONFIG_CONTENT="$INPUT_CONFIG"; fi
+        out="$RUNNER_TEMP/vedecaps-response.md"
+        status=0
+        vedecaps "${args[@]}" -- "$INPUT_PROMPT" > "$out" || status=$?
+        {
+          echo "### Vedecaps"
+          echo
+          cat "$out"
+        } >> "$GITHUB_STEP_SUMMARY"
+        delimiter="VEDECAPS_$(date +%s%N)_EOF"
+        {
+          echo "response<<$delimiter"
+          cat "$out"
+          echo
+          echo "$delimiter"
+        } >> "$GITHUB_OUTPUT"
+        exit "$status"

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (0.1.1)
+## 0.1.1
 
 - Local models: Ollama, LM Studio, llama.cpp and vLLM are detected automatically, with each model's real context window and capabilities (`vedecaps debug local`).
 - Ollama native API with an explicit `num_ctx` (default: the model's maximum, capped at 16,384), instead of the OpenAI-compatible API that silently truncates prompts to 2-4K tokens.
@@ -9,6 +9,11 @@
 - Context usage and auto-compaction stay correct when Ollama under-reports cached prompt tokens.
 - Providers configured by URL only list their models from `/models`.
 - `patch` tool: create, update, move and delete several files with one `*** Begin Patch` block; atomic, with whitespace-tolerant matching.
+- `websearch` tool through Exa (free shared limit, or your own `EXA_API_KEY`). Asks before sending a query.
+- Missing language servers (TypeScript, Pyright, gopls, rust-analyzer) can be installed on request into Vedecaps' own data directory, with confirmation.
+- JavaScript SDK (`@vedecaps/sdk`) for the HTTP API, including event streaming and spawning a server.
+- `vedecaps acp`: Agent Client Protocol server for Zed and other editors.
+- GitHub Action (`nxodh/vedecaps`) and example workflows for PR review and `/vedecaps` comments.
 
 ## 0.1.0
 
