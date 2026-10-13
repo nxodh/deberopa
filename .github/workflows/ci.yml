@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Test
+        run: npx bun test
+
+  build:
+    name: Build and smoke test (Linux, Debian 13)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Build every target
+        run: npx bun run script/build.ts --all
+      - name: Compile the smoke test for Linux
+        run: npx bun build --compile --target=bun-linux-x64 script/smoke.ts --outfile dist/smoke-linux-x64
+      - name: Smoke test (Ubuntu)
+        run: dist/smoke-linux-x64 dist/linux-x64/vedecaps
+      - name: Smoke test (clean debian:13 container, only the binaries inside)
+        run: docker run --rm -v "$PWD/dist:/s:ro" debian:13 /s/smoke-linux-x64 /s/linux-x64/vedecaps
+      - name: Check release assets
+        run: |
+          ls -l dist
+          cat dist/checksums.txt
+          test "$(wc -l < dist/checksums.txt)" -eq 5
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vedecaps-binaries
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
+
+  windows-binary:
+    name: Build and smoke test (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Build the Windows executable
+        run: npx bun run script/build.ts --target windows-x64
+      - name: Smoke test
+        run: npx bun run script/smoke.ts dist/windows-x64/vedecaps.exe
