@@ -49,6 +49,18 @@ const COMMANDS: Record<string, () => Promise<Entry>> = {
     const m = await import("./cli/commands/debug")
     return { spec: m.spec, run: m.main }
   },
+  serve: async () => {
+    const m = await import("./cli/commands/serve")
+    return { spec: m.spec, run: m.main }
+  },
+  upgrade: async () => {
+    const m = await import("./cli/commands/upgrade")
+    return { spec: m.spec, run: m.main }
+  },
+  uninstall: async () => {
+    const m = await import("./cli/commands/uninstall")
+    return { spec: m.spec, run: m.main }
+  },
 }
 
 const SUMMARY: [string, string][] = [
@@ -95,6 +107,7 @@ function mainHelp(): string {
 
 async function main(argv: string[]): Promise<number> {
   const first = argv[0]
+  void import("./update/update").then((m) => m.cleanupOldBinary()).catch(() => {})
   if (first === "--version" || first === "-v" || first === "version") {
     process.stdout.write(VERSION + "\n")
     return 0
@@ -103,15 +116,6 @@ async function main(argv: string[]): Promise<number> {
     if (first === "help" && argv[1] && COMMANDS[argv[1]]) return main([argv[1], "--help"])
     process.stdout.write(mainHelp() + "\n")
     return 0
-  }
-
-  if (first === "serve" || first === "upgrade" || first === "uninstall") {
-    const m = await import("./cli/commands/" + first)
-    if (argv.includes("--help") || argv.includes("-h")) {
-      process.stdout.write(helpText(first, m.spec) + "\n")
-      return 0
-    }
-    return m.main(argv.slice(1))
   }
 
   const load = first ? COMMANDS[first] : undefined
@@ -128,6 +132,10 @@ async function main(argv: string[]): Promise<number> {
     throw new UsageError(`Unknown command "${first}". Run \`vedecaps --help\` to see what is available.`)
   }
   const tui = await import("./cli/commands/tui")
+  if (argv.includes("--help") || argv.includes("-h")) {
+    process.stdout.write(mainHelp() + "\n")
+    return 0
+  }
   return tui.main(argv)
 }
 

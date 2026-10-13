@@ -20,6 +20,7 @@ import { totalTokens, type AssistantMessage, type Message } from "../session/mes
 import { listFiles } from "../util/walk"
 import { mcpStatus } from "../mcp"
 import { lspStatus } from "../lsp"
+import { checkForUpdate } from "../update/update"
 import { app } from "./state"
 import { getTheme, THEMES } from "./theme"
 import { Header, MessageView, Muted, Plain, SPINNER } from "./view"
@@ -138,6 +139,7 @@ export function App(props: { options: AppOptions }) {
       setHistory(await fs.readFile(historyFile(), "utf8").then((t) => JSON.parse(t) as string[], () => []))
       await app.open(props.options.sessionID)
       setReady(true)
+      void checkForUpdate().then((latest) => latest && app.showToast(`Vedecaps ${latest} is available. Run \`vedecaps upgrade\` to update.`, "info", 8000))
       if (props.options.initialPrompt) submit(props.options.initialPrompt)
     })()
     return () => app.stop()

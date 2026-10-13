@@ -87,6 +87,96 @@ check("models", models.code === 0 && models.stdout.includes("mock/m"), JSON.stri
 const debug = await vedecaps(["debug"])
 check("debug", debug.code === 0 && debug.stdout.includes("Providers"), JSON.stringify(debug).slice(0, 300))
 
+// serve: the HTTP API answers on a free port
+{
+  const proc = Bun.spawn([bin, "serve", "--port", "0"], {
+    cwd: work,
+    env: { ...process.env, VEDECAPS_HOME: home, VEDECAPS_DISABLE_MODELS_FETCH: "1", VEDECAPS_CONFIG_CONTENT: JSON.stringify(config) },
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  let ok = false
+  let detail = ""
+  try {
+    const reader = proc.stdout.getReader()
+    let printed = ""
+    const deadline = Date.now() + 15_000
+    while (!/http:\/\/[^\s]+:\d+/.test(printed) && Date.now() < deadline) {
+      const { value, done } = await reader.read()
+      if (done) break
+      printed += new TextDecoder().decode(value)
+    }
+    const url = /http:\/\/[^\s]+:\d+/.exec(printed)?.[0]
+    if (url) {
+      const health: any = await fetch(url + "/health").then((r) => r.json())
+      const agents: any = await fetch(url + "/agent").then((r) => r.json())
+      ok = health.ok === true && agents.some((a: any) => a.name === "build")
+      detail = JSON.stringify(health)
+    } else detail = "no listening line: " + printed
+  } catch (err) {
+    detail = String(err)
+  }
+  proc.kill()
+  await proc.exited
+  check("serve: HTTP API", ok, detail)
+}
+
+// upgrade: download from a (local) release host, verify the checksum, swap the executable
+{
+  const { createHash } = await import("node:crypto")
+  const windows = process.platform === "win32"
+  const exe = windows ? "vedecaps.exe" : "vedecaps"
+  const target = `${windows ? "windows" : process.platform}-${process.arch}`
+  const asset = `vedecaps-${target}.${windows ? "zip" : "tar.gz"}`
+  const stage = fs.mkdtempSync(path.join(os.tmpdir(), "vdc-smoke-release-"))
+  const installDir = fs.mkdtempSync(path.join(os.tmpdir(), "vdc-smoke-install-"))
+  const installed = path.join(installDir, exe)
+  fs.copyFileSync(bin, path.join(stage, exe))
+  fs.copyFileSync(bin, installed)
+  fs.chmodSync(installed, 0o755)
+  const packed = Bun.spawnSync(windows ? ["tar", "-a", "-c", "-f", asset, exe] : ["tar", "-czf", asset, exe], { cwd: stage })
+  const current = version.stdout.trim()
+  let ok = false
+  let detail = packed.exitCode === 0 ? "" : "could not package: " + packed.stderr.toString()
+  if (packed.exitCode === 0) {
+    const digest = createHash("sha256").update(fs.readFileSync(path.join(stage, asset))).digest("hex")
+    const release = Bun.serve({
+      port: 0,
+      hostname: "127.0.0.1",
+      fetch(req) {
+        const url = new URL(req.url)
+        if (url.pathname === "/latest") return new Response(null, { status: 302, headers: { location: `/tag/v${current}` } })
+        if (url.pathname === `/download/v${current}/checksums.txt`) return new Response(`${digest}  ${asset}\n`)
+        if (url.pathname === `/download/v${current}/${asset}`) return new Response(Bun.file(path.join(stage, asset)))
+        if (url.pathname === `/download/v9.9.9/checksums.txt`) return new Response(`${"0".repeat(64)}  ${asset}\n`)
+        if (url.pathname === `/download/v9.9.9/${asset}`) return new Response(Bun.file(path.join(stage, asset)))
+        return new Response("not found", { status: 404 })
+      },
+    })
+    const env = { ...process.env, VEDECAPS_HOME: home, VEDECAPS_RELEASE_URL: `http://127.0.0.1:${release.port}` }
+    const runInstalled = async (args: string[]) => {
+      const proc = Bun.spawn([installed, ...args], { env, stdin: "ignore", stdout: "pipe", stderr: "pipe" })
+      const [stdout, stderr, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited])
+      return { stdout, stderr, code }
+    }
+    const upToDate = await runInstalled(["upgrade", "--check"])
+    const forced = await runInstalled(["upgrade", "--force"])
+    const after = await runInstalled(["--version"])
+    const tampered = await runInstalled(["upgrade", "9.9.9"])
+    ok =
+      upToDate.code === 0 && upToDate.stdout.includes("up to date") &&
+      forced.code === 0 && forced.stdout.includes("Updated") &&
+      after.code === 0 && after.stdout.trim() === current &&
+      tampered.code === 1 && tampered.stderr.includes("Checksum mismatch")
+    detail = JSON.stringify({ upToDate, forced, after, tampered })
+    release.stop(true)
+  }
+  check("upgrade: verified self-replace, tampered download refused", ok, detail)
+  fs.rmSync(stage, { recursive: true, force: true })
+  fs.rmSync(installDir, { recursive: true, force: true })
+}
+
 server.stop(true)
 fs.rmSync(home, { recursive: true, force: true })
 fs.rmSync(work, { recursive: true, force: true })
