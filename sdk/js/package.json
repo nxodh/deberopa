@@ -1,0 +1,14 @@
+{
+  "name": "@vedecaps/sdk",
+  "version": "0.1.1",
+  "description": "JavaScript/TypeScript client for the Vedecaps HTTP API",
+  "type": "module",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/nxodh/vedecaps.git", "directory": "sdk/js" },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "files": ["dist", "README.md"],
+  "scripts": { "build": "tsc -p tsconfig.json" },
+  "engines": { "node": ">=18" }
+}
