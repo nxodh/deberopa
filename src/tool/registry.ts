@@ -1,6 +1,7 @@
 import type { AgentInfo } from "../agent/agent"
 import { isDisabled } from "../permission/permission"
 import { mcpTools } from "../mcp"
+import { pluginTools } from "../plugin"
 import { BashTool } from "./bash"
 import { EditTool, MultiEditTool, WriteTool } from "./edit"
 import { GlobTool } from "./glob"
@@ -55,6 +56,7 @@ export async function toolsFor(agent: AgentInfo): Promise<ToolDefinition[]> {
   const skill = await createSkillTool()
   if (skill) tools.push(skill)
   tools.push(...mcpTools().sort((a, b) => a.id.localeCompare(b.id)))
+  tools.push(...(await pluginTools(new Set(tools.map((t) => t.id)))))
 
   const websearchOff = (await getConfig()).websearch?.enabled === false
   return tools.filter((tool) => {

@@ -8,6 +8,8 @@
  *   await close()
  */
 
+export type { Plugin, PluginContext, PluginHooks, PluginTool, PluginToolContext } from "./plugin"
+
 export type Role = "user" | "assistant"
 
 export interface Session {

@@ -19,6 +19,7 @@ import { changedFiles, track } from "../snapshot/snapshot"
 import { project } from "../project"
 import { compact, shouldCompact } from "./compaction"
 import { toModelMessages } from "./convert"
+import { runHook } from "../plugin"
 import { COMPACT_DROPPED_TOOLS, MAX_STEPS_REMINDER, shortenDescription, systemPrompt, useCompactPrompt } from "./system"
 import {
   addMessage,
@@ -328,6 +329,7 @@ async function runStep(input: StepInput): Promise<{ next: "continue" | "stop" | 
   let tools = input.finalStep ? [] : model.toolCall ? await toolsFor(agent) : []
   if (compact) tools = tools.filter((t) => !COMPACT_DROPPED_TOOLS.has(t.id))
   const system = await systemPrompt({ agent, model, compact })
+  await runHook("chat.system", { agent: agent.name, providerID: provider.id, modelID: model.id }, { system })
   const history = toModelMessages(await getMessages(sessionID))
   if (input.finalStep) history.push({ role: "user", content: [{ type: "text", text: MAX_STEPS_REMINDER }] })
 
@@ -391,14 +393,26 @@ async function runStep(input: StepInput): Promise<{ next: "continue" | "stop" | 
           metadata: { tool: part.tool, input: coerced },
         })
       }
-      const result = await tool.execute(coerced, ctx)
+      // plugins may rewrite the arguments, or throw to veto the call
+      const hookInput = { tool: tool.id, sessionID, callID: part.callID }
+      const rewritten = { args: coerced }
+      await runHook("tool.execute.before", hookInput, rewritten)
+      const finalArgs = rewritten.args
+      if (finalArgs !== coerced) {
+        const again = validateArgs(tool.parameters, finalArgs)
+        if (again) throw new Error(`A plugin changed the arguments of ${tool.id} into something invalid: ${again}`)
+        part.state = { status: "running", input: finalArgs, time: { start } }
+      }
+      const result = await tool.execute(finalArgs, ctx)
       if (signal.aborted) throw Object.assign(new Error("Aborted"), { name: "AbortError" })
+      const shaped = { title: result.title, output: result.output, metadata: result.metadata ?? {} }
+      await runHook("tool.execute.after", hookInput, shaped)
       part.state = {
         status: "completed",
-        input: coerced,
-        output: result.output,
-        title: result.title,
-        metadata: result.metadata ?? {},
+        input: finalArgs,
+        output: shaped.output,
+        title: shaped.title,
+        metadata: shaped.metadata,
         time: { start, end: Date.now() },
         attachments: result.attachments?.length ? result.attachments : undefined,
       }

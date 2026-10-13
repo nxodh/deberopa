@@ -18,6 +18,8 @@ export async function bootstrap(opts: BootstrapOptions = {}): Promise<Project> {
   ensureDirs()
   initLog({ print: opts.printLogs })
   const project = initProject(opts.directory ?? process.cwd())
+  // plugins can listen to events from the first moment, so load them now rather than at the first prompt
+  void import("../plugin").then((m) => m.loadPlugins()).catch(() => {})
   if (opts.mcp === true) await startMcp()
   else if (opts.mcp === "background") void startMcp()
   return project

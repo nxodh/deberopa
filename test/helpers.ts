@@ -9,6 +9,7 @@ import { initProject } from "../src/project"
 import { resetCommands } from "../src/command/command"
 import { resetSnapshot } from "../src/snapshot/snapshot"
 import { setCatalog } from "../src/provider/models"
+import { resetPlugins } from "../src/plugin"
 
 export function tmpDir(prefix = "vdc-") {
   return fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefix)))
@@ -21,6 +22,7 @@ export function resetAll() {
   resetSkills()
   resetSnapshot()
   resetCommands()
+  resetPlugins()
 }
 
 /** Make `dir` the current project and apply a config object on top of the defaults. */
