@@ -1,0 +1,45 @@
+name: Verify release
+
+# Installs the published release exactly the way the README tells users to.
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  debian:
+    name: curl | sh on Debian 13
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    container: debian:13
+    steps:
+      - name: Install with the documented one-liner
+        run: |
+          apt-get update -qq && apt-get install -y -qq curl ca-certificates >/dev/null
+          curl -fsSL https://raw.githubusercontent.com/nxodh/vedecaps/main/install.sh | sh
+          "$HOME/.vedecaps/bin/vedecaps" --version
+          "$HOME/.vedecaps/bin/vedecaps" --help | head -5
+          "$HOME/.vedecaps/bin/vedecaps" upgrade --check
+
+  windows:
+    name: irm | iex on Windows
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [powershell, pwsh]
+    steps:
+      - name: Install with the documented one-liner
+        shell: pwsh
+        run: |
+          & ${{ matrix.shell }} -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/nxodh/vedecaps/main/install.ps1 | iex"
+          if ($LASTEXITCODE -ne 0) { throw 'install failed' }
+          $exe = Join-Path $env:LOCALAPPDATA 'vedecaps\bin\vedecaps.exe'
+          & $exe --version
+          & $exe upgrade --check
+          if ($LASTEXITCODE -ne 0) { throw 'installed binary failed' }

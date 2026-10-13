@@ -47,6 +47,22 @@ jobs:
         run: dist/smoke-linux-x64 dist/linux-x64/vedecaps
       - name: Smoke test (clean debian:13 container, only the binaries inside)
         run: docker run --rm -v "$PWD/dist:/s:ro" debian:13 /s/smoke-linux-x64 /s/linux-x64/vedecaps
+      - name: Terminal UI in a pseudo-terminal (compiled binary, mock model)
+        run: python3 script/tui-pty.py "$PWD/dist/linux-x64/vedecaps"
+      - name: install.sh in a clean debian:13 container (local release host)
+        run: |
+          npx bun run script/release-server.ts dist 48731 &
+          sleep 2
+          docker run --rm --network host -v "$PWD/install.sh:/install.sh:ro" \
+            -e VEDECAPS_RELEASE_URL=http://127.0.0.1:48731 \
+            -e EXPECTED="$(node -p "require('./package.json').version")" debian:13 sh -c '
+              set -e
+              apt-get update -qq >/dev/null && apt-get install -y -qq curl ca-certificates >/dev/null
+              sh /install.sh
+              test "$($HOME/.vedecaps/bin/vedecaps --version)" = "$EXPECTED"
+              sh /install.sh >/dev/null
+              test "$(grep -c "# vedecaps" $HOME/.profile)" = 1
+            '
       - name: Binaries must not embed build-machine paths
         run: |
           if strings -a dist/linux-x64/vedecaps | grep -E "/home/runner/|/Users/"; then
@@ -74,7 +90,32 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
-      - name: Build the Windows executable
-        run: npx bun run script/build.ts --target windows-x64
+      - name: Build and package the Windows executable
+        run: npx bun run script/build.ts --target windows-x64 --package
       - name: Smoke test
         run: npx bun run script/smoke.ts dist/windows-x64/vedecaps.exe
+      - name: install.ps1 on Windows PowerShell 5.1 and PowerShell 7 (local release host)
+        shell: pwsh
+        run: |
+          $server = Start-Process -FilePath (Resolve-Path 'node_modules/bun/bin/bun.exe') -ArgumentList 'run','script/release-server.ts','dist','48731' -PassThru -NoNewWindow
+          Start-Sleep -Seconds 3
+          $expected = (Get-Content package.json | ConvertFrom-Json).version
+          $env:VEDECAPS_RELEASE_URL = 'http://127.0.0.1:48731'
+          try {
+            foreach ($shell in 'powershell', 'pwsh') {
+              $dir = Join-Path $env:RUNNER_TEMP "vdc-$shell"
+              $env:VEDECAPS_INSTALL_DIR = $dir
+              & $shell -NoProfile -ExecutionPolicy Bypass -Command "Get-Content -Raw install.ps1 | Invoke-Expression"
+              if ($LASTEXITCODE -ne 0) { throw "install.ps1 failed under $shell" }
+              $got = & (Join-Path $dir 'vedecaps.exe') --version
+              if ($got -ne $expected) { throw "expected $expected, got $got under $shell" }
+              # installing again over an existing copy must work too
+              & $shell -NoProfile -ExecutionPolicy Bypass -Command "Get-Content -Raw install.ps1 | Invoke-Expression"
+              if ($LASTEXITCODE -ne 0) { throw "reinstall failed under $shell" }
+              $path = [Environment]::GetEnvironmentVariable('Path', 'User')
+              if (($path -split ';' | Where-Object { $_ -eq $dir }).Count -ne 1) { throw "PATH entry for $dir is missing or duplicated" }
+              Write-Host "install.ps1 ok under $shell ($got)"
+            }
+          } finally {
+            Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
+          }

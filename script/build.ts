@@ -93,8 +93,12 @@ for (const target of selected) {
   fs.rmSync(archive, { force: true })
   const packed =
     target.archive === "zip"
-      ? spawnSync("zip", ["-j", "-q", archive, outfile], { stdio: "inherit" })
-      : spawnSync("tar", ["-czf", archive, "-C", dir, target.exe], { stdio: "inherit" })
+      ? process.platform === "win32"
+        ? // Windows has no zip command, but its bundled bsdtar writes zip archives
+          spawnSync("tar", ["-a", "-c", "-f", archive, "-C", dir, target.exe], { stdio: "inherit" })
+        : spawnSync("zip", ["-j", "-q", archive, outfile], { stdio: "inherit" })
+      : // COPYFILE_DISABLE keeps macOS from adding extended-attribute headers that GNU tar warns about
+        spawnSync("tar", ["-czf", archive, "-C", dir, target.exe], { stdio: "inherit", env: { ...process.env, COPYFILE_DISABLE: "1" } })
   if (packed.status !== 0) fail(`Packaging ${target.name} failed (is ${target.archive === "zip" ? "zip" : "tar"} installed?)`)
   const digest = createHash("sha256").update(fs.readFileSync(archive)).digest("hex")
   checksums.push(`${digest}  ${path.basename(archive)}`)
