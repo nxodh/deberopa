@@ -675,6 +675,7 @@ export async function compactSession(sessionID: string) {
   running.set(sessionID, state)
   setStatus(sessionID, { type: "busy" })
   try {
+    await settleRevert(sessionID)
     return await compact({ sessionID, signal: state.abort.signal })
   } finally {
     running.delete(sessionID)

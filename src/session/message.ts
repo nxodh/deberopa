@@ -9,7 +9,7 @@ export interface SessionInfo {
   version: string
   time: { created: number; updated: number }
   /** Set while the session is rewound: messages from `messageID` on are hidden until redo or the next prompt. */
-  revert?: { messageID: string; snapshot?: string }
+  revert?: { messageID: string; snapshot?: string; files?: string[] }
 }
 
 export interface TextPart {
