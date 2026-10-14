@@ -1,5 +1,5 @@
 import { VERSION } from "../global"
-import { EMPTY_USAGE, ProviderError, type FinishReason, type StreamEvent, type StreamInput, type Usage } from "./types"
+import { EMPTY_USAGE, ProviderError, type FinishReason, type StreamEvent, type StreamInput, type Timings, type Usage } from "./types"
 import { describeTlsError, hostOf, tlsInit } from "./tls"
 
 /** Split an SSE byte stream into `data:` payloads. */
@@ -178,6 +178,7 @@ export async function* streamOpenAI(input: StreamInput): AsyncGenerator<StreamEv
   const calls = new Map<number, { id: string; name: string; args: string; meta?: Record<string, unknown>; started: boolean }>()
   let finish: string | null | undefined
   let usage: Usage = { ...EMPTY_USAGE }
+  let timings: Timings | undefined
   let reasoningOpen = false
   let sawContent = false
 
@@ -192,6 +193,16 @@ export async function* streamOpenAI(input: StreamInput): AsyncGenerator<StreamEv
     if (chunk.error) {
       const message = chunk.error.message ?? JSON.stringify(chunk.error)
       throw new ProviderError(`${provider.name}: ${message}`, { status: typeof chunk.error.code === "number" ? chunk.error.code : undefined })
+    }
+    // llama.cpp (and so Opereta) reports how long reading the prompt and writing the answer took.
+    if (chunk.timings && typeof chunk.timings === "object") {
+      const t = chunk.timings
+      const promptMs = Number(t.prompt_ms)
+      const generationMs = Number(t.predicted_ms)
+      timings = {
+        ...(Number.isFinite(promptMs) && promptMs >= 0 ? { promptMs } : {}),
+        ...(Number.isFinite(generationMs) && generationMs > 0 ? { generationMs } : {}),
+      }
     }
     if (chunk.usage) {
       const cached = chunk.usage.prompt_tokens_details?.cached_tokens ?? chunk.usage.prompt_cache_hit_tokens ?? 0
@@ -264,7 +275,7 @@ export async function* streamOpenAI(input: StreamInput): AsyncGenerator<StreamEv
   // Some servers report "stop" even when they returned tool calls.
   if (emittedCalls > 0 && reason !== "length") reason = "tool-calls"
   if (reason === "unknown" && (sawContent || emittedCalls === 0)) reason = "stop"
-  yield { type: "finish", reason, usage }
+  yield { type: "finish", reason, usage, timings }
 }
 
 export const __test = { buildBody, toMessages }

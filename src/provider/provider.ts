@@ -348,7 +348,7 @@ function pickDefault(provider: ProviderInfo): Model | undefined {
   return newest(big.length ? big : usable)[0]
 }
 
-/** config.model → last used → best model of the first provider with credentials. */
+/** config.model → last used → best model of a local server, then of the first provider with credentials. */
 export async function defaultModel(): Promise<{ providerID: string; modelID: string } | undefined> {
   const config = await getConfig()
   if (config.model) {
@@ -358,7 +358,9 @@ export async function defaultModel(): Promise<{ providerID: string; modelID: str
   const available = await availableProviders()
   const state = await readState()
   if (state.model && available.some((p) => p.id === state.model!.providerID)) return state.model
-  for (const provider of available) {
+  // Deberopa is built for local models: with nothing chosen yet, a server on this machine beats a hosted one.
+  const ordered = [...available].sort((a, b) => Number(!!b.local) - Number(!!a.local))
+  for (const provider of ordered) {
     const model = pickDefault(provider)
     if (model) return { providerID: provider.id, modelID: model.id }
   }

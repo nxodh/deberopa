@@ -1,4 +1,4 @@
-import type { Usage } from "../provider/types"
+import type { Timings, Usage } from "../provider/types"
 
 export interface SessionInfo {
   id: string
@@ -57,6 +57,8 @@ export interface ToolPart {
   tool: string
   /** Provider metadata that has to be echoed back with the call. */
   meta?: Record<string, unknown>
+  /** The model wrote this call as text instead of a structured tool call; Deberopa recovered it. */
+  viaText?: boolean
   state: ToolState
 }
 
@@ -100,6 +102,8 @@ export interface AssistantMessage {
   parts: Part[]
   tokens: Usage
   cost: number
+  /** Server-reported timings for this response, when available. */
+  timings?: Timings
   finish?: string
   error?: { name: string; message: string }
   /** This message is a compaction summary: history before it is no longer sent to the model. */

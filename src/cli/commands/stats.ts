@@ -1,5 +1,4 @@
-import { getMessages, listSessions } from "../../session/store"
-import { totalTokens } from "../../session/message"
+import { usageStats } from "../../session/stats"
 import { parse, type CommandSpec } from "../args"
 import { bootstrap } from "../bootstrap"
 
@@ -18,38 +17,17 @@ const n = (value: number) => value.toLocaleString("en-US")
 export async function main(argv: string[]): Promise<number> {
   const { values } = parse(argv, spec.options!)
   await bootstrap()
-  const cutoff = values.days ? Date.now() - Number(values.days) * 86_400_000 : 0
-  const sessions = (await listSessions({ all: values.all, includeChildren: true })).filter((s) => s.time.updated >= cutoff)
-  const byModel = new Map<string, { messages: number; input: number; output: number; cache: number; cost: number }>()
-  let messages = 0
-  let cost = 0
-  let tokens = 0
-  for (const session of sessions) {
-    for (const m of await getMessages(session.id)) {
-      messages++
-      if (m.role !== "assistant" || !m.modelID) continue
-      const key = `${m.providerID}/${m.modelID}`
-      const row = byModel.get(key) ?? { messages: 0, input: 0, output: 0, cache: 0, cost: 0 }
-      row.messages++
-      row.input += m.tokens.input
-      row.output += m.tokens.output
-      row.cache += m.tokens.cacheRead + m.tokens.cacheWrite
-      row.cost += m.cost
-      byModel.set(key, row)
-      cost += m.cost
-      tokens += totalTokens(m.tokens)
-    }
-  }
+  const stats = await usageStats({ all: values.all, days: values.days ? Number(values.days) : undefined })
   const out = (s = "") => process.stdout.write(s + "\n")
-  out(`Sessions   ${n(sessions.length)}`)
-  out(`Messages   ${n(messages)}`)
-  out(`Tokens     ${n(tokens)}`)
-  out(`Cost       $${cost.toFixed(4)}`)
-  if (byModel.size) {
+  out(`Sessions   ${n(stats.sessions)}`)
+  out(`Messages   ${n(stats.messages)}`)
+  out(`Tokens     ${n(stats.tokens)}`)
+  out(`Cost       $${stats.cost.toFixed(4)}`)
+  if (stats.models.length) {
     out()
     out("By model")
-    for (const [model, row] of [...byModel].sort((a, b) => b[1].cost - a[1].cost)) {
-      out(`  ${model}`)
+    for (const row of stats.models) {
+      out(`  ${row.model}`)
       out(`    ${n(row.messages)} responses · in ${n(row.input)} · out ${n(row.output)} · cache ${n(row.cache)} · $${row.cost.toFixed(4)}`)
     }
   }

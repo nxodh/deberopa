@@ -23,6 +23,9 @@
 
 ## 1. 목표와 비목표
 
+> **제품의 큰 목표 (소유자, 2026-10-15)**: Deberopa(CLI와 Desktop 모두)는 코딩 에이전트로서 **로컬 LLM의 사용성을 극대화**한다. 클라우드 모델도 지원하지만 로컬 모델 쪽 기능과 편의성이 중요하다. 이 설계의 우선순위 판단은 이 목표를 따른다: 첫 실행에서 로컬 서버를 찾아 바로 쓰게 하고, 도구 호출 점검·짧은 프롬프트·속도·슬롯·컨텍스트를 항상 보이게 하며, 서버가 꺼져 있으면 시작 방법을, 모델이 없으면 내려받기를 화면에서 제공한다(구현은 대화 패널의 "Local models" 카드와 선택기, `desktop/extensions/deberopa-agent`).
+
+
 ### 목표
 
 1. 터미널을 쓰지 않는 사람도 Deberopa를 설치해서 바로 쓸 수 있다(접근성).
@@ -219,6 +222,10 @@ VSCodium이 같은 방식(소스 빌드, 텔레메트리 제거, Open VSX)으로
 | `!셸` 모드 | 입력창 모드 전환 | `POST /session/:id/shell` | 없음 |
 | 에이전트 선택(build/plan/…), 사용자 정의 에이전트 | 입력창 상단 선택기, 설정 | `GET /agent` | 에이전트 파일 편집은 에디터로 연다 |
 | 모델, 제공자 선택, 로컬 서버 감지 | 모델 선택기, "모델 서버" 화면 | `GET /provider` | 감지 결과와 상태(`debug local`), 사용 가능 여부 |
+| **로컬 서버 확인과 시작 안내** (`deberopa local`, `/local`) | 대화 패널의 "Local models" 카드(상태, 슬롯, 시작 명령, 다시 검색) | `GET /local` | 없음(추가함) |
+| **도구 호출 점검** (`deberopa local check`, `/toolcheck`) | 모델 선택기 옆 "Check tools" | `POST /local/toolcheck` | 없음(추가함) |
+| **Ollama 모델 내려받기** (`deberopa local pull`, `/pull`) | 카드의 내려받기 입력과 진행률 | `POST /local/pull`, 이벤트 `local.pull` | 없음(추가함) |
+| **모델 사용 방식·속도·슬롯** (`deberopa local status`, 상태 표시줄) | 헤더의 `compact`, `tok/s`, `slots`, 컨텍스트 사용량 | `GET /provider`의 `mode`, 메시지의 `timings`, `GET /local/slots` | 없음(추가함) |
 | `auth login/list/logout` | 로그인 화면(키 입력) | 없음 | **인증 라우트**(키 저장, 삭제, 목록) |
 | 권한 요청(`once/always/reject`) | 대화 안의 카드, 알림 | `GET/POST /permission` | 없음 |
 | 세션: 목록, 이어가기, 이름 변경, 삭제 | 세션 목록 | `GET/PATCH/DELETE /session` | 없음 |
@@ -529,6 +536,38 @@ deberopa/                      (현재 저장소)
 | Q13 | 아티팩트 증명 | **사용한다.** 비용 0, 적용은 D4(10.4절의 동시 릴리스에 맞춤)(8.4절). 세부는 소유자가 위임 |
 | Q9 | 업데이트 채널 | **GitHub Releases + 서명된 자산 + 앱의 자체 검증**. Opereta OS는 OS 업데이트로만 갱신(자체 업데이트 끔). 이후 패키지 관리자(winget, APT)를 보조 채널로 추가 |
 | Q10 | 워크벤치 모양 패치 | **중간 범위**: 탭, 사이드바, 패널, 입력창의 모서리와 간격. 웹뷰는 전부 직접 제어. 패치마다 번호와 이유, 스크린샷 시험 |
+
+## 15.1 D0 결과 (2026-10-15)
+
+D0은 `desktop/`의 빌드 스크립트와 GitHub Actions(`desktop-build.yml`)로 수행했다. 고정 대상은 Code - OSS **1.141.2**(커밋 `16507d9…`, Node 24.18.0).
+
+확인한 것:
+
+| 항목 | 결과 |
+|---|---|
+| Debian 13 x64 빌드 | CI에서 성공. 설치 약 3.5분 + 패키징 약 2.5분(ubuntu-latest, 4 CPU) |
+| 제품 검사 | `check-product.mjs`가 통과: `nameLong`, 갤러리·채팅 에이전트·MS 호스팅 주소 키 없음, Copilot 언급 없음 |
+| 패치 규모 | 상류 소스 패치 1개(115줄, 3개 파일) + 디렉터리 1개 제거 + `product.json` 덮어쓰기 + 아이콘 2개 |
+| 패키지 시작 | 처음에는 시작하자마자 `builtInExtensionsEnabledWithAutoUpdates is not iterable`로 종료. 키를 지웠기 때문이며, 빈 배열로 바꿔 해결(아래 교훈) |
+
+D0에서 새로 알게 된 것(설계 가정과 달랐던 것):
+
+1. **Code - OSS 1.141은 Copilot Chat 확장(`extensions/copilot`, MIT, 약 1.7 GB의 작업 트리)을 소스 트리에 둔다.** 그리고 `compile`, 개발 의존 디렉터리 목록, 패키징 단계가 이를 전제한다. 제거에는 빌드 스크립트 패치가 필요하다(패치 0001). 코어에는 `@github/copilot-sdk` 의존성이 남아 있다(에이전트 호스트). 이것까지 걷어내려면 `src/vs/platform/agentHost` 쪽 패치가 더 필요하며 **아직 하지 않았다**. 사용자 쪽에서는 `defaultChatAgent`를 지우고 `chat.disableAIFeatures`를 기본으로 켜 내장 채팅 화면이 나타나지 않게 했지만, 코어의 SDK 코드 자체는 산출물에 남아 있다.
+2. **필수 배열·객체 키는 지우면 안 된다.** `builtInExtensionsEnabledWithAutoUpdates`는 배열(빈 배열), `trustedExtensionAuthAccess`는 객체(빈 객체)로 둔다. 키를 지우는 방식은 시작 시점에 깨진다. 그래서 산출물을 **실제로 실행**하는 단계를 CI에 넣었다.
+3. 기본 `product.json`에는 `extensionsGallery`가 **없다**(Code - OSS 빌드는 갤러리 없이 나온다). Q12 결정과 맞는다. 다만 `webviewContentExternalBaseUrlTemplate`(MS 호스팅 CDN)과 `voiceWsUrl`(MS 음성 서비스) 같은 외부 주소 키가 있어 지웠다.
+4. 내장 확장 3개(`js-debug`, `js-debug-companion`, `vscode-js-profile-table`)는 GitHub 릴리스에서 내려받는 MIT 확장이며 `Microsoft`를 게시자로 표기한다.
+5. 빌드 전제: `windows-latest` 이미지에서 상류 `preinstall`이 Visual Studio를 찾지 못해 실패했다(지원 목록이 2022/2019). **Windows 작업은 `windows-2022`로 고정**했다. 상류가 이미지 변화를 따라가면 `windows-latest`로 되돌린다.
+6. Windows에서 git의 줄바꿈 변환(autocrlf)이 패치를 깨뜨린다. 복제 시 `core.autocrlf=false`로 두고, 패치 파일은 `.gitattributes`로 바이트 그대로 보존한다.
+7. 이 Mac의 4 GB 컨테이너(arm64)에서는 `extensions/copilot`의 esbuild가 중단돼(메모리 부족 추정) 완료하지 못했다. x64 CI 러너(16 GB)에서는 문제가 없었다. 로컬 빌드는 신뢰하지 않고 CI를 기준으로 한다.
+
+**결정(소유자, 2026-10-15): 코어의 Copilot SDK는 걷어내지 않고 UI만 가린 채 둔다.** 걷어내려면 `agentHost/node/copilot/`(51개 파일)와 공통 스키마·OTel·텔레메트리 라우터, 빌드 스크립트까지 패치해야 하고 상류 업데이트마다 충돌한다는 비용을 고려했다. 대신 아래를 유지한다.
+
+- `defaultChatAgent`와 GitHub 권한·토큰·MCP 레지스트리 주소를 `product.json`에서 제거했다(산출물 검사로 보증).
+- `chat.disableAIFeatures`를 기본으로 켜 내장 채팅 화면이 나타나지 않게 했다.
+- 산출물에 SDK 런타임이 남는다는 사실은 `check-product.mjs`가 매번 출력한다(`copilotVersions`).
+- 같은 에이전트 호스트의 Claude·Codex 에이전트는 빌드된 앱에서 SDK 묶음을 `product.agentSdks`의 주소(Microsoft CDN)에서 내려받아야 등록되며, 이 항목은 상류의 배포 파이프라인이 `product.json`에 채우는 것이라 우리 빌드에는 없다. 코드상으로는 등록되지 않는 구성이지만 **실제 앱에서 확인하지 못했다.** 확인 방법은 12절 D1의 앱 실행 시험에 포함한다.
+
+아직 하지 않은 것: Windows 11 산출물의 실제 실행 확인(CI 단계는 추가함), Smart App Control 측정(실제 Windows 11 PC 필요: 앱이 완성된 뒤 소유자가 설치해 확인), 대표 확장 15개의 VSIX 설치 시험, 워크벤치 모서리 곡률 공식 설정 조사.
 
 ## 16. 출처
 

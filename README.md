@@ -20,6 +20,8 @@ Deberopa는 터미널에서 코드를 읽고, 고치고, 명령을 실행하는 
 
 > **이름이 바뀌었습니다**: Vedecaps는 0.2.0부터 **Deberopa**입니다. 실행 파일은 `deberopa`, 설정은 `~/.config/deberopa/deberopa.json`(Windows는 `%APPDATA%\deberopa`), 프로젝트 폴더는 `.deberopa/`, 환경 변수는 `DEBEROPA_*`입니다. 처음 실행할 때 새 설정 폴더가 없고 옛 폴더가 있으면 설정, 저장된 로그인, 세션, 신뢰한 프로젝트를 새 폴더로 **복사**합니다(옛 폴더는 그대로 두고 더 이상 쓰지 않습니다). 프로젝트의 옛 이름 설정 파일과 폴더도 계속 읽으며, 새 이름이 우선합니다. 옛 환경 변수 이름은 이번 릴리스까지 읽고 사용 중단 안내를 한 줄 냅니다.
 
+**목표**: Deberopa(CLI와 Deberopa Desktop 모두)는 **로컬 LLM을 코딩 에이전트로 쓰기 가장 편한 도구**를 목표로 합니다. 클라우드 모델도 지원하지만, 기능과 편의성의 우선순위는 로컬 모델에 있습니다. 로컬 서버를 자동으로 찾고, 도구 호출이 되는지 점검하고, 작은 모델에 맞게 프롬프트를 줄이고, 속도·슬롯·컨텍스트를 보여 주고, Ollama 모델을 바로 내려받을 수 있습니다([로컬 모델](#모델-제공자)).
+
 ## 설치
 
 **Linux / macOS**
@@ -135,6 +137,21 @@ API 키는 `deberopa auth login`, TUI의 `/connect`, 또는 환경 변수로 등
 - **`<think>` 태그 분리**: 본문에 섞여 나오는 추론 과정을 추론 블록으로 분리합니다.
 - **컨텍스트 사용량 보정**: Ollama가 캐시된 프롬프트를 사용량에서 빼고 보고해도 실제 크기를 추정해 자동 압축 시점과 상태 표시줄이 틀어지지 않게 합니다.
 - **친절한 오류**: 모델이 없을 때(`ollama pull …`), 도구를 지원하지 않을 때, 서버가 꺼져 있을 때 해결 방법을 알려 줍니다.
+
+**로컬 모델 도구**: 로컬 모델이 목적이므로 다음을 터미널 UI와 CLI, Deberopa Desktop에서 같은 방식으로 제공합니다.
+
+| 하는 일 | 터미널 UI | CLI | HTTP API |
+|---|---|---|---|
+| 실행 중인 서버 확인, 꺼져 있으면 시작 방법 안내 | `/local` | `deberopa local` | `GET /local` |
+| 이 모델이 도구를 호출할 수 있는지 한 번 확인 (Ollama 네이티브 API 포함) | `/toolcheck` | `deberopa local check [제공자/모델]` | `POST /local/toolcheck` |
+| Ollama 모델 내려받기(진행률) | `/pull <모델>` | `deberopa local pull <모델>` | `POST /local/pull`, 이벤트 `local.pull` |
+| 모델이 쓰이는 방식(짧은 프롬프트 여부와 이유, 컨텍스트, 슬롯) | 상태 표시줄의 `compact`, `slots 1/2` | `deberopa local status` | `GET /provider`의 `mode`, `GET /local/slots` |
+| 응답 속도 | 상태 표시줄의 `34 tok/s` | | 메시지의 `timings` |
+
+- **첫 실행**: 모델을 고르지 않았다면 이 컴퓨터에서 실행 중인 로컬 서버의 모델이 클라우드보다 먼저 기본값이 됩니다. 아무것도 없으면 키 입력을 요구하기 전에 서버를 시작하는 방법을 보여 줍니다.
+- **속도**: Ollama의 `eval_duration`과 llama.cpp/Opereta의 `timings`처럼 서버가 알려 주는 생성 시간을 우선 쓰고, 없으면 응답 시간으로 계산해 `~`를 붙입니다.
+- **텍스트 도구 호출**: 모델이 도구 호출을 본문에 텍스트로 쓰면 Deberopa가 복구해 실행합니다. 이렇게 복구된 호출은 기록에 `viaText`로 남습니다.
+- **슬롯**: llama-server의 `/slots`가 켜져 있으면 작업 중에 사용 중인 슬롯 수를 보여 줍니다.
 
 **API 키가 있는 서버와 Opereta 게이트웨이**: llama-server(`--api-key`)나 Opereta처럼 키를 요구하는 서버는 환경 변수 `OPERETA_API_KEY`(없으면 `LLAMA_API_KEY`)에 키를 두면 감지되고 요청에도 쓰입니다. 키는 감지된 주소와 직접 적은 제공자 주소로만 보내며, 리다이렉트는 따르지 않고, 로그와 `debug` 출력에서는 가려집니다. 키가 필요한데 없으면 `deberopa debug local`이 "이 서버는 API 키가 필요하다(401)"고 알려 줍니다. Opereta는 `X-Opereta` 헤더나 `GET /opereta/info`(인증 없음)로 알아보며, 슬롯 수와 슬롯당 컨텍스트를 읽습니다. 설정에 컨텍스트를 적지 않은 로컬 제공자는 그 값을 쓰고, 적은 값이 항상 우선합니다. 호스팅 API에는 이 경로를 요청하지 않습니다.
 
@@ -487,6 +504,7 @@ PR 리뷰와 `/deberopa` 댓글 응답 예시는 [`examples/github`](examples/gi
 | `deberopa trust [경로]` | 프로젝트 설정 신뢰 (`--status`, `--revoke`, `--list`) |
 | `deberopa upgrade [버전]` | 업데이트 (`--check`) |
 | `deberopa uninstall` | 제거 (`--dry-run`, `--keep-config`, `--keep-data`) |
+| `deberopa local [servers\|check\|pull\|status]` | 로컬 모델 서버 확인, 도구 호출 점검, Ollama 모델 내려받기, 모델 사용 방식 |
 | `deberopa debug [config\|local]` | 경로·설정·제공자·도구 상태, 로컬 모델 서버 진단 |
 
 각 명령에 `--help`를 붙이면 옵션과 예시가 나옵니다.
@@ -510,6 +528,8 @@ PR 리뷰와 `/deberopa` 댓글 응답 예시는 [`examples/github`](examples/gi
 | `GET /permission`, `POST /permission/:id` | 대기 중인 권한 요청·응답 (`{ reply: "once"\|"always"\|"reject" }`) |
 | `GET /agent`, `/provider`, `/command`, `/config`, `/project` | 정보 조회 (키는 포함되지 않음) |
 | `GET /find/file?query=` | 파일 퍼지 검색 |
+| `GET /local`, `POST /local/toolcheck`, `GET /local/slots?provider=`, `POST /local/pull` | 로컬 서버 감지, 도구 호출 점검, 슬롯 사용량, Ollama 모델 내려받기 |
+| `GET\|PUT\|DELETE /auth`, `GET\|POST\|DELETE /trust`, `GET /skill`, `GET /stats` | 자격 증명(키는 반환하지 않음), 프로젝트 신뢰, 스킬, 사용량 |
 
 ## 0.1.2에 추가된 기능
 

@@ -313,7 +313,7 @@ export async function* withCompat(source: AsyncGenerator<StreamEvent>, opts: Com
         for (const call of parsed.calls) {
           const id = `call_t${nextCall++}_${Date.now().toString(36)}`
           yield { type: "tool-input-start", id, name: call.name }
-          yield { type: "tool-call", id, name: call.name, input: call.args }
+          yield { type: "tool-call", id, name: call.name, input: call.args, viaText: true }
         }
         if (finish.reason === "stop" || finish.reason === "unknown") finish = { ...finish, reason: "tool-calls" }
       } else {

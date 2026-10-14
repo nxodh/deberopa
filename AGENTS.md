@@ -2,6 +2,8 @@
 
 An AI coding agent for the terminal, written in TypeScript and compiled to single-file executables with Bun. It must keep working on Windows 11 and Debian 13.
 
+**Goal**: for the CLI and for Deberopa Desktop (`desktop/`), make local LLMs as comfortable as possible as a coding agent. Hosted models are supported, but local-model features and convenience come first: when two designs compete, favour the one that serves a model on the user's own machine (detection, tool-call checks, small-context behaviour, speed and slot visibility, downloads). Local-model changes are verified against a real local server, not only mocks.
+
 ## Commands
 
 - Bun is a dev dependency, not a global: always `npx bun ...`.
@@ -22,6 +24,7 @@ An AI coding agent for the terminal, written in TypeScript and compiled to singl
 - `src/plugin/` plugin loader and hooks; `src/acp/` Agent Client Protocol server; `src/config/trust.ts` project trust
 - `sdk/js/`, `sdk/python/`, `sdk/go/` HTTP API clients; `ide/vscode/` VS Code extension (own package.json); `action.yml` GitHub Action
 - `src/tui/keybinds.ts` terminal key mappings; `src/plugin/package.ts` explicitly installed npm packages; `src/session/share.ts` reviewed, read-only session sharing
+- `src/provider/localmode.ts` (mode, speed, slots, Ollama tool check and pull, start hints) and `localreport.ts` serve the terminal UI, `deberopa local` and the HTTP API alike; `desktop/` is Deberopa Desktop (Code - OSS build, patches, built-in `deberopa-agent` extension). CLI and Desktop change and release together
 - `test/helpers.ts` has the mock OpenAI-compatible server every loop test uses; call `endProject()` in `afterAll` after `useProject()` so config does not leak into the next test file
 
 ## Rules

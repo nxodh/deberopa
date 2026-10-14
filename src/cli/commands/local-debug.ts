@@ -17,7 +17,7 @@ export interface LocalDebugOptions {
 
 const n = (value: number) => value.toLocaleString("en-US")
 
-function toolCheckLines(result: ToolCheckResult): string[] {
+export function toolCheckLines(result: ToolCheckResult): string[] {
   const secs = `${(result.ms / 1000).toFixed(1)} s`
   switch (result.status) {
     case "ok":

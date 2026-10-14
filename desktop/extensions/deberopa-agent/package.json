@@ -1,0 +1,63 @@
+{
+  "name": "deberopa-agent",
+  "displayName": "Deberopa Agent",
+  "description": "The Deberopa coding agent inside Deberopa Desktop: conversation panel, permissions and sessions.",
+  "version": "0.2.0",
+  "publisher": "nxodh",
+  "license": "MIT",
+  "private": true,
+  "engines": { "vscode": "^1.100.0" },
+  "categories": ["AI"],
+  "main": "./extension.js",
+  "activationEvents": ["onStartupFinished", "onView:deberopa.chat"],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "The agent is not started in an untrusted folder."
+    }
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [{ "id": "deberopa", "title": "Deberopa", "icon": "media/icon.svg" }]
+    },
+    "views": {
+      "deberopa": [{ "type": "webview", "id": "deberopa.chat", "name": "Conversation" }]
+    },
+    "commands": [
+      { "command": "deberopa.focus", "title": "Deberopa: Focus Conversation" },
+      { "command": "deberopa.newSession", "title": "Deberopa: New Session" },
+      { "command": "deberopa.abort", "title": "Deberopa: Stop" },
+      { "command": "deberopa.restartServer", "title": "Deberopa: Restart Agent Server" },
+      { "command": "deberopa.addSelection", "title": "Deberopa: Add Selection to Prompt" },
+      { "command": "deberopa.addFile", "title": "Deberopa: Add File to Prompt" }
+    ],
+    "keybindings": [
+      { "command": "deberopa.focus", "key": "ctrl+alt+v", "mac": "cmd+alt+v" },
+      { "command": "deberopa.addSelection", "key": "ctrl+alt+k", "mac": "cmd+alt+k", "when": "editorTextFocus" }
+    ],
+    "menus": {
+      "editor/context": [{ "command": "deberopa.addSelection", "group": "navigation@99", "when": "editorHasSelection" }],
+      "explorer/context": [{ "command": "deberopa.addFile", "group": "navigation@99", "when": "!explorerResourceIsFolder" }],
+      "view/title": [
+        { "command": "deberopa.newSession", "when": "view == deberopa.chat", "group": "navigation" },
+        { "command": "deberopa.abort", "when": "view == deberopa.chat", "group": "navigation" }
+      ]
+    },
+    "configuration": {
+      "title": "Deberopa",
+      "properties": {
+        "deberopa.command": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the deberopa executable. Empty uses the copy that ships with the app, then deberopa on PATH."
+        },
+        "deberopa.arguments": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Extra arguments for deberopa serve."
+        }
+      }
+    }
+  }
+}

@@ -43,7 +43,7 @@ if os.environ.get("ASK_EDIT"):
 submit_key = "\x07" if os.environ.get("CUSTOM_KEYS") else "\r"
 if os.environ.get("CUSTOM_KEYS"):
     config["keybinds"] = {"submit": "ctrl+g"}
-env = dict(os.environ, DEBEROPA_HOME=home, DEBEROPA_DISABLE_MODELS_FETCH="1", DEBEROPA_CONFIG_CONTENT=json.dumps(config), TERM="xterm-256color", EDITOR=editor)
+env = dict(os.environ, DEBEROPA_HOME=home, DEBEROPA_DISABLE_MODELS_FETCH="1", DEBEROPA_DISABLE_LOCAL_DETECT="1", DEBEROPA_CONFIG_CONTENT=json.dumps(config), TERM="xterm-256color", EDITOR=editor)
 env.pop("CI", None)
 
 pid, fd = pty.fork()
@@ -146,6 +146,16 @@ try:
     if "Mock Model" not in screen.display[-1]: failures.append("small help dialog hid the status bar")
     save_frame("help-small")
     resize(32, 100)
+    send("\x1b", 0.4)
+    # local-model helpers: server report with start hints, and the tool-call check
+    send("/local", 0.2)
+    send(submit_key, 0.6)
+    expect("No local model server answered")
+    expect("ollama serve")
+    send("\x1b", 0.4)
+    send("/toolcheck", 0.2)
+    send(submit_key, 0.6)
+    expect("Tool calls", 15)
     send("\x1b", 0.4)
     send("edit the notes", 0.2)
     send(submit_key, 0.5)

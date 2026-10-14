@@ -8,6 +8,8 @@
 
 Deberopa reads, edits and runs code from your terminal. It is the same kind of tool as [OpenCode](https://opencode.ai) and ships as a single executable for Windows 11 and Debian 13 class Linux (macOS builds are provided too).
 
+**Goal**: Deberopa (the CLI and Deberopa Desktop alike) aims to be the most comfortable way to use **local LLMs as a coding agent**. Hosted models are supported too, but features and conveniences are prioritised for local ones: it finds local servers, checks that a model can call tools, shrinks the prompt for small models, shows speed, slots and context, and downloads Ollama models for you.
+
 ## Install
 
 Linux / macOS:

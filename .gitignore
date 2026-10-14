@@ -24,3 +24,4 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 /sdk/python/build/
+.desktop-work/

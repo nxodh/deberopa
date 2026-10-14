@@ -1,0 +1,87 @@
+name: Desktop build
+
+# Builds Deberopa Desktop (Code - OSS + patches) on the platforms we support. It is slow (about an hour),
+# so it runs on demand and when the Desktop sources change, never on every pull request.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["desktop/**", ".github/workflows/desktop-build.yml"]
+  pull_request:
+    paths: ["desktop/**", ".github/workflows/desktop-build.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Desktop (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Debian 13 x64
+            os: ubuntu-latest
+            target: linux-x64
+            cli: linux-x64
+            exe: deberopa
+          - name: Windows 11 x64
+            os: windows-2022
+            target: win32-x64
+            cli: windows-x64
+            exe: deberopa.exe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.18.0"
+      - name: Linux build dependencies
+        if: matrix.target == 'linux-x64'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libx11-dev libxkbfile-dev libsecret-1-dev libkrb5-dev pkg-config
+      - name: Fetch, patch and install
+        run: node desktop/script/build.mjs --work ${{ runner.temp }}/deberopa-desktop --target ${{ matrix.target }} --stage fetch && node desktop/script/build.mjs --work ${{ runner.temp }}/deberopa-desktop --target ${{ matrix.target }} --stage patch && node desktop/script/build.mjs --work ${{ runner.temp }}/deberopa-desktop --target ${{ matrix.target }} --stage install
+      - name: Build the CLI that ships inside the app
+        run: npm ci && npx bun run script/build.ts --target ${{ matrix.cli }}
+      - name: Package
+        run: node desktop/script/build.mjs --work ${{ runner.temp }}/deberopa-desktop --target ${{ matrix.target }} --stage package
+      - name: Bundle the CLI
+        run: node desktop/script/build.mjs --work ${{ runner.temp }}/deberopa-desktop --target ${{ matrix.target }} --stage bundle-cli --cli dist/${{ matrix.cli }}/${{ matrix.exe }}
+      - name: Check the packaged product
+        run: node desktop/script/check-product.mjs ${{ runner.temp }}/deberopa-desktop/VSCode-${{ matrix.target }}
+      - name: Size of the packaged app
+        shell: bash
+        run: du -sh "${{ runner.temp }}/deberopa-desktop/VSCode-${{ matrix.target }}" && ls "${{ runner.temp }}/deberopa-desktop/VSCode-${{ matrix.target }}" | head -30
+      - name: Run the packaged app (Linux, headless)
+        if: matrix.target == 'linux-x64'
+        run: |
+          sudo apt-get install -y --no-install-recommends xvfb libgbm1 libasound2t64 libgtk-3-0t64 libnss3 libxss1 libxkbfile1 >/dev/null
+          APP="${{ runner.temp }}/deberopa-desktop/VSCode-linux-x64"
+          "$APP/bin/deberopa-desktop" --version --no-sandbox
+          "$APP/resources/deberopa/deberopa" --version
+          xvfb-run -a "$APP/bin/deberopa-desktop" --no-sandbox --user-data-dir "$RUNNER_TEMP/ud" --extensions-dir "$RUNNER_TEMP/ex" --list-extensions --show-versions | tee "$RUNNER_TEMP/exts.txt"
+          test -f "$APP/resources/app/extensions/deberopa-agent/package.json"
+          test -f "$APP/resources/app/extensions/deberopa-agent/extension.js"
+          test ! -e "$APP/resources/app/extensions/copilot"
+          ! grep -qi copilot "$RUNNER_TEMP/exts.txt"
+      - name: Run the packaged app (Windows)
+        if: matrix.target == 'win32-x64'
+        shell: pwsh
+        run: |
+          $app = "${{ runner.temp }}\deberopa-desktop\VSCode-win32-x64"
+          Get-ChildItem $app | Select-Object -First 30 | Format-Table Name, Length
+          & "$app\bin\deberopa-desktop.cmd" --version
+          & "$app\resources\deberopa\deberopa.exe" --version
+          $exe = Get-ChildItem $app -Filter *.exe | Where-Object { $_.Name -notmatch 'deberopa|unins|elevate|inno' } | Select-Object -First 1
+          $exe.VersionInfo | Format-List FileName, CompanyName, ProductName, LegalCopyright, FileVersion
+          if ($exe.VersionInfo.CompanyName -match 'Microsoft') { throw "the executable's file properties still name Microsoft as the company" }
+          $exts = & "$app\bin\deberopa-desktop.cmd" --user-data-dir "$env:RUNNER_TEMP\ud" --extensions-dir "$env:RUNNER_TEMP\ex" --list-extensions --show-versions
+          $exts
+          if (-not (Test-Path "$app\resources\app\extensions\deberopa-agent\extension.js")) { throw "deberopa-agent is not built in" }
+          if (Test-Path "$app\resources\app\extensions\copilot") { throw "the Copilot extension is present" }
+          if ($exts -match 'copilot') { throw "a Copilot extension is listed" }
