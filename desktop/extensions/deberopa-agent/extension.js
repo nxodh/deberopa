@@ -23,6 +23,10 @@ class ChatController {
     this.slots = null
     this.toolcheck = null
     this.slotTimer = undefined
+    this.sessions = []
+    this.trustInfo = null
+    this.commandList = []
+    this.connectable = []
     this.selection = context.globalState.get("deberopa.selection", {})
     this.status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100)
     this.status.command = "deberopa.focus"
@@ -40,7 +44,38 @@ class ChatController {
   }
 
   push() {
-    if (this.view) this.view.webview.postMessage({ type: "state", state: this.state, choices: this.choices, selection: this.selection, local: this.local, slots: this.slots, toolcheck: this.toolcheck })
+    if (this.view) this.view.webview.postMessage({ type: "state", state: this.state, choices: this.choices, selection: this.selection, local: this.local, slots: this.slots, toolcheck: this.toolcheck, sessions: this.sessions, trust: this.trustInfo, connectable: this.connectable })
+  }
+
+  async loadSessions() {
+    try {
+      const list = await this.client.sessions()
+      this.sessions = list.slice().sort((a, b) => b.time.updated - a.time.updated).slice(0, 50).map((s) => ({ id: s.id, title: s.title, updated: s.time.updated }))
+    } catch {
+      this.sessions = []
+    }
+  }
+
+  async loadTrust() {
+    try {
+      this.trustInfo = await this.client.trust()
+    } catch {
+      this.trustInfo = null
+    }
+  }
+
+  /** Providers that do not have a key yet and can take one, the usual hosted ones first. */
+  async loadConnectable() {
+    try {
+      const popular = ["anthropic", "openai", "google", "openrouter", "groq", "deepseek", "mistral", "xai"]
+      const { providers } = await this.client.providers()
+      const open = providers.filter((p) => !p.connected && !p.local)
+      this.connectable = [...open.filter((p) => popular.includes(p.id)).sort((a, b) => popular.indexOf(a.id) - popular.indexOf(b.id)), ...open.filter((p) => !popular.includes(p.id)).sort((a, b) => a.name.localeCompare(b.name))]
+        .slice(0, 30)
+        .map((p) => ({ id: p.id, name: p.name }))
+    } catch {
+      this.connectable = []
+    }
   }
 
   async loadLocal() {
@@ -105,6 +140,8 @@ class ChatController {
       this.startStream()
       await this.loadChoices().catch(() => {})
       await this.loadLocal()
+      await Promise.all([this.loadSessions(), this.loadTrust(), this.loadConnectable()])
+      this.client.commands().then((c) => { this.commandList = c.map((x) => ({ name: x.name, description: x.description || "" })) }).catch(() => {})
       return this.client
     })()
     try {
@@ -168,6 +205,7 @@ class ChatController {
   async onEvent(event) {
     if (applyEvent(this.state, event) === "reload") await this.loadMessages()
     this.watchSlots()
+    if (event.type === "session.created" || event.type === "session.deleted" || event.type === "session.updated") this.loadSessions().then(() => this.push())
     // a finished download changes which models exist
     if (event.type === "local.pull" && event.properties && event.properties.done && !event.properties.error) {
       await this.loadChoices().catch(() => {})
@@ -210,7 +248,20 @@ class ChatController {
       const chosen = {}
       if (this.selection.agent && this.choices.agents.some((a) => a.name === this.selection.agent)) chosen.agent = this.selection.agent
       if (this.selection.model && this.choices.models.some((m) => m.value === this.selection.model)) chosen.model = this.selection.model
-      await client.prompt(this.state.sessionID, text, chosen)
+      const slash = /^\/(\S+)\s*([\s\S]*)$/.exec(text)
+      if (slash && this.commandList.some((c) => c.name === slash[1])) {
+        // custom commands run through their own route (they are not prompts)
+        client.runCommand(this.state.sessionID, slash[1], slash[2], chosen).catch((err) => {
+          this.state.busy = false
+          this.state.error = { name: "Error", message: err.message }
+          this.push()
+        })
+      } else if (text.startsWith("!") && text.slice(1).trim() !== "") {
+        client.shell(this.state.sessionID, text.slice(1).trim()).catch((err) => {
+          this.state.error = { name: "Error", message: err.message }
+          this.push()
+        })
+      } else await client.prompt(this.state.sessionID, text, chosen)
     } catch (err) {
       this.state.busy = false
       this.state.error = { name: "Error", message: err.message }
@@ -284,6 +335,64 @@ class ChatController {
       case "pull": {
         if (!this.client || typeof message.model !== "string") return
         await this.client.pull(message.provider || "ollama", message.model.trim()).catch((e) => this.notice(e.message))
+        return
+      }
+      case "switchSession": {
+        if (!this.client || typeof message.id !== "string") return
+        try {
+          const session = await this.client.session(message.id)
+          this.state = { ...createState(), sessionID: session.id, title: session.title, busy: !!session.busy }
+          await this.loadMessages()
+          this.state.permissions = await this.client.permissions()
+        } catch (err) {
+          this.notice(err.message)
+        }
+        this.push()
+        return
+      }
+      case "deleteSession": {
+        if (!this.client || typeof message.id !== "string") return
+        await this.client.deleteSession(message.id).catch((e) => this.notice(e.message))
+        if (message.id === this.state.sessionID) this.state = createState()
+        await this.loadSessions()
+        this.push()
+        return
+      }
+      case "grantTrust": {
+        if (!this.client) return
+        await this.client.grantTrust().catch((e) => this.notice(e.message))
+        await this.loadTrust()
+        await this.loadChoices().catch(() => {})
+        this.push()
+        return
+      }
+      case "connect": {
+        if (!this.client || typeof message.provider !== "string" || typeof message.key !== "string") return
+        try {
+          await this.client.setKey(message.provider, message.key)
+          await this.loadChoices()
+          await this.loadConnectable()
+          this.notice("Saved. The provider's models are in the model list now.")
+        } catch (err) {
+          this.notice(err.message)
+        }
+        this.push()
+        return
+      }
+      case "suggest": {
+        if (!this.client || !this.view) return
+        const query = typeof message.query === "string" ? message.query : ""
+        let items = []
+        try {
+          if (message.kind === "file") items = (await this.client.findFile(query, 8)).map((f) => ({ value: "@" + f, label: f }))
+          else if (message.kind === "command") {
+            const q = query.toLowerCase()
+            items = this.commandList.filter((c) => c.name.toLowerCase().startsWith(q)).slice(0, 8).map((c) => ({ value: "/" + c.name + " ", label: "/" + c.name, hint: c.description }))
+          }
+        } catch {
+          items = []
+        }
+        this.view.webview.postMessage({ type: "suggestions", kind: message.kind, seq: message.seq, items })
         return
       }
       case "rescanLocal":

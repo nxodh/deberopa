@@ -47,6 +47,21 @@ irm https://raw.githubusercontent.com/nxodh/deberopa/main/install.ps1 | iex
 
 업데이트는 `deberopa upgrade`, 제거는 `deberopa uninstall`입니다.
 
+## Deberopa Desktop
+
+터미널 대신 창으로 쓰는 데스크톱 앱입니다. Code - OSS 기반 에디터 안에 대화 패널(권한 요청, 도구 카드, 세션, 로컬 모델 카드)이 들어 있고, 같은 버전의 `deberopa`를 함께 담고 있어 따로 설치할 것이 없습니다. CLI와 같은 번호로 함께 릴리스됩니다.
+
+| 대상 | 파일 | 실행 |
+|---|---|---|
+| Debian 13 · Opereta (x86-64) | `deberopa-desktop-linux-x64.tar.gz` | 풀어서 `deberopa-desktop-<버전>-linux-x64/deberopa-desktop` |
+| Windows 11 (x86-64) | `deberopa-desktop-windows-x64.zip` | 풀어서 `Deberopa Desktop.exe` |
+
+- 설치 프로그램과 자동 업데이트는 아직 없습니다. 새 버전은 새로 내려받아 풉니다.
+- **서명되지 않았습니다.** Windows에서 SmartScreen이 경고하거나 Smart App Control이 막을 수 있습니다. `checksums.txt`(SHA-256)와 GitHub 빌드 증명(`gh attestation verify <파일> --repo nxodh/deberopa`)으로 확인하세요.
+- Debian 13에서 Electron 샌드박스 때문에 바로 종료되면 `--no-sandbox`로 실행하거나, `chrome-sandbox`의 소유자를 root로 하고 `chmod 4755` 하세요.
+- Microsoft 마켓플레이스와 원격 측정을 쓰지 않으며 Copilot 확장을 뺐습니다. 확장은 내장 확장과 VSIX 직접 설치만 지원합니다.
+- 소스와 빌드 방법: `desktop/`, 설계: [docs/desktop-design.md](docs/desktop-design.md).
+
 ## 시작하기
 
 ```sh
@@ -447,7 +462,7 @@ deberopa pr 123 --no-ui > review.md   # UI 없이 결과만 출력
 ## GitHub Action
 
 ```yaml
-- uses: nxodh/deberopa@v0.2.0
+- uses: nxodh/deberopa@v0.3.0
   env:
     ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
   with:
@@ -473,7 +488,7 @@ deberopa pr 123 --no-ui > review.md   # UI 없이 결과만 출력
 permissions: { contents: write, pull-requests: write }
 steps:
   - uses: actions/checkout@v4
-  - uses: nxodh/deberopa@v0.2.0
+  - uses: nxodh/deberopa@v0.3.0
     env: { ANTHROPIC_API_KEY: "${{ secrets.ANTHROPIC_API_KEY }}" }
     with:
       prompt: 의존성 경고를 고쳐줘

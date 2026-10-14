@@ -2,7 +2,7 @@
   "name": "deberopa-agent",
   "displayName": "Deberopa Agent",
   "description": "The Deberopa coding agent inside Deberopa Desktop: conversation panel, permissions and sessions.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "nxodh",
   "license": "MIT",
   "private": true,

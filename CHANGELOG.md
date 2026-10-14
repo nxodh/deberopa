@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
 
 Goal, for the CLI and Deberopa Desktop alike: make local LLMs as comfortable as possible as a coding agent. Hosted models stay supported; local ones come first.
 

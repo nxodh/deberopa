@@ -75,12 +75,26 @@ class DeberopaClient {
   pull(provider, model) { return this.request("POST", "/local/pull", { provider, model }) }
   commands() { return this.request("GET", "/command") }
   sessions() { return this.request("GET", "/session") }
+  deleteSession(id) { return this.request("DELETE", `/session/${encodeURIComponent(id)}`) }
+  renameSession(id, title) { return this.request("PATCH", `/session/${encodeURIComponent(id)}`, { title }) }
+  auth() { return this.request("GET", "/auth") }
+  setKey(provider, key) { return this.request("PUT", `/auth/${encodeURIComponent(provider)}`, { key }) }
+  removeKey(provider) { return this.request("DELETE", `/auth/${encodeURIComponent(provider)}`) }
+  trust() { return this.request("GET", "/trust") }
+  grantTrust() { return this.request("POST", "/trust", {}) }
+  revokeTrust() { return this.request("DELETE", "/trust") }
+  stats() { return this.request("GET", "/stats") }
+  skills() { return this.request("GET", "/skill") }
   createSession(title) { return this.request("POST", "/session", title ? { title } : {}) }
   session(id) { return this.request("GET", `/session/${encodeURIComponent(id)}`) }
   messages(id) { return this.request("GET", `/session/${encodeURIComponent(id)}/message`) }
   prompt(id, text, options = {}) {
     return this.request("POST", `/session/${encodeURIComponent(id)}/prompt_async`, { text, ...options })
   }
+  runCommand(id, name, args = "", options = {}) {
+    return this.request("POST", `/session/${encodeURIComponent(id)}/command`, { name, arguments: args, ...options })
+  }
+  shell(id, command) { return this.request("POST", `/session/${encodeURIComponent(id)}/shell`, { command }) }
   abort(id) { return this.request("POST", `/session/${encodeURIComponent(id)}/abort`, {}) }
   compact(id) { return this.request("POST", `/session/${encodeURIComponent(id)}/compact`, {}) }
   revert(id, messageID) { return this.request("POST", `/session/${encodeURIComponent(id)}/revert`, { messageID }) }

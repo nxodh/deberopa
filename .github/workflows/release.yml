@@ -7,10 +7,116 @@ on:
 permissions:
   contents: write
   actions: read
+  id-token: write
+  attestations: write
 
 jobs:
+  desktop:
+    name: Deberopa Desktop (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: Debian 13 x64
+            os: ubuntu-latest
+            target: linux-x64
+            cli: linux-x64
+            exe: deberopa
+            archive: deberopa-desktop-linux-x64.tar.gz
+          - name: Windows 11 x64
+            os: windows-2022
+            target: win32-x64
+            cli: windows-x64
+            exe: deberopa.exe
+            archive: deberopa-desktop-windows-x64.zip
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.18.0"
+      - name: Tag must match package.json
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          test "v$version" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME does not match package.json version $version"; exit 1; }
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - name: Linux build dependencies
+        if: matrix.target == 'linux-x64'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libx11-dev libxkbfile-dev libsecret-1-dev libkrb5-dev pkg-config
+      - name: Build the CLI that ships inside the app
+        run: npm ci && npx bun run script/build.ts --target ${{ matrix.cli }}
+      - name: Fetch, patch, install, package
+        run: |
+          node desktop/script/build.mjs --work ${{ runner.temp }}/deberopa-desktop --target ${{ matrix.target }} --stage fetch
+          node desktop/script/build.mjs --work ${{ runner.temp }}/deberopa-desktop --target ${{ matrix.target }} --stage patch
+          node desktop/script/build.mjs --work ${{ runner.temp }}/deberopa-desktop --target ${{ matrix.target }} --stage install
+          node desktop/script/build.mjs --work ${{ runner.temp }}/deberopa-desktop --target ${{ matrix.target }} --stage package
+          node desktop/script/build.mjs --work ${{ runner.temp }}/deberopa-desktop --target ${{ matrix.target }} --stage bundle-cli --cli dist/${{ matrix.cli }}/${{ matrix.exe }}
+      - name: Check the packaged product
+        run: node desktop/script/check-product.mjs ${{ runner.temp }}/deberopa-desktop/VSCode-${{ matrix.target }}
+      - name: Start the packaged app (Linux, headless) and run the in-app test
+        if: matrix.target == 'linux-x64'
+        run: |
+          sudo apt-get install -y --no-install-recommends xvfb libgbm1 libasound2t64 libgtk-3-0t64 libnss3 libxss1 libxkbfile1 >/dev/null
+          APP="${{ runner.temp }}/deberopa-desktop/VSCode-linux-x64"
+          test "$("$APP/resources/deberopa/deberopa" --version)" = "$VERSION"
+          WORK="$RUNNER_TEMP/e2e-work"; mkdir -p "$WORK"
+          export DEBEROPA_HOME="$RUNNER_TEMP/e2e-home" DEBEROPA_DISABLE_LOCAL_DETECT=1 DEBEROPA_DISABLE_MODELS_FETCH=1
+          xvfb-run -a "$APP/bin/deberopa-desktop" --no-sandbox --disable-gpu --disable-workspace-trust \
+            --user-data-dir "$RUNNER_TEMP/e2e-ud" --extensions-dir "$RUNNER_TEMP/e2e-ex" \
+            --extensionDevelopmentPath="$APP/resources/app/extensions/deberopa-agent" \
+            --extensionTestsPath="$GITHUB_WORKSPACE/desktop/test/e2e/index.js" "$WORK"
+      - name: Start the packaged app (Windows) and run the in-app test
+        if: matrix.target == 'win32-x64'
+        shell: pwsh
+        run: |
+          $app = "${{ runner.temp }}\deberopa-desktop\VSCode-win32-x64"
+          if ((& "$app\resources\deberopa\deberopa.exe" --version) -ne $env:VERSION) { throw "bundled CLI version differs from the release version" }
+          $work = Join-Path $env:RUNNER_TEMP "e2e-work"; New-Item -ItemType Directory -Force $work | Out-Null
+          $env:DEBEROPA_HOME = Join-Path $env:RUNNER_TEMP "e2e-home"
+          $env:DEBEROPA_DISABLE_LOCAL_DETECT = "1"; $env:DEBEROPA_DISABLE_MODELS_FETCH = "1"
+          $exe = Get-ChildItem $app -Filter "Deberopa Desktop.exe" | Select-Object -First 1
+          if (-not $exe) { $exe = Get-ChildItem $app -Filter *.exe | Where-Object { $_.Name -notmatch 'unins|elevate|inno|crash' } | Select-Object -First 1 }
+          if ($exe.VersionInfo.CompanyName -match 'Microsoft') { throw "the executable's file properties still name Microsoft as the company" }
+          $args = @("--disable-gpu", "--disable-workspace-trust", "--user-data-dir", "$env:RUNNER_TEMP\e2e-ud", "--extensions-dir", "$env:RUNNER_TEMP\e2e-ex",
+                    "--extensionDevelopmentPath=$app\resources\app\extensions\deberopa-agent",
+                    "--extensionTestsPath=$env:GITHUB_WORKSPACE\desktop\test\e2e\index.js", $work)
+          $p = Start-Process -FilePath $exe.FullName -ArgumentList $args -Wait -PassThru -NoNewWindow
+          if ($p.ExitCode -ne 0) { throw "in-app test failed (exit $($p.ExitCode))" }
+      - name: Archive (Linux)
+        if: matrix.target == 'linux-x64'
+        run: |
+          mkdir -p out
+          src="${{ runner.temp }}/deberopa-desktop/VSCode-linux-x64"
+          top="deberopa-desktop-$VERSION-linux-x64"
+          rm -rf "${{ runner.temp }}/stage" && mkdir -p "${{ runner.temp }}/stage"
+          cp -a "$src" "${{ runner.temp }}/stage/$top"
+          tar -czf "out/${{ matrix.archive }}" -C "${{ runner.temp }}/stage" "$top"
+      - name: Archive (Windows)
+        if: matrix.target == 'win32-x64'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          $top = "deberopa-desktop-$env:VERSION-windows-x64"
+          $stage = Join-Path $env:RUNNER_TEMP "stage"
+          Remove-Item -Recurse -Force $stage -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force $stage | Out-Null
+          Copy-Item -Recurse "$env:RUNNER_TEMP\deberopa-desktop\VSCode-win32-x64" (Join-Path $stage $top)
+          Push-Location $stage
+          tar -a -c -f "$env:GITHUB_WORKSPACE\out\${{ matrix.archive }}" $top
+          Pop-Location
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.target }}
+          path: out/${{ matrix.archive }}
+          if-no-files-found: error
+          retention-days: 7
+
   release:
     name: Build and publish
+    needs: desktop
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -59,6 +165,23 @@ jobs:
           npm run package
           test -s deberopa.vsix
           cp deberopa.vsix "../../dist/deberopa-vscode-$VERSION.vsix"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          path: desktop-artifacts
+          merge-multiple: true
+      - name: Add the Desktop archives to the checksums
+        run: |
+          cp desktop-artifacts/deberopa-desktop-linux-x64.tar.gz desktop-artifacts/deberopa-desktop-windows-x64.zip dist/
+          (cd dist && sha256sum deberopa-desktop-linux-x64.tar.gz deberopa-desktop-windows-x64.zip >> checksums.txt)
+          cat dist/checksums.txt
+      - name: Attest build provenance of the release files
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            dist/deberopa-*.tar.gz
+            dist/deberopa-*.zip
+            dist/deberopa-vscode-*.vsix
       - name: Release notes from the changelog
         run: |
           awk -v v="$VERSION" '
@@ -80,6 +203,16 @@ jobs:
           irm https://raw.githubusercontent.com/nxodh/deberopa/main/install.ps1 | iex
           ```
           Verify downloads against `checksums.txt` (SHA-256).
+
+          ## Deberopa Desktop
+
+          `deberopa-desktop-linux-x64.tar.gz` (Debian 13 and Opereta, x86-64) and `deberopa-desktop-windows-x64.zip` (Windows 11, x86-64). Unpack and run; there is no installer yet.
+
+          - It bundles the `deberopa` command of this same version. Nothing is installed system-wide.
+          - **Not signed.** Windows may show SmartScreen, and Smart App Control can block it; checksums are in `checksums.txt` and each file has a GitHub build attestation (`gh attestation verify <file> --repo nxodh/deberopa`).
+          - **No auto-update**: install a newer release by unpacking it.
+          - Debian 13 can refuse Electron's sandbox on a fresh system. If it exits at once, start it with `--no-sandbox` or see the project README.
+          - Built from Code - OSS 1.141.2 with the Copilot extension removed; no Microsoft marketplace or telemetry.
           NOTES
           sed -i 's/^          //' notes.md
       - name: Publish the GitHub release
@@ -90,4 +223,5 @@ jobs:
             dist/deberopa-linux-x64.tar.gz dist/deberopa-linux-arm64.tar.gz \
             dist/deberopa-linux-x64-musl.tar.gz dist/deberopa-linux-arm64-musl.tar.gz \
             dist/deberopa-darwin-arm64.tar.gz dist/deberopa-darwin-x64.tar.gz \
-            dist/deberopa-windows-x64.zip dist/checksums.txt "dist/deberopa-vscode-$VERSION.vsix"
+            dist/deberopa-windows-x64.zip dist/checksums.txt "dist/deberopa-vscode-$VERSION.vsix" \
+            dist/deberopa-desktop-linux-x64.tar.gz dist/deberopa-desktop-windows-x64.zip

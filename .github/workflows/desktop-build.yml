@@ -69,7 +69,7 @@ jobs:
           test -f "$APP/resources/app/extensions/deberopa-agent/extension.js"
           test ! -e "$APP/resources/app/extensions/copilot"
           ! grep -qi copilot "$RUNNER_TEMP/exts.txt"
-      - name: In-app test (Linux): the agent extension starts the bundled server
+      - name: "In-app test (Linux) - the agent extension starts the bundled server"
         if: matrix.target == 'linux-x64'
         run: |
           APP="${{ runner.temp }}/deberopa-desktop/VSCode-linux-x64"
@@ -95,7 +95,7 @@ jobs:
           if (-not (Test-Path "$app\resources\app\extensions\deberopa-agent\extension.js")) { throw "deberopa-agent is not built in" }
           if (Test-Path "$app\resources\app\extensions\copilot") { throw "the Copilot extension is present" }
           if ($exts -match 'copilot') { throw "a Copilot extension is listed" }
-      - name: In-app test (Windows): the agent extension starts the bundled server
+      - name: "In-app test (Windows) - the agent extension starts the bundled server"
         if: matrix.target == 'win32-x64'
         shell: pwsh
         run: |
