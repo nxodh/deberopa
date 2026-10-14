@@ -129,7 +129,7 @@ test("OLLAMA_HOST in its different spellings", () => {
 })
 
 test("detecting servers and reading each model's real capabilities", async () => {
-  delete process.env.VEDECAPS_DISABLE_LOCAL_DETECT
+  delete process.env.DEBEROPA_DISABLE_LOCAL_DETECT
   try {
     const servers = await detectLocalServers({ ollama: base, lmstudio: base, llamacpp: base, vllm: "http://127.0.0.1:9" })
     expect(servers.map((s) => s.id).sort()).toEqual(["llamacpp", "lmstudio", "ollama"])
@@ -150,18 +150,18 @@ test("detecting servers and reading each model's real capabilities", async () =>
     const llama = servers.find((s) => s.id === "llamacpp")!
     expect(llama.models["gemma-3-4b"]!.context).toBe(8192)
   } finally {
-    process.env.VEDECAPS_DISABLE_LOCAL_DETECT = "1"
+    process.env.DEBEROPA_DISABLE_LOCAL_DETECT = "1"
   }
 })
 
 test("an unreachable server is simply absent", async () => {
-  delete process.env.VEDECAPS_DISABLE_LOCAL_DETECT
+  delete process.env.DEBEROPA_DISABLE_LOCAL_DETECT
   try {
     const started = Date.now()
     expect(await detectLocalServers({ ollama: "http://127.0.0.1:9", lmstudio: "http://127.0.0.1:9", llamacpp: "http://127.0.0.1:9", vllm: "http://127.0.0.1:9" })).toEqual([])
     expect(Date.now() - started).toBeLessThan(3000)
   } finally {
-    process.env.VEDECAPS_DISABLE_LOCAL_DETECT = "1"
+    process.env.DEBEROPA_DISABLE_LOCAL_DETECT = "1"
   }
 })
 
@@ -391,7 +391,7 @@ test("end to end: a configured Ollama provider drives a full tool round trip", a
   const chats = requests.filter((r) => r.path === "/api/chat" && !isTitle(r.body))
   expect(chats).toHaveLength(2)
   expect(chats[0]!.body.options.num_ctx).toBe(12000)
-  expect(chats[0]!.body.messages[0].content).toContain("You are Vedecaps")
+  expect(chats[0]!.body.messages[0].content).toContain("You are Deberopa")
   expect(chats[0]!.body.tools.map((t: any) => t.function.name)).toContain("task")
   const parts = (await getMessages(session.id)).flatMap((m) => m.parts).filter((p): p is ToolPart => p.type === "tool")
   expect(parts[0]!.state.status).toBe("completed")

@@ -10,7 +10,7 @@ export async function shareHTML(sessionID: string): Promise<string> {
   const text = redact(await exportMarkdown(sessionID, { tools: false, thinking: false }))
     .replace(/^Session `[^`]+` · created .* · updated .*\n/m, "")
     .replace(/\b(password|passwd|api[_-]?key|(?:access[_-]?)?token|secret)\s*[:=]\s*["']?[^\s"'`<]+/gi, "$1=[redacted]")
-  return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><title>Vedecaps conversation</title><style>body{max-width:72rem;margin:2rem auto;padding:0 1rem;font-family:monospace}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style><h1>Vedecaps conversation</h1><pre>${escape(text)}</pre></html>`
+  return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><title>Deberopa conversation</title><style>body{max-width:72rem;margin:2rem auto;padding:0 1rem;font-family:monospace}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style><h1>Deberopa conversation</h1><pre>${escape(text)}</pre></html>`
 }
 
 /** A separate read-only viewer: it exposes none of the agent HTTP API. */

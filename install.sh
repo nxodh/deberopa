@@ -1,16 +1,16 @@
 #!/bin/sh
-# Vedecaps installer for Linux and macOS.
-#   curl -fsSL https://raw.githubusercontent.com/nxodh/vedecaps/main/install.sh | sh
+# Deberopa installer for Linux and macOS.
+#   curl -fsSL https://raw.githubusercontent.com/nxodh/deberopa/main/install.sh | sh
 #
 # Environment:
-#   VEDECAPS_VERSION         version to install (default: latest release), e.g. 0.1.0
-#   VEDECAPS_INSTALL_DIR     where the binary goes (default: ~/.vedecaps/bin)
-#   VEDECAPS_NO_MODIFY_PATH  set to 1 to leave shell profiles untouched
+#   DEBEROPA_VERSION         version to install (default: latest release), e.g. 0.1.0
+#   DEBEROPA_INSTALL_DIR     where the binary goes (default: ~/.deberopa/bin)
+#   DEBEROPA_NO_MODIFY_PATH  set to 1 to leave shell profiles untouched
 set -eu
 
-REPO="nxodh/vedecaps"
-BASE="${VEDECAPS_RELEASE_URL:-https://github.com/$REPO/releases}"
-INSTALL_DIR="${VEDECAPS_INSTALL_DIR:-$HOME/.vedecaps/bin}"
+REPO="nxodh/deberopa"
+BASE="${DEBEROPA_RELEASE_URL:-https://github.com/$REPO/releases}"
+INSTALL_DIR="${DEBEROPA_INSTALL_DIR:-$HOME/.deberopa/bin}"
 
 say() { printf '%s\n' "$*"; }
 fail() { printf 'error: %s\n' "$*" >&2; exit 1; }
@@ -47,20 +47,20 @@ main() {
     fail "curl or wget is required"
   fi
 
-  version="${VEDECAPS_VERSION:-}"
+  version="${DEBEROPA_VERSION:-}"
   if [ -z "$version" ]; then
     location=$(redirect "$BASE/latest" || true)
     version=$(printf '%s' "$location" | sed -n 's|.*/tag/v\{0,1\}\([^/?#]*\).*|\1|p')
-    [ -n "$version" ] || fail "could not determine the latest version. Set VEDECAPS_VERSION, or see https://github.com/$REPO/releases"
+    [ -n "$version" ] || fail "could not determine the latest version. Set DEBEROPA_VERSION, or see https://github.com/$REPO/releases"
   fi
   version=${version#v}
 
-  asset="vedecaps-$os-$arch$libc.tar.gz"
+  asset="deberopa-$os-$arch$libc.tar.gz"
   url="$BASE/download/v$version"
-  tmp=$(mktemp -d 2>/dev/null || mktemp -d -t vedecaps)
+  tmp=$(mktemp -d 2>/dev/null || mktemp -d -t deberopa)
   trap 'rm -rf "$tmp"' EXIT INT TERM
 
-  say "Downloading vedecaps $version ($os-$arch$libc)"
+  say "Downloading deberopa $version ($os-$arch$libc)"
   fetch "$url/$asset" "$tmp/$asset" || fail "download failed: $url/$asset"
   fetch "$url/checksums.txt" "$tmp/checksums.txt" || fail "download failed: $url/checksums.txt"
 
@@ -78,30 +78,30 @@ main() {
   [ "$expected" = "$actual" ] || fail "checksum mismatch for $asset (expected $expected, got $actual). Nothing was installed."
 
   tar -xzf "$tmp/$asset" -C "$tmp"
-  [ -f "$tmp/vedecaps" ] || fail "the archive did not contain the vedecaps binary"
-  chmod 755 "$tmp/vedecaps"
-  if ! "$tmp/vedecaps" --version >/dev/null 2>&1; then
+  [ -f "$tmp/deberopa" ] || fail "the archive did not contain the deberopa binary"
+  chmod 755 "$tmp/deberopa"
+  if ! "$tmp/deberopa" --version >/dev/null 2>&1; then
     if [ -n "$libc" ]; then fail "musl requires libstdc++ and libgcc (Alpine: apk add --no-cache libstdc++ libgcc), then retry"; fi
     fail "the downloaded binary does not run on this system"
   fi
 
   mkdir -p "$INSTALL_DIR"
-  # Move into place under a temporary name first so a running vedecaps is replaced atomically.
-  cp "$tmp/vedecaps" "$INSTALL_DIR/.vedecaps.new"
-  mv -f "$INSTALL_DIR/.vedecaps.new" "$INSTALL_DIR/vedecaps"
-  say "Installed $INSTALL_DIR/vedecaps"
+  # Move into place under a temporary name first so a running deberopa is replaced atomically.
+  cp "$tmp/deberopa" "$INSTALL_DIR/.deberopa.new"
+  mv -f "$INSTALL_DIR/.deberopa.new" "$INSTALL_DIR/deberopa"
+  say "Installed $INSTALL_DIR/deberopa"
 
   add_to_path
   say ""
-  say "Run 'vedecaps' in a project directory to start."
-  say "First time? Connect a model provider with 'vedecaps auth login'."
+  say "Run 'deberopa' in a project directory to start."
+  say "First time? Connect a model provider with 'deberopa auth login'."
 }
 
 add_to_path() {
   case ":$PATH:" in
     *":$INSTALL_DIR:"*) return 0 ;;
   esac
-  if [ "${VEDECAPS_NO_MODIFY_PATH:-0}" = 1 ]; then
+  if [ "${DEBEROPA_NO_MODIFY_PATH:-0}" = 1 ]; then
     say "Add $INSTALL_DIR to your PATH to use it."
     return 0
   fi
@@ -123,7 +123,7 @@ add_to_path() {
   for profile in $profiles; do
     if [ -f "$profile" ] && grep -Fq "$INSTALL_DIR" "$profile"; then continue; fi
     mkdir -p "$(dirname "$profile")"
-    printf '\n# vedecaps\n%s\n' "$line" >>"$profile"
+    printf '\n# deberopa\n%s\n' "$line" >>"$profile"
     say "Added $INSTALL_DIR to PATH in $profile"
   done
   say "Open a new terminal, or run:  export PATH=\"$INSTALL_DIR:\$PATH\""

@@ -293,7 +293,7 @@ test("CJK: an unbroken Korean run hard-breaks between wide characters", () => {
 })
 
 test("CJK: mixed Korean and Latin text wraps at width", () => {
-  const src = "Vedecaps는 터미널에서 동작하는 AI 코딩 에이전트입니다 with English words"
+  const src = "Deberopa는 터미널에서 동작하는 AI 코딩 에이전트입니다 with English words"
   const lines = renderMarkdown(src, 16)
   expect(allWithin(lines, 16)).toBe(true)
   expect(linesToText(lines).replace(/\s/g, "")).toBe(src.replace(/\s/g, ""))

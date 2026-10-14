@@ -26,7 +26,7 @@ export async function trustedProjects(): Promise<string[]> {
 
 export async function isTrusted(worktree: string): Promise<boolean> {
   // CI and scripted use: the operator vouches for the checkout
-  if (process.env.VEDECAPS_TRUST_PROJECT === "1") return true
+  if (process.env.DEBEROPA_TRUST_PROJECT === "1") return true
   const target = norm(worktree)
   return (await read()).some((p) => norm(p) === target)
 }

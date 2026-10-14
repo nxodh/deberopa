@@ -3,7 +3,7 @@ import { parse, UsageError, type CommandSpec } from "../args"
 import { bootstrap } from "../bootstrap"
 
 export const spec: CommandSpec = {
-  usage: "vedecaps session <list|delete> [id]",
+  usage: "deberopa session <list|delete> [id]",
   description: "list or delete saved sessions",
   options: {
     all: { type: "boolean", description: "include sessions from every project" },
@@ -11,7 +11,7 @@ export const spec: CommandSpec = {
     format: { type: "string", arg: "table|json", description: "output format (list)" },
     help: { type: "boolean", short: "h", description: "show this help" },
   },
-  examples: ["vedecaps session list", "vedecaps session list --all -n 20", "vedecaps session delete ses_0123abcd"],
+  examples: ["deberopa session list", "deberopa session list --all -n 20", "deberopa session delete ses_0123abcd"],
 }
 
 export function ago(ms: number): string {
@@ -40,7 +40,7 @@ export async function main(argv: string[]): Promise<number> {
     return 0
   }
   if (action === "delete" || action === "rm") {
-    if (!id) throw new UsageError("Usage: vedecaps session delete <id>")
+    if (!id) throw new UsageError("Usage: deberopa session delete <id>")
     if (!(await getSession(id))) {
       process.stderr.write(`Session not found: ${id}\n`)
       return 1

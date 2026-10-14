@@ -59,7 +59,7 @@ function backend(cert: string | undefined, opts: { delayMs?: number; redirectTo?
       const url = new URL(req.url)
       state.seen.push({ path: url.pathname, auth: req.headers.get("authorization") ?? undefined })
       if (opts.redirectTo) return Response.redirect(opts.redirectTo, 301)
-      if (url.pathname === "/diparnux/info") return opts.info === undefined ? new Response("no", { status: 404 }) : Response.json(opts.info, { headers: { "x-diparnux": "0.5.4" } })
+      if (url.pathname === "/opereta/info") return opts.info === undefined ? new Response("no", { status: 404 }) : Response.json(opts.info, { headers: { "x-opereta": "0.5.4" } })
       if (url.pathname === "/v1/models") return Response.json({ data: [{ id: "m" }] })
       if (url.pathname === "/v1/chat/completions") {
         const body: any = await req.json().catch(() => ({}))
@@ -100,15 +100,15 @@ beforeAll(() => {
 })
 afterAll(() => {
   endProject()
-  for (const k of ["VEDECAPS_DISABLE_LOCAL_DETECT", "VEDECAPS_TRUST_PROJECT", "VEDECAPS_CONFIG"]) {
+  for (const k of ["DEBEROPA_DISABLE_LOCAL_DETECT", "DEBEROPA_TRUST_PROJECT", "DEBEROPA_CONFIG"]) {
     if (savedEnv[k] === undefined) delete process.env[k]
     else process.env[k] = savedEnv[k]
   }
 })
 beforeEach(() => {
-  process.env.VEDECAPS_DISABLE_LOCAL_DETECT = "1"
-  delete process.env.VEDECAPS_TRUST_PROJECT
-  delete process.env.VEDECAPS_CONFIG
+  process.env.DEBEROPA_DISABLE_LOCAL_DETECT = "1"
+  delete process.env.DEBEROPA_TRUST_PROJECT
+  delete process.env.DEBEROPA_CONFIG
 })
 afterEach(() => {
   while (servers.length) servers.pop()!.stop()
@@ -155,7 +155,7 @@ test("TC2 without options.ca a private CA is refused, with guidance, and the req
   const r = await ask()
   expect(r.error?.message).toContain("is not trusted")
   expect(r.error?.message).toContain("provider.tlsp.options.ca")
-  expect(r.error?.message).toContain("diparnux tls ca")
+  expect(r.error?.message).toContain("opereta tls ca")
   expect(s.seen).toHaveLength(0)
   expect(r.error?.message).not.toContain(KEY)
 })
@@ -173,7 +173,7 @@ test("TC4 a certificate for another name is refused and says what to do", async 
   useProject(dir, providerConfig(s.port, file("ca.pem")))
   const r = await ask()
   expect(r.error?.message).toContain("does not cover 127.0.0.1")
-  expect(r.error?.message).toContain("diparnux tls status")
+  expect(r.error?.message).toContain("opereta tls status")
   expect(s.seen).toHaveLength(0)
 })
 
@@ -182,7 +182,7 @@ test("TC5 an expired certificate is refused and says how to renew it", async () 
   useProject(dir, providerConfig(s.port, file("ca.pem")))
   const r = await ask()
   expect(r.error?.message).toContain("has expired")
-  expect(r.error?.message).toContain("diparnux tls renew")
+  expect(r.error?.message).toContain("opereta tls renew")
   expect(s.seen).toHaveLength(0)
 })
 
@@ -257,9 +257,9 @@ test("TC7 a relative ca is relative to the config file it came from, whatever th
   fs.mkdirSync(path.join(root, "sub", "deeper"), { recursive: true })
   fs.copyFileSync(file("ca.pem"), path.join(root, "certs", "ca.pem"))
   const s = start("server")
-  fs.writeFileSync(path.join(root, "vedecaps.json"), JSON.stringify(providerConfig(s.port, "certs/ca.pem")))
-  process.env.VEDECAPS_TRUST_PROJECT = "1"
-  delete process.env.VEDECAPS_CONFIG_CONTENT
+  fs.writeFileSync(path.join(root, "deberopa.json"), JSON.stringify(providerConfig(s.port, "certs/ca.pem")))
+  process.env.DEBEROPA_TRUST_PROJECT = "1"
+  delete process.env.DEBEROPA_CONFIG_CONTENT
   initProject(path.join(root, "sub", "deeper"))
   setCatalog({})
   resetAll()
@@ -268,19 +268,19 @@ test("TC7 a relative ca is relative to the config file it came from, whatever th
   expect(p.tlsSources?.[0]?.label).toBe("ca.pem")
   expect((await ask()).text).toBe("secure pong")
 
-  // a file named by VEDECAPS_CONFIG resolves against its own folder
+  // a file named by DEBEROPA_CONFIG resolves against its own folder
   const elsewhere = tmpDir("vdc-tls-cfg-")
   fs.copyFileSync(file("ca.pem"), path.join(elsewhere, "my-ca.pem"))
   fs.writeFileSync(path.join(elsewhere, "extra.json"), JSON.stringify(providerConfig(s.port, "my-ca.pem")))
-  fs.rmSync(path.join(root, "vedecaps.json"))
-  process.env.VEDECAPS_CONFIG = path.join(elsewhere, "extra.json")
+  fs.rmSync(path.join(root, "deberopa.json"))
+  process.env.DEBEROPA_CONFIG = path.join(elsewhere, "extra.json")
   initProject(root)
   resetAll()
   expect((await allProviders()).tlsp!.problem).toBeUndefined()
   expect((await ask()).text).toBe("secure pong")
 })
 
-test("VEDECAPS_CONFIG_CONTENT resolves a relative ca against the current directory", async () => {
+test("DEBEROPA_CONFIG_CONTENT resolves a relative ca against the current directory", async () => {
   const root = tmpDir("vdc-tls-env-")
   fs.mkdirSync(path.join(root, ".git"))
   fs.copyFileSync(file("ca.pem"), path.join(root, "ca.pem"))
@@ -304,12 +304,12 @@ test("resolveCaPath: ~ is the home directory, absolute stays, inline PEM is unto
 test("TC8 a project that is not trusted cannot choose the CA; the global config's ca is kept", async () => {
   const root = tmpDir("vdc-tls-trust-")
   fs.mkdirSync(path.join(root, ".git"))
-  fs.writeFileSync(path.join(root, "vedecaps.json"), JSON.stringify({ provider: { evil: { name: "Evil", options: { ca: "attacker-ca.pem", timeout: 5000 } } } }))
+  fs.writeFileSync(path.join(root, "deberopa.json"), JSON.stringify({ provider: { evil: { name: "Evil", options: { ca: "attacker-ca.pem", timeout: 5000 } } } }))
   const globalDir = tmpDir("vdc-tls-global-")
   fs.writeFileSync(path.join(globalDir, "global.json"), JSON.stringify({ provider: { mine: { options: { ca: "my-ca.pem" } } } }))
-  process.env.VEDECAPS_CONFIG = path.join(globalDir, "global.json")
-  delete process.env.VEDECAPS_CONFIG_CONTENT
-  delete process.env.VEDECAPS_TRUST_PROJECT
+  process.env.DEBEROPA_CONFIG = path.join(globalDir, "global.json")
+  delete process.env.DEBEROPA_CONFIG_CONTENT
+  delete process.env.DEBEROPA_TRUST_PROJECT
   initProject(root)
   resetConfig()
 
@@ -357,7 +357,7 @@ test("TC10 http -> https redirects are errors: the second request is never made 
   expect(target.seen).toHaveLength(0)
   expect(r.error?.message).not.toContain(KEY)
 
-  const res = await probe(`http://127.0.0.1:${plain.port}/diparnux/info`, 2000, {}, { tls: { ca: [pem("ca.pem")] } })
+  const res = await probe(`http://127.0.0.1:${plain.port}/opereta/info`, 2000, {}, { tls: { ca: [pem("ca.pem")] } })
   expect(res.ok).toBe(false)
   expect(res.status).toBe(0)
   expect(target.seen).toHaveLength(0)
@@ -402,12 +402,12 @@ test("TC12 the key appears in no error, debug output or provider problem text", 
   expect(lines.join("\n")).toContain("is not trusted")
 })
 
-// ---- TC13: Diparnux features over HTTPS --------------------------------------------------
+// ---- TC13: Opereta features over HTTPS --------------------------------------------------
 
-const INFO = { diparnux: "0.5.4", server: "running", model: "m", ctx_per_slot: 16384, slots: 1 }
+const INFO = { opereta: "0.5.4", server: "running", model: "m", ctx_per_slot: 16384, slots: 1 }
 
-test("TC13 /diparnux/info, the slot limit and the tool check all work over HTTPS with options.ca", async () => {
-  delete process.env.VEDECAPS_DISABLE_LOCAL_DETECT
+test("TC13 /opereta/info, the slot limit and the tool check all work over HTTPS with options.ca", async () => {
+  delete process.env.DEBEROPA_DISABLE_LOCAL_DETECT
   const dead = "http://127.0.0.1:9"
   setDefaultEndpoints({ llamacpp: dead, ollama: dead, lmstudio: dead, vllm: dead })
   const s = start("server", { delayMs: 120, info: INFO })
@@ -415,12 +415,12 @@ test("TC13 /diparnux/info, the slot limit and the tool check all work over HTTPS
   resetProviders()
 
   const p = (await allProviders()).tlsp!
-  expect(p.diparnux).toMatchObject({ version: "0.5.4", slots: 1, ctxPerSlot: 16384 })
+  expect(p.opereta).toMatchObject({ version: "0.5.4", slots: 1, ctxPerSlot: 16384 })
   expect(p.maxConcurrency).toBe(1)
-  expect(p.maxConcurrencySource).toBe("diparnux")
+  expect(p.maxConcurrencySource).toBe("opereta")
   expect(Object.keys(p.models)).toContain("m")
   // the info request carries no credentials
-  expect(s.seen.filter((x) => x.path === "/diparnux/info").every((x) => x.auth === undefined)).toBe(true)
+  expect(s.seen.filter((x) => x.path === "/opereta/info").every((x) => x.auth === undefined)).toBe(true)
 
   // two requests at once: the server never sees more than one
   const { provider, model } = await getModel("tlsp", "m")
@@ -442,7 +442,7 @@ test("TC13 /diparnux/info, the slot limit and the tool check all work over HTTPS
   const text = lines.join("\n")
   expect(text).toContain("TLS: certificate accepted, trusted by ca.pem")
   expect(text).toMatch(/CA SHA-256 ([0-9A-F]{2}:){31}[0-9A-F]{2}/)
-  expect(text).toContain("Diparnux 0.5.4")
+  expect(text).toContain("Opereta 0.5.4")
   expect(text).toContain("tool call check: ok")
   expect(text).not.toContain(KEY)
 })
@@ -452,7 +452,7 @@ test("TC13 /diparnux/info, the slot limit and the tool check all work over HTTPS
 test("describeTlsError recognises the nested codes and leaves everything else alone", () => {
   const ctx = { providerID: "gw", host: "spark.local:8444", hasCA: false }
   expect(describeTlsError(Object.assign(new TypeError("x"), { code: "UNABLE_TO_VERIFY_LEAF_SIGNATURE" }), ctx)).toContain("provider.gw.options.ca")
-  expect(describeTlsError(new Error("outer", { cause: Object.assign(new Error("inner"), { code: "CERT_HAS_EXPIRED" }) }), ctx)).toContain("diparnux tls renew")
+  expect(describeTlsError(new Error("outer", { cause: Object.assign(new Error("inner"), { code: "CERT_HAS_EXPIRED" }) }), ctx)).toContain("opereta tls renew")
   expect(tlsErrorCode(Object.assign(new Error("x"), { code: "ECONNREFUSED" }))).toBeUndefined()
   expect(describeTlsError(new Error("socket hang up"), ctx)).toBeUndefined()
   expect(describeTlsError(Object.assign(new Error("x"), { code: "ECONNREFUSED" }), ctx)).toBeUndefined()

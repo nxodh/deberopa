@@ -1,6 +1,6 @@
-# Review every pull request with Vedecaps and post the result as a comment.
+# Review every pull request with Deberopa and post the result as a comment.
 # Pull requests from forks do not receive secrets, so they are skipped.
-name: vedecaps review
+name: deberopa review
 
 on:
   pull_request:
@@ -21,7 +21,7 @@ jobs:
 
       - name: Review
         id: review
-        uses: nxodh/vedecaps@v0.1.1
+        uses: nxodh/deberopa@v0.1.1
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:

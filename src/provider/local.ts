@@ -32,8 +32,8 @@ export function parseParamSize(text: unknown): number | undefined {
   return { K: 1e-6, M: 1e-3, B: 1, T: 1e3 }[m[2]!.toUpperCase() as "K" | "M" | "B" | "T"] * n
 }
 
-/** What a Diparnux gateway says about itself (GET /diparnux/info, or the X-Diparnux header). */
-export interface DiparnuxInfo {
+/** What a Opereta gateway says about itself (GET /opereta/info, or the X-Opereta header). */
+export interface OperetaInfo {
   version: string
   /** Server state as reported: "running", "running_cpu", "stopped", ... Only "running*" is usable. */
   state?: string
@@ -50,8 +50,8 @@ export interface LocalServer {
   protocol: "ollama" | "openai"
   baseURL: string
   models: Record<string, DetectedModel>
-  /** Present only for Diparnux gateways; a plain llama.cpp has none. */
-  diparnux?: DiparnuxInfo
+  /** Present only for Opereta gateways; a plain llama.cpp has none. */
+  opereta?: OperetaInfo
 }
 
 /** A server that answered but refused us: it is there, it needs a key. */
@@ -118,7 +118,7 @@ export interface ProbeResult {
  */
 export async function probe(url: string, timeoutMs: number, init: RequestInit = {}, opts: { jsonOnly?: boolean; tls?: ProviderTls } = {}): Promise<ProbeResult> {
   try {
-    const res = await fetch(url, { ...init, ...tlsInit(opts.tls), redirect: "error", signal: AbortSignal.timeout(timeoutMs), headers: { "User-Agent": `vedecaps/${VERSION}`, ...init.headers } })
+    const res = await fetch(url, { ...init, ...tlsInit(opts.tls), redirect: "error", signal: AbortSignal.timeout(timeoutMs), headers: { "User-Agent": `deberopa/${VERSION}`, ...init.headers } })
     if (!res.ok) return { ok: false, status: res.status, headers: res.headers }
     // An endpoint that is merely "something that answers 200" (a catch-all proxy, a streaming
     // mock) is not worth waiting for: do not read a body that cannot be what we asked for.
@@ -142,11 +142,11 @@ async function getJSON(url: string, timeoutMs: number, init: RequestInit = {}, t
 }
 
 /**
- * The API key for a local gateway, from the environment. DIPARNUX_API_KEY first, then
+ * The API key for a local gateway, from the environment. OPERETA_API_KEY first, then
  * LLAMA_API_KEY (llama-server's own name). Registered so logs and errors never show it.
  */
 export function localAPIKey(env: Record<string, string | undefined> = process.env): string | undefined {
-  for (const name of ["DIPARNUX_API_KEY", "LLAMA_API_KEY"]) {
+  for (const name of ["OPERETA_API_KEY", "LLAMA_API_KEY"]) {
     const value = env[name]?.trim()
     if (value) {
       registerSecret(value)
@@ -168,14 +168,14 @@ const count = (value: unknown): number | undefined =>
   typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 1_000_000 ? value : undefined
 
 /**
- * Read a Diparnux self-description. Anything unexpected is ignored field by field; an answer that
- * does not name itself ("diparnux" string, or the X-Diparnux header) is not Diparnux at all.
+ * Read a Opereta self-description. Anything unexpected is ignored field by field; an answer that
+ * does not name itself ("opereta" string, or the X-Opereta header) is not Opereta at all.
  */
-export function parseDiparnuxInfo(json: unknown, headerVersion?: string | null): DiparnuxInfo | undefined {
+export function parseOperetaInfo(json: unknown, headerVersion?: string | null): OperetaInfo | undefined {
   const obj = json && typeof json === "object" && !Array.isArray(json) ? (json as Record<string, unknown>) : undefined
-  const version = clean(obj?.diparnux) ?? clean(headerVersion ?? undefined, 64)
+  const version = clean(obj?.opereta) ?? clean(headerVersion ?? undefined, 64)
   if (!version) return undefined
-  const info: DiparnuxInfo = { version }
+  const info: OperetaInfo = { version }
   if (obj) {
     const state = clean(obj.server, 64)
     if (state) info.state = state
@@ -192,20 +192,21 @@ export function parseDiparnuxInfo(json: unknown, headerVersion?: string | null):
   return info
 }
 
-/** GET {root}/diparnux/info. Sent without credentials: the contract makes it public. */
-export async function fetchDiparnuxInfo(root: string, timeoutMs = 700, headerVersion?: string | null, tls?: ProviderTls): Promise<DiparnuxInfo | undefined> {
-  const result = await probe(`${root.replace(/\/+$/, "").replace(/\/v1$/, "")}/diparnux/info`, timeoutMs, {}, { jsonOnly: true, tls })
-  return parseDiparnuxInfo(result.ok ? result.json : undefined, headerVersion)
+/** GET {root}/opereta/info. Sent without credentials: the contract makes it public. */
+export async function fetchOperetaInfo(root: string, timeoutMs = 700, headerVersion?: string | null, tls?: ProviderTls): Promise<OperetaInfo | undefined> {
+  const result = await probe(`${root.replace(/\/+$/, "").replace(/\/v1$/, "")}/opereta/info`, timeoutMs, {}, { jsonOnly: true, tls })
+  // the answer names its own version in X-Opereta as well; the body's "opereta" field wins
+  return parseOperetaInfo(result.ok ? result.json : undefined, headerVersion ?? result.headers?.get("x-opereta"))
 }
 
 /** Whether a reported server state means "can take requests". */
-export function diparnuxUsable(info: DiparnuxInfo): boolean {
+export function operetaUsable(info: OperetaInfo): boolean {
   return info.state === undefined || info.state === "running" || info.state === "running_cpu"
 }
 
-/** One short phrase for model details and `debug local`: `Diparnux 0.5.3 · 2 slots`. */
-export function describeDiparnux(info: DiparnuxInfo): string {
-  const parts = [`Diparnux ${info.version}`]
+/** One short phrase for model details and `debug local`: `Opereta 0.5.3 · 2 slots`. */
+export function describeOpereta(info: OperetaInfo): string {
+  const parts = [`Opereta ${info.version}`]
   if (info.slots) parts.push(`${info.slots} slot${info.slots === 1 ? "" : "s"}`)
   else if (info.slotsAuto) parts.push("slots chosen by the server")
   return parts.join(" · ")
@@ -314,16 +315,16 @@ export async function detectLlamaCpp(
   if (modelsResult.status === 401 || modelsResult.status === 403) onFailure?.({ id: "llamacpp", baseURL: root, status: modelsResult.status })
   const listed = modelsResult.ok ? modelsResult.json : undefined
 
-  const diparnux = await fetchDiparnuxInfo(root, timeoutMs, propsResult.headers?.get("x-diparnux"))
+  const opereta = await fetchOperetaInfo(root, timeoutMs, propsResult.headers?.get("x-opereta"))
   const propsContext = typeof (props.default_generation_settings?.n_ctx ?? props.n_ctx) === "number" ? (props.default_generation_settings?.n_ctx ?? props.n_ctx) : undefined
   // Two sources can disagree (total vs per-slot). An over-estimate makes compaction fire too late,
   // so the smaller one wins; `maxContext` keeps what the model itself reported.
-  const context = [propsContext, diparnux?.ctxPerSlot].filter((n): n is number => typeof n === "number").sort((x, y) => x - y)[0]
+  const context = [propsContext, opereta?.ctxPerSlot].filter((n): n is number => typeof n === "number").sort((x, y) => x - y)[0]
 
   const models: Record<string, DetectedModel> = {}
   const rows: any[] = Array.isArray(listed?.data) ? listed.data : []
   const ids = rows.map((r) => r?.id).filter((id): id is string => typeof id === "string")
-  if (ids.length === 0) ids.push(String(props.model_alias ?? props.model_path ?? diparnux?.model ?? "default").split(/[\\/]/).pop()!)
+  if (ids.length === 0) ids.push(String(props.model_alias ?? props.model_path ?? opereta?.model ?? "default").split(/[\\/]/).pop()!)
   for (const id of ids) {
     models[id] = {
       id,
@@ -333,11 +334,11 @@ export async function detectLlamaCpp(
       toolCall: true,
       reasoning: /r1|qwq|think|reason|gpt-oss/i.test(id),
       attachment: !!props.modalities?.vision,
-      details: diparnux ? describeDiparnux(diparnux) : undefined,
+      details: opereta ? describeOpereta(opereta) : undefined,
     }
   }
   const server: LocalServer = { id: "llamacpp", name: "llama.cpp", protocol: "openai", baseURL: `${root}/v1`, models }
-  if (diparnux) server.diparnux = diparnux
+  if (opereta) server.opereta = opereta
   return server
 }
 
@@ -372,7 +373,7 @@ export function lastDetectFailures(): DetectFailure[] {
 /** Probe the usual local ports in parallel. Never throws; servers that do not answer are skipped. */
 export async function detectLocalServers(endpoints: LocalEndpoints = {}, timeoutMs = 700): Promise<LocalServer[]> {
   lastFailures = []
-  if (process.env.VEDECAPS_DISABLE_LOCAL_DETECT) return []
+  if (process.env.DEBEROPA_DISABLE_LOCAL_DETECT) return []
   endpoints = { ...defaultEndpoints, ...endpoints }
   const failures: DetectFailure[] = []
   const found = await Promise.all([

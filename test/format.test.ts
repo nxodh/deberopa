@@ -4,10 +4,10 @@ import path from "node:path"
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 
 // Must be set before any project module that computes Paths is imported.
-const home = fs.mkdtempSync(path.join(os.tmpdir(), "vedecaps-fmt-home-"))
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vedecaps-fmt-proj-"))
-process.env.VEDECAPS_HOME = home
-delete process.env.VEDECAPS_CONFIG_CONTENT // a previous test file may have left one behind
+const home = fs.mkdtempSync(path.join(os.tmpdir(), "deberopa-fmt-home-"))
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), "deberopa-fmt-proj-"))
+process.env.DEBEROPA_HOME = home
+delete process.env.DEBEROPA_CONFIG_CONTENT // a previous test file may have left one behind
 
 const { initProject } = await import("../src/project")
 const { resetConfig } = await import("../src/config/config")
@@ -18,7 +18,7 @@ const UPPERCASE_JS = "const fs = require('fs'); const f = process.argv[process.a
 const upper = { command: [process.execPath, "-e", UPPERCASE_JS, "$FILE"], extensions: [".txt"] }
 
 function setConfig(config: unknown) {
-  fs.writeFileSync(path.join(dir, "vedecaps.json"), JSON.stringify(config))
+  fs.writeFileSync(path.join(dir, "deberopa.json"), JSON.stringify(config))
   resetConfig()
   resetFormatters()
 }

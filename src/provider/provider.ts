@@ -1,6 +1,6 @@
 import { getConfig, readState, type ModelConfig } from "../config/config"
 import { allCredentials } from "../auth/auth"
-import { detectLocalServers, discoverOpenAIModels, fetchDiparnuxInfo, isLocalURL, lastDetectFailures, localAPIKey, type DetectedModel } from "./local"
+import { detectLocalServers, discoverOpenAIModels, fetchOperetaInfo, isLocalURL, lastDetectFailures, localAPIKey, type DetectedModel } from "./local"
 import { getCatalog, type CatalogModel, type CatalogProvider } from "./models"
 import { registerSecret } from "../util/redact"
 import { loadProviderCA, TlsConfigError } from "./tls"
@@ -169,7 +169,7 @@ async function build(): Promise<Record<string, ProviderInfo>> {
 export const MAX_CONCURRENCY = 64
 
 /**
- * `options.max_concurrency` wins when it is a usable integer. Otherwise a Diparnux gateway that
+ * `options.max_concurrency` wins when it is a usable integer. Otherwise a Opereta gateway that
  * reports a fixed slot count sets the limit (slots chosen by the server give no number to use).
  * A value that cannot be used is ignored and recorded, never guessed at.
  */
@@ -183,10 +183,10 @@ function applyConcurrency(id: string, provider: ProviderInfo, raw: unknown) {
     provider.maxConcurrencyIgnored = `options.max_concurrency must be a whole number from 1 to ${MAX_CONCURRENCY} (got ${JSON.stringify(raw)}); requests are not limited`
     log.warn(`provider ${id}: ${provider.maxConcurrencyIgnored}`)
   }
-  const slots = provider.diparnux?.slots
-  if (slots && !provider.diparnux?.slotsAuto && !provider.maxConcurrencyIgnored) {
+  const slots = provider.opereta?.slots
+  if (slots && !provider.opereta?.slotsAuto && !provider.maxConcurrencyIgnored) {
     provider.maxConcurrency = Math.min(slots, MAX_CONCURRENCY)
-    provider.maxConcurrencySource = "diparnux"
+    provider.maxConcurrencySource = "opereta"
   }
 }
 
@@ -212,7 +212,7 @@ function detectedToModel(providerID: string, d: DetectedModel, existing?: ModelC
  */
 async function addLocalProviders(result: Record<string, ProviderInfo>, config: Awaited<ReturnType<typeof getConfig>>, assumedContext: Set<string>) {
   const configured = Object.entries(result).filter(([, p]) => p.local && p.protocol !== "anthropic")
-  const probing = !process.env.VEDECAPS_DISABLE_LOCAL_DETECT
+  const probing = !process.env.DEBEROPA_DISABLE_LOCAL_DETECT
   // Server detection and the per-provider lookups below are independent: run them side by side so
   // startup waits for the slowest one, not for the sum.
   const detecting = config.local_detect === false ? Promise.resolve([]) : detectLocalServers()
@@ -231,13 +231,13 @@ async function addLocalProviders(result: Record<string, ProviderInfo>, config: A
         if (found.length) provider.source = provider.source === "none" ? "config" : provider.source
       }
 
-      // A Diparnux gateway says how big each slot's context really is. Ask only addresses on this
+      // A Opereta gateway says how big each slot's context really is. Ask only addresses on this
       // machine or its network (never a hosted API), without credentials, and only to fill in a
       // guess: a window written in the config always wins.
       if (config.local_detect === false || provider.protocol === "ollama") return
-      const info = await fetchDiparnuxInfo(provider.baseURL, undefined, undefined, provider.tls)
+      const info = await fetchOperetaInfo(provider.baseURL, undefined, undefined, provider.tls)
       if (!info) return
-      provider.diparnux = info
+      provider.opereta = info
       if (!info.ctxPerSlot) return
       for (const [modelID, model] of Object.entries(provider.models)) {
         if (!assumedContext.has(`${id}/${modelID}`)) continue
@@ -254,12 +254,12 @@ async function addLocalProviders(result: Record<string, ProviderInfo>, config: A
       for (const d of Object.values(server.models)) {
         if (!existing.models[d.id]) existing.models[d.id] = detectedToModel(server.id, d, config.provider?.[server.id]?.models?.[d.id])
       }
-      if (server.diparnux && !existing.diparnux) existing.diparnux = server.diparnux
+      if (server.opereta && !existing.opereta) existing.opereta = server.opereta
       continue
     }
     const models: Record<string, Model> = {}
     for (const d of Object.values(server.models)) models[d.id] = detectedToModel(server.id, d, config.provider?.[server.id]?.models?.[d.id])
-    // llama-server (and Diparnux in front of it) can require a key; it is read from the environment
+    // llama-server (and Opereta in front of it) can require a key; it is read from the environment
     // and goes only to the address that was detected.
     const key = server.id === "llamacpp" ? localAPIKey() : undefined
     result[server.id] = {
@@ -267,14 +267,14 @@ async function addLocalProviders(result: Record<string, ProviderInfo>, config: A
       name: config.provider?.[server.id]?.name ?? server.name,
       protocol: server.protocol,
       baseURL: server.baseURL,
-      env: server.id === "llamacpp" ? ["DIPARNUX_API_KEY", "LLAMA_API_KEY"] : [],
+      env: server.id === "llamacpp" ? ["OPERETA_API_KEY", "LLAMA_API_KEY"] : [],
       apiKey: key,
       headers: config.provider?.[server.id]?.options?.headers,
       timeout: config.provider?.[server.id]?.options?.timeout,
       source: key ? "env" : "local",
       local: true,
       models: { ...models, ...Object.fromEntries(Object.entries(result[server.id]?.models ?? {})) },
-      ...(server.diparnux ? { diparnux: server.diparnux } : {}),
+      ...(server.opereta ? { opereta: server.opereta } : {}),
     }
   }
 }
@@ -319,17 +319,17 @@ export async function getModel(providerID: string, modelID: string): Promise<{ p
       throw new ModelNotFoundError(
         providerID,
         modelID,
-        `The server at ${refused.baseURL} answered ${refused.status}: it needs an API key. Set DIPARNUX_API_KEY (or LLAMA_API_KEY) and try again.`,
+        `The server at ${refused.baseURL} answered ${refused.status}: it needs an API key. Set OPERETA_API_KEY (or LLAMA_API_KEY) and try again.`,
       )
     }
-    throw new ModelNotFoundError(providerID, modelID, `Unknown provider "${providerID}". Run \`vedecaps models\` to list what is available.`)
+    throw new ModelNotFoundError(providerID, modelID, `Unknown provider "${providerID}". Run \`deberopa models\` to list what is available.`)
   }
   if (provider.problem) throw new ModelNotFoundError(providerID, modelID, `${provider.name} cannot be used: ${provider.problem}`)
   if (provider.source === "none") {
     throw new ModelNotFoundError(
       providerID,
       modelID,
-      `No credentials for ${provider.name}. Run \`vedecaps auth login\`${provider.env[0] ? ` or set ${provider.env[0]}` : ""}.`,
+      `No credentials for ${provider.name}. Run \`deberopa auth login\`${provider.env[0] ? ` or set ${provider.env[0]}` : ""}.`,
     )
   }
   // Unknown ids pass straight through: new models work before the catalog knows them.

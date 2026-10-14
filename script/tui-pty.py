@@ -43,7 +43,7 @@ if os.environ.get("ASK_EDIT"):
 submit_key = "\x07" if os.environ.get("CUSTOM_KEYS") else "\r"
 if os.environ.get("CUSTOM_KEYS"):
     config["keybinds"] = {"submit": "ctrl+g"}
-env = dict(os.environ, VEDECAPS_HOME=home, VEDECAPS_DISABLE_MODELS_FETCH="1", VEDECAPS_CONFIG_CONTENT=json.dumps(config), TERM="xterm-256color", EDITOR=editor)
+env = dict(os.environ, DEBEROPA_HOME=home, DEBEROPA_DISABLE_MODELS_FETCH="1", DEBEROPA_CONFIG_CONTENT=json.dumps(config), TERM="xterm-256color", EDITOR=editor)
 env.pop("CI", None)
 
 pid, fd = pty.fork()
@@ -103,7 +103,7 @@ def resize(rows, columns):
 
 def check_frame(name):
     lines = screen.display
-    if "VEDECAPS" not in lines[0]: failures.append(name + ": header moved")
+    if "DEBEROPA" not in lines[0]: failures.append(name + ": header moved")
     if "Mock Model" not in lines[-1]: failures.append(name + ": status bar moved")
     if not any("❯" in line or "! " in line for line in lines[-5:-2]): failures.append(name + ": prompt moved")
     if not 0 <= screen.cursor.y < terminal_rows: failures.append(name + ": cursor outside screen")
@@ -116,7 +116,7 @@ def save_frame(name):
             file.write(text() + f"\nCURSOR {screen.cursor.x},{screen.cursor.y}\n")
 
 try:
-    expect("V E D E C A P S", 20)
+    expect("D E B E R O P A", 20)
     if os.environ.get("GIT_REPO"):
         expect("⎇ trunk", 10)
     expect("Ask anything")
@@ -188,12 +188,12 @@ try:
     if "HISTORY 100" in text(): failures.append("history did not scroll")
     check_frame("history scrolling")
     send("\x1b[1;5H")
-    expect("V E D E C A P S")
+    expect("D E B E R O P A")
     send("\x1b[1;5F")
     expect("HISTORY 100")
     send("/new")
     send(submit_key)
-    expect("V E D E C A P S")
+    expect("D E B E R O P A")
     if "HISTORY 100" in text(): failures.append("new session retained the old conversation")
     check_frame("new session")
     send("/editor")

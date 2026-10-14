@@ -5,8 +5,8 @@ import { afterAll, describe, expect, test } from "bun:test"
 import type { PermissionRequest, ToolContext } from "../src/tool/tool"
 
 // Must be set before any project module that computes Paths is imported.
-const home = fs.mkdtempSync(path.join(os.tmpdir(), "vedecaps-test-"))
-process.env.VEDECAPS_HOME = home
+const home = fs.mkdtempSync(path.join(os.tmpdir(), "deberopa-test-"))
+process.env.DEBEROPA_HOME = home
 
 const { htmlToMarkdown, htmlToText } = await import("../src/util/html")
 const { WebFetchTool } = await import("../src/tool/webfetch")

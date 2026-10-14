@@ -6,7 +6,7 @@ import { parse, UsageError, type CommandSpec } from "../args"
 import { bootstrap } from "../bootstrap"
 
 export const exportSpec: CommandSpec = {
-  usage: "vedecaps export [session-id] [options]",
+  usage: "deberopa export [session-id] [options]",
   description: "export a session as JSON or Markdown (default: the latest session)",
   options: {
     format: { type: "string", arg: "json|markdown", description: "output format (default: json)" },
@@ -14,7 +14,7 @@ export const exportSpec: CommandSpec = {
     thinking: { type: "boolean", description: "include reasoning (markdown)" },
     help: { type: "boolean", short: "h", description: "show this help" },
   },
-  examples: ["vedecaps export > session.json", "vedecaps export ses_0123 --format markdown -o notes.md"],
+  examples: ["deberopa export > session.json", "deberopa export ses_0123 --format markdown -o notes.md"],
 }
 
 export async function exportMain(argv: string[]): Promise<number> {
@@ -42,16 +42,16 @@ export async function exportMain(argv: string[]): Promise<number> {
 }
 
 export const importSpec: CommandSpec = {
-  usage: "vedecaps import <file>",
-  description: "import a session exported with `vedecaps export`",
+  usage: "deberopa import <file>",
+  description: "import a session exported with `deberopa export`",
   options: { help: { type: "boolean", short: "h", description: "show this help" } },
-  examples: ["vedecaps import session.json"],
+  examples: ["deberopa import session.json"],
 }
 
 export async function importMain(argv: string[]): Promise<number> {
   const { positionals } = parse(argv, importSpec.options!)
   const file = positionals[0]
-  if (!file) throw new UsageError("Usage: vedecaps import <file>")
+  if (!file) throw new UsageError("Usage: deberopa import <file>")
   await bootstrap()
   let text: string
   try {
@@ -62,7 +62,7 @@ export async function importMain(argv: string[]): Promise<number> {
   }
   try {
     const info = await importExport(parseExport(text))
-    process.stdout.write(`Imported as ${info.id}: ${info.title}\nResume it with \`vedecaps -s ${info.id}\`.\n`)
+    process.stdout.write(`Imported as ${info.id}: ${info.title}\nResume it with \`deberopa -s ${info.id}\`.\n`)
     return 0
   } catch (err) {
     if (err instanceof ImportError) {

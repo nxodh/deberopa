@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0
+
+Vedecaps is now **Deberopa**. Entries below this one keep the old name on purpose: they describe what shipped under it.
+
+- 이름 변경 (Rename): the executable is `deberopa`, the config file is `deberopa.json` (`~/.config/deberopa/`, `%APPDATA%\deberopa` on Windows), the project folder is `.deberopa/`, environment variables are `DEBEROPA_*`, the release assets are `deberopa-<target>.tar.gz`/`.zip` (each holds only the executable), the SDKs, the GitHub Action and the VS Code extension use the new name, and the logo is the new "D" mark.
+- Migration: on the first run, when the new settings folder does not exist and the old one does, settings, saved logins, sessions and trusted projects are copied over (the old folders are left in place and never written to again). A project's old-named config file and `.vedecaps` folder are still read, and a new-named file wins. The old `VEDECAPS_*` environment variable names are read for this release and print a one-line deprecation notice; they will stop working later.
+- Opereta 인식 (Opereta recognition): the model-server OS is recognised by `GET /opereta/info` (sent without credentials) and the `X-Opereta` response header, shown as `Opereta <version>` with its slots by `deberopa debug local`, and its slot count sets `options.max_concurrency` as before. The key variable is `OPERETA_API_KEY` (then `LLAMA_API_KEY`). Certificate errors point at `opereta tls ca`, `opereta tls status` and `opereta tls renew`. Nothing recognises the previous OS name any more: no alias, no fallback.
+- `deberopa debug local` suggests `opereta connect deberopa --write --mcp` for an Opereta server that is only auto-detected.
+- An installed `vedecaps` 0.1.x that runs `vedecaps upgrade` looks for the old asset names and stops with a download error without changing anything; install Deberopa with the install script instead (see the README).
+
 ## 0.1.5
 
 - VE2: `provider.<id>.options.ca` (PEM file path, list of paths, or inline PEM) makes a provider trust a private certificate authority for its HTTPS server. `~` is the home directory; a relative path is relative to the config file it was written in (`VEDECAPS_CONFIG_CONTENT`: the current directory). The file is read when providers are built. A provider with `ca` trusts only those authorities, for chat, model listing, `/diparnux/info` and the tool check. A file that is missing, unreadable or not a PEM certificate makes the provider unusable (shown by `vedecaps debug` and in errors) and never falls back to the system store. There is no option to disable certificate or host-name verification.

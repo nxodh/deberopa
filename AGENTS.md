@@ -1,4 +1,4 @@
-# Vedecaps
+# Deberopa
 
 An AI coding agent for the terminal, written in TypeScript and compiled to single-file executables with Bun. It must keep working on Windows 11 and Debian 13.
 
@@ -30,8 +30,8 @@ An AI coding agent for the terminal, written in TypeScript and compiled to singl
 - Cross-platform: never shell out to POSIX tools (`grep`, `find`, `ls`) from product code; use `path` for paths; tests must not hard-code `/tmp`. Windows `.cmd` shims go through `launchSpec` in `src/util/shell.ts`.
 - The UI is strictly monochrome (bold, dim, inverse; no hues). Wrapping and cursor maths use `string-width`, never `.length`.
 - The repository is public. Never commit keys, tokens, personal email addresses or machine-specific absolute paths; fixtures use obviously fake values such as `sk-test-not-a-real-key`. Anything that prints configuration or errors goes through `src/util/redact.ts`.
-- Tests set `VEDECAPS_HOME` to a temp directory (see `test/setup.ts`) and never call a real model API.
-- Project config is untrusted by default: anything in it that runs code or routes requests/keys is stripped in `src/config/trust.ts` until `vedecaps trust`. New config keys with such effects must be added to `stripUntrusted`.
+- Tests set `DEBEROPA_HOME` to a temp directory (see `test/setup.ts`) and never call a real model API.
+- Project config is untrusted by default: anything in it that runs code or routes requests/keys is stripped in `src/config/trust.ts` until `deberopa trust`. New config keys with such effects must be added to `stripUntrusted`.
 - Local-model behaviour (Ollama native API, compact prompt, text tool calls) lives in `src/provider/{local,ollama,compat}.ts`; verify changes against a real Ollama (`docker run ollama/ollama`, a small model like `qwen3:0.6b`), not only the mocks.
 - The system prompt and tool list are part of the provider-side prompt cache: keep them deterministic (no timestamps, stable ordering).
 - Ink imports `react-devtools-core` statically; `script/build.ts` stubs it. Build through that script rather than `bun build --compile` directly.

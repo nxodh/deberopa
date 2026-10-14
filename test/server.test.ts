@@ -105,8 +105,8 @@ test("password protects every route", async () => {
   try {
     const url = `http://127.0.0.1:${locked.port}/health`
     expect((await fetch(url)).status).toBe(401)
-    expect((await fetch(url, { headers: { authorization: "Basic " + btoa("vedecaps:wrong") } })).status).toBe(401)
-    expect((await fetch(url, { headers: { authorization: "Basic " + btoa("vedecaps:open-sesame") } })).status).toBe(200)
+    expect((await fetch(url, { headers: { authorization: "Basic " + btoa("deberopa:wrong") } })).status).toBe(401)
+    expect((await fetch(url, { headers: { authorization: "Basic " + btoa("deberopa:open-sesame") } })).status).toBe(200)
   } finally {
     locked.stop(true)
   }

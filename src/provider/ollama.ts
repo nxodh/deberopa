@@ -153,7 +153,7 @@ export async function* streamOllama(input: StreamInput): AsyncGenerator<StreamEv
   const body = buildBody(input)
   const ctx = (body.options as any).num_ctx as number
 
-  const headers: Record<string, string> = { "Content-Type": "application/json", "User-Agent": `vedecaps/${VERSION}`, ...provider.headers }
+  const headers: Record<string, string> = { "Content-Type": "application/json", "User-Agent": `deberopa/${VERSION}`, ...provider.headers }
   if (provider.apiKey) headers.Authorization = `Bearer ${provider.apiKey}`
 
   let response: Response

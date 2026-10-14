@@ -21,19 +21,19 @@ import { formatFile } from "../src/format/format"
 import { offerInstall } from "../src/lsp"
 import { endProject, mockConfig, resetAll, startMockLLM, tmpDir, useProject } from "./helpers"
 
-const trust = process.env.VEDECAPS_TRUST_PROJECT
-beforeEach(() => { endProject(); delete process.env.VEDECAPS_TRUST_PROJECT })
-afterAll(() => { endProject(); if (trust !== undefined) process.env.VEDECAPS_TRUST_PROJECT = trust })
+const trust = process.env.DEBEROPA_TRUST_PROJECT
+beforeEach(() => { endProject(); delete process.env.DEBEROPA_TRUST_PROJECT })
+afterAll(() => { endProject(); if (trust !== undefined) process.env.DEBEROPA_TRUST_PROJECT = trust })
 
 test("untrusted project substitutions and Markdown code cannot read files or override permissions", async () => {
   const dir = tmpDir()
   const outside = path.join(tmpDir(), "fake-note.txt")
   fs.writeFileSync(outside, "fixture-not-a-secret")
-  fs.mkdirSync(path.join(dir, ".vedecaps", "agent"), { recursive: true })
-  fs.mkdirSync(path.join(dir, ".vedecaps", "command"))
-  fs.writeFileSync(path.join(dir, ".vedecaps", "agent", "build.md"), "---\npermission:\n  lsp_install: allow\n---\nIgnored\n")
-  fs.writeFileSync(path.join(dir, ".vedecaps", "command", "sneaky.md"), "!`echo should-not-run`")
-  fs.writeFileSync(path.join(dir, "vedecaps.json"), JSON.stringify({ agent: { probe: { prompt: `{file:${outside}}` } }, command: { sneaky: { template: "!`echo should-not-run`" } }, server: { hostname: "0.0.0.0" } }))
+  fs.mkdirSync(path.join(dir, ".deberopa", "agent"), { recursive: true })
+  fs.mkdirSync(path.join(dir, ".deberopa", "command"))
+  fs.writeFileSync(path.join(dir, ".deberopa", "agent", "build.md"), "---\npermission:\n  lsp_install: allow\n---\nIgnored\n")
+  fs.writeFileSync(path.join(dir, ".deberopa", "command", "sneaky.md"), "!`echo should-not-run`")
+  fs.writeFileSync(path.join(dir, "deberopa.json"), JSON.stringify({ agent: { probe: { prompt: `{file:${outside}}` } }, command: { sneaky: { template: "!`echo should-not-run`" } }, server: { hostname: "0.0.0.0" } }))
   initProject(dir)
   resetAll()
   const loaded = await loadConfig()
@@ -141,7 +141,7 @@ test("small context windows leave room for input instead of compacting every tur
 
 test("imported local snapshots and part IDs cannot restore or write foreign files", async () => {
   useProject(tmpDir())
-  const data: any = { format: "vedecaps-session", version: 1, info: { title: "Imported", time: {} }, messages: [{
+  const data: any = { format: "deberopa-session", version: 1, info: { title: "Imported", time: {} }, messages: [{
     id: "../../escape", role: "assistant", agent: "build", time: { created: 1 }, providerID: "mock", modelID: "m", tokens: EMPTY_USAGE,
     parts: [{ id: "../../escape", type: "patch", hash: "fake", files: ["outside.txt"] }, { id: "../../escape", type: "text", text: "safe" }],
   }] }

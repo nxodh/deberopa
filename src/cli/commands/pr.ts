@@ -3,7 +3,7 @@ import { run } from "../../util/shell"
 import { buildPullRequestPrompt, parsePullRequestRef, preparePullRequest, PullRequestError } from "../../git/pr"
 
 export const spec: CommandSpec = {
-  usage: "vedecaps pr <number|url> [message..] [options]",
+  usage: "deberopa pr <number|url> [message..] [options]",
   description: "check out a GitHub pull request and review it (or work on it) with the agent",
   options: {
     agent: { type: "string", arg: "name", description: 'agent to use (default: "plan", read-only, for a review; "build" when you give a message)' },
@@ -13,17 +13,17 @@ export const spec: CommandSpec = {
     "print-logs": { type: "boolean", description: "print the log to stderr" },
   },
   examples: [
-    "vedecaps pr 123",
-    "vedecaps pr https://github.com/owner/repo/pull/123",
-    'vedecaps pr 123 "fix the failing test and explain the cause"',
-    "vedecaps pr 123 --no-ui > review.md",
+    "deberopa pr 123",
+    "deberopa pr https://github.com/owner/repo/pull/123",
+    'deberopa pr 123 "fix the failing test and explain the cause"',
+    "deberopa pr 123 --no-ui > review.md",
   ],
 }
 
 export async function main(argv: string[]): Promise<number> {
   const { values, positionals } = parse(argv, spec.options!)
   const target = positionals[0]
-  if (!target) throw new UsageError("Which pull request? Give a number or URL: vedecaps pr 123")
+  if (!target) throw new UsageError("Which pull request? Give a number or URL: deberopa pr 123")
   const ref = parsePullRequestRef(target)
   if (!ref) throw new UsageError(`"${target}" is not a pull request number or URL.`)
   const message = positionals.slice(1).join(" ").trim()

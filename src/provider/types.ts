@@ -1,6 +1,6 @@
 import type { JSONSchema } from "../tool/tool"
 import { redact } from "../util/redact"
-import type { DiparnuxInfo } from "./local"
+import type { OperetaInfo } from "./local"
 import type { CaSource, ProviderTls } from "./tls"
 
 export interface Model {
@@ -35,12 +35,12 @@ export interface ProviderInfo {
   /** Where the credential came from; "none" means the provider is known but not usable yet. */
   source: "env" | "auth" | "config" | "local" | "none"
   models: Record<string, Model>
-  /** What a Diparnux gateway reported about itself; unset for every other server. */
-  diparnux?: DiparnuxInfo
+  /** What a Opereta gateway reported about itself; unset for every other server. */
+  opereta?: OperetaInfo
   /** At most this many model requests to this server at once. Unset means no limit. */
   maxConcurrency?: number
   /** Where `maxConcurrency` came from: the user's `options.max_concurrency`, or the gateway's slot count. */
-  maxConcurrencySource?: "config" | "diparnux"
+  maxConcurrencySource?: "config" | "opereta"
   /** Set when `options.max_concurrency` was present but unusable (so `debug` can say why). */
   maxConcurrencyIgnored?: string
   /** The CAs this provider trusts instead of the system store (`options.ca`). Passed to every request to it. */

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, expect, test } from "bun:test"
 import fs from "node:fs"
 import path from "node:path"
 import { startServer as startApi } from "../src/server/server"
-import { createClient, messageText, VedecapsError } from "../sdk/js/src/index"
+import { createClient, messageText, DeberopaError } from "../sdk/js/src/index"
 import { endProject, mockConfig, reply, startMockLLM, tmpDir, useProject, type MockLLM } from "./helpers"
 
 let mock: MockLLM
@@ -36,7 +36,7 @@ test("sessions: create, prompt, read back, rename, delete", async () => {
   expect(await client.session.export(session.id)).toContain("hello sdk")
   await client.session.delete(session.id)
   const missing = await client.session.get(session.id).catch((e) => e)
-  expect(missing).toBeInstanceOf(VedecapsError)
+  expect(missing).toBeInstanceOf(DeberopaError)
   expect(missing.status).toBe(404)
 })
 
@@ -73,7 +73,7 @@ test("lookups and errors", async () => {
   expect((await client.find.files("hello"))[0]).toBe("hello.txt")
   expect((await client.provider.list()).providers.some((p) => p.id === "mock")).toBe(true)
   const bad = await client.session.prompt("ses_missing", { text: "x" }).catch((e) => e)
-  expect(bad).toBeInstanceOf(VedecapsError)
+  expect(bad).toBeInstanceOf(DeberopaError)
   expect(bad.message).toContain("not found")
 })
 

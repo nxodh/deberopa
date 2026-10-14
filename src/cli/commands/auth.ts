@@ -6,14 +6,14 @@ import { UsageError, type CommandSpec } from "../args"
 import { bootstrap } from "../bootstrap"
 
 export const spec: CommandSpec = {
-  usage: "vedecaps auth <login|list|logout> [provider]",
+  usage: "deberopa auth <login|list|logout> [provider]",
   description: "manage provider credentials",
   examples: [
-    "vedecaps auth login",
-    "vedecaps auth login anthropic",
-    "echo $MY_KEY | vedecaps auth login openrouter    # key from stdin",
-    "vedecaps auth list",
-    "vedecaps auth logout openai",
+    "deberopa auth login",
+    "deberopa auth login anthropic",
+    "echo $MY_KEY | deberopa auth login openrouter    # key from stdin",
+    "deberopa auth list",
+    "deberopa auth logout openai",
   ],
 }
 
@@ -45,7 +45,7 @@ async function login(requested?: string): Promise<number> {
   }
   const info = providers[id]
   if (!info) {
-    process.stderr.write(`Unknown provider "${id}". Run \`vedecaps models --all\` to see known providers, or define it under "provider" in vedecaps.json.\n`)
+    process.stderr.write(`Unknown provider "${id}". Run \`deberopa models --all\` to see known providers, or define it under "provider" in deberopa.json.\n`)
     return 1
   }
   let key: string
@@ -62,7 +62,7 @@ async function login(requested?: string): Promise<number> {
   await setCredential(id, { type: "api", key })
   resetProviders()
   out(`Saved credentials for ${info.name} to ${Paths.auth}`)
-  out(`Run \`vedecaps models ${id}\` to see its models, then \`vedecaps -m ${id}/<model>\`.`)
+  out(`Run \`deberopa models ${id}\` to see its models, then \`deberopa -m ${id}/<model>\`.`)
   return 0
 }
 
@@ -76,11 +76,11 @@ async function list(): Promise<number> {
   for (const info of Object.values(providers)) {
     if (stored[info.id]) continue
     if (info.source === "env") rows.push(`  ${info.name.padEnd(24)} ${(info.env.find((e) => process.env[e]) ?? "env").padEnd(8)}  (environment variable)`)
-    else if (info.source === "config") rows.push(`  ${info.name.padEnd(24)} config    (vedecaps.json)`)
+    else if (info.source === "config") rows.push(`  ${info.name.padEnd(24)} config    (deberopa.json)`)
   }
   out(`Credentials  ${Paths.auth}`)
   out()
-  if (rows.length === 0) out("  none yet. Run `vedecaps auth login`.")
+  if (rows.length === 0) out("  none yet. Run `deberopa auth login`.")
   for (const row of rows) out(row)
   return 0
 }

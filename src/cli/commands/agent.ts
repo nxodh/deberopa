@@ -9,7 +9,7 @@ import { ask } from "../input"
 import { bootstrap } from "../bootstrap"
 
 export const spec: CommandSpec = {
-  usage: "vedecaps agent <list|create> [options]",
+  usage: "deberopa agent <list|create> [options]",
   description: "list agents or scaffold a new one",
   options: {
     name: { type: "string", arg: "name", description: "agent name (create)" },
@@ -20,7 +20,7 @@ export const spec: CommandSpec = {
     global: { type: "boolean", description: "create in your global config instead of this project" },
     help: { type: "boolean", short: "h", description: "show this help" },
   },
-  examples: ["vedecaps agent list", 'vedecaps agent create --name reviewer --mode subagent --description "Reviews diffs"'],
+  examples: ["deberopa agent list", 'deberopa agent create --name reviewer --mode subagent --description "Reviews diffs"'],
 }
 
 export async function main(argv: string[]): Promise<number> {
@@ -41,7 +41,7 @@ export async function main(argv: string[]): Promise<number> {
     const description = values.description ?? (interactive ? await ask("What is it for? ") : "")
     const mode = values.mode ?? "all"
     if (!["primary", "subagent", "all"].includes(mode)) throw new UsageError("--mode must be primary, subagent or all")
-    const dir = values.global ? path.join(Paths.config, "agent") : path.join(project().worktree, ".vedecaps", "agent")
+    const dir = values.global ? path.join(Paths.config, "agent") : path.join(project().worktree, ".deberopa", "agent")
     const file = path.join(dir, `${name}.md`)
     if (await exists(file)) throw new UsageError(`${file} already exists.`)
     const front = [`description: ${JSON.stringify(description || `The ${name} agent`)}`, `mode: ${mode}`]

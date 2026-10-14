@@ -1,4 +1,4 @@
-package vedecaps
+package deberopa
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 func TestAPIAndEvents(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, password, ok := r.BasicAuth()
-		if !ok || user != "vedecaps" || password != "fixture-password" {
+		if !ok || user != "deberopa" || password != "fixture-password" {
 			w.WriteHeader(401)
 			return
 		}

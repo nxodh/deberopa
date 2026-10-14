@@ -4,7 +4,7 @@ import { parse, type CommandSpec } from "../args"
 import { bootstrap } from "../bootstrap"
 
 export const spec: CommandSpec = {
-  usage: "vedecaps stats [options]",
+  usage: "deberopa stats [options]",
   description: "token usage and cost across your sessions",
   options: {
     all: { type: "boolean", description: "include every project, not just this one" },

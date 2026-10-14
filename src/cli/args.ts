@@ -28,7 +28,7 @@ export function parse<T extends OptionSpec>(argv: string[], spec: T) {
 }
 
 export function helpText(name: string, spec: CommandSpec): string {
-  const lines = [`vedecaps ${name} - ${spec.description}`, "", `Usage: ${spec.usage}`]
+  const lines = [`deberopa ${name} - ${spec.description}`, "", `Usage: ${spec.usage}`]
   const options = Object.entries(spec.options ?? {})
   if (options.length) {
     lines.push("", "Options:")

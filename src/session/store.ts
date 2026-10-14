@@ -195,7 +195,7 @@ export async function removeMessage(sessionID: string, messageID: string) {
   publish("message.removed", { sessionID, messageID })
 }
 
-/** Import a session exported with `vedecaps export`. */
+/** Import a session exported with `deberopa export`. */
 export async function importSession(data: { info: SessionInfo; messages: Message[] }): Promise<SessionInfo> {
   const info: SessionInfo = { ...data.info, projectID: project().id }
   infoCache.set(info.id, info)

@@ -1,5 +1,5 @@
 /**
- * Vedecaps is monochrome by design: the mark is a black "V" on a white disc. Hierarchy comes
+ * Deberopa is monochrome by design: the mark is a black "V" on a white disc. Hierarchy comes
  * from weight (bold), dimness and inverse video, never from hue. A theme only decides which
  * shade of grey "text" and "muted" are.
  */

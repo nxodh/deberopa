@@ -1,5 +1,5 @@
 /**
- * Smoke test for a compiled vedecaps binary: bun run script/smoke.ts <path-to-binary>
+ * Smoke test for a compiled deberopa binary: bun run script/smoke.ts <path-to-binary>
  * (or compile this file and run it inside a clean container next to the binary).
  * It starts a tiny OpenAI-compatible server and drives the binary against it.
  */
@@ -11,7 +11,7 @@ import { createHash } from "node:crypto"
 
 const bin = path.resolve(process.argv[2] ?? "")
 if (!process.argv[2] || !fs.existsSync(bin)) {
-  console.error("usage: smoke <path-to-vedecaps-binary>")
+  console.error("usage: smoke <path-to-deberopa-binary>")
   process.exit(2)
 }
 
@@ -30,7 +30,7 @@ const server = Bun.serve({
   port: 0,
   hostname: "127.0.0.1",
   async fetch(req) {
-    // Only chat completions are model turns. Probes (/models, /diparnux/info, ...) must not
+    // Only chat completions are model turns. Probes (/models, /opereta/info, ...) must not
     // consume the scripted replies, exactly like a real server that has no such route.
     if (!new URL(req.url).pathname.endsWith("/chat/completions")) return new Response("not found", { status: 404 })
     const body: any = await req.json().catch(() => ({}))
@@ -49,10 +49,10 @@ const config = {
   provider: { mock: { name: "Mock", api: `http://127.0.0.1:${server.port}/v1`, models: { m: { name: "M", tool_call: true, limit: { context: 100000, output: 4000 } } } } },
 }
 
-async function vedecaps(args: string[], stdin?: string) {
+async function deberopa(args: string[], stdin?: string) {
   const proc = Bun.spawn([bin, ...args], {
     cwd: work,
-    env: { ...process.env, VEDECAPS_HOME: home, VEDECAPS_DISABLE_MODELS_FETCH: "1", VEDECAPS_CONFIG_CONTENT: JSON.stringify(config), NO_COLOR: "1" },
+    env: { ...process.env, DEBEROPA_HOME: home, DEBEROPA_DISABLE_MODELS_FETCH: "1", DEBEROPA_CONFIG_CONTENT: JSON.stringify(config), NO_COLOR: "1" },
     stdin: stdin !== undefined ? new TextEncoder().encode(stdin) : "ignore",
     stdout: "pipe",
     stderr: "pipe",
@@ -67,18 +67,18 @@ function check(name: string, ok: boolean, detail = "") {
   if (!ok) failures++
 }
 
-const version = await vedecaps(["--version"])
+const version = await deberopa(["--version"])
 check("--version", version.code === 0 && /^\d+\.\d+\.\d+/.test(version.stdout.trim()), JSON.stringify(version))
 
-const help = await vedecaps(["--help"])
-check("--help", help.code === 0 && help.stdout.includes("vedecaps run"), JSON.stringify(help).slice(0, 300))
+const help = await deberopa(["--help"])
+check("--help", help.code === 0 && help.stdout.includes("deberopa run"), JSON.stringify(help).slice(0, 300))
 
 queue.push(text("Hello from the smoke test."))
-const plain = await vedecaps(["run", "say hello"])
+const plain = await deberopa(["run", "say hello"])
 check("run: text reply", plain.code === 0 && plain.stdout.trim() === "Hello from the smoke test.", JSON.stringify(plain))
 
 queue.push(tool("read", { filePath: path.join(work, "hello.txt") }), text("The file contains a greeting."))
-const withTool = await vedecaps(["run", "read hello.txt"])
+const withTool = await deberopa(["run", "read hello.txt"])
 const toolReply = seen.at(-1)?.messages?.find((m: any) => m.role === "tool")?.content ?? ""
 check("run: tool round trip", withTool.code === 0 && withTool.stdout.includes("greeting") && String(toolReply).includes("greetings from the smoke test"), JSON.stringify(withTool))
 
@@ -93,26 +93,26 @@ check("run: tool round trip", withTool.code === 0 && withTool.stdout.includes("g
   fs.writeFileSync(path.join(moduleDir, "index.js"), 'export default () => ({tool:{fixture:{description:"Fixture",parameters:{type:"object",properties:{}},execute:()=>"package plugin worked"}}})')
   ;(config as any).plugin = ["npm:" + spec]
   queue.push(tool("fixture", {}), text("plugin done"))
-  const result = await vedecaps(["run", "use the fixture plugin"])
+  const result = await deberopa(["run", "use the fixture plugin"])
   check("npm plugin in compiled binary", result.code === 0 && seen.at(-1)?.messages?.some((m: any) => m.role === "tool" && String(m.content).includes("package plugin worked")), JSON.stringify(result))
   delete (config as any).plugin
 }
 
 queue.push(text("from stdin"))
-const piped = await vedecaps(["run", "echo"], "piped input")
+const piped = await deberopa(["run", "echo"], "piped input")
 check("run: piped stdin", piped.code === 0 && String(seen.at(-1)?.messages?.at(-1)?.content).includes("piped input"), JSON.stringify(piped))
 
-const models = await vedecaps(["models"])
+const models = await deberopa(["models"])
 check("models", models.code === 0 && models.stdout.includes("mock/m"), JSON.stringify(models))
 
-const debug = await vedecaps(["debug"])
+const debug = await deberopa(["debug"])
 check("debug", debug.code === 0 && debug.stdout.includes("Providers"), JSON.stringify(debug).slice(0, 300))
 
 // serve: the HTTP API answers on a free port
 {
   const proc = Bun.spawn([bin, "serve", "--port", "0"], {
     cwd: work,
-    env: { ...process.env, VEDECAPS_HOME: home, VEDECAPS_DISABLE_MODELS_FETCH: "1", VEDECAPS_CONFIG_CONTENT: JSON.stringify(config) },
+    env: { ...process.env, DEBEROPA_HOME: home, DEBEROPA_DISABLE_MODELS_FETCH: "1", DEBEROPA_CONFIG_CONTENT: JSON.stringify(config) },
     stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
@@ -147,9 +147,9 @@ check("debug", debug.code === 0 && debug.stdout.includes("Providers"), JSON.stri
 {
   const { createHash } = await import("node:crypto")
   const windows = process.platform === "win32"
-  const exe = windows ? "vedecaps.exe" : "vedecaps"
+  const exe = windows ? "deberopa.exe" : "deberopa"
   const target = targetName()
-  const asset = `vedecaps-${target}.${windows ? "zip" : "tar.gz"}`
+  const asset = `deberopa-${target}.${windows ? "zip" : "tar.gz"}`
   const stage = fs.mkdtempSync(path.join(os.tmpdir(), "vdc-smoke-release-"))
   const installDir = fs.mkdtempSync(path.join(os.tmpdir(), "vdc-smoke-install-"))
   const installed = path.join(installDir, exe)
@@ -175,7 +175,7 @@ check("debug", debug.code === 0 && debug.stdout.includes("Providers"), JSON.stri
         return new Response("not found", { status: 404 })
       },
     })
-    const env = { ...process.env, VEDECAPS_HOME: home, VEDECAPS_RELEASE_URL: `http://127.0.0.1:${release.port}` }
+    const env = { ...process.env, DEBEROPA_HOME: home, DEBEROPA_RELEASE_URL: `http://127.0.0.1:${release.port}` }
     const runInstalled = async (args: string[]) => {
       const proc = Bun.spawn([installed, ...args], { env, stdin: "ignore", stdout: "pipe", stderr: "pipe" })
       const [stdout, stderr, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited])

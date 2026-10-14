@@ -14,7 +14,7 @@ import { bootstrap } from "../bootstrap"
 import { redact } from "../../util/redact"
 
 export const spec: CommandSpec = {
-  usage: "vedecaps run [message..] [options]",
+  usage: "deberopa run [message..] [options]",
   description: "run a prompt non-interactively and print the answer",
   options: {
     continue: { type: "boolean", short: "c", description: "continue the most recent session" },
@@ -31,10 +31,10 @@ export const spec: CommandSpec = {
     help: { type: "boolean", short: "h", description: "show this help" },
   },
   examples: [
-    'vedecaps run "explain what this repo does"',
-    'git diff | vedecaps run "write a commit message for this"',
-    'vedecaps run -m anthropic/claude-sonnet-5-5 --agent plan "plan a refactor of src/auth"',
-    "vedecaps run --format json \"list the TODOs\" > events.jsonl",
+    'deberopa run "explain what this repo does"',
+    'git diff | deberopa run "write a commit message for this"',
+    'deberopa run -m anthropic/claude-sonnet-5-5 --agent plan "plan a refactor of src/auth"',
+    "deberopa run --format json \"list the TODOs\" > events.jsonl",
   ],
 }
 
@@ -59,14 +59,14 @@ export async function main(argv: string[]): Promise<number> {
     process.stderr.write(
       `Note: ${loaded.blocked.length} part${loaded.blocked.length === 1 ? "" : "s"} of this project's config ${loaded.blocked.length === 1 ? "was" : "were"} ignored because the project is not trusted (${loaded.blocked
         .map((b) => b.split(": ").pop()!.split(" (")[0])
-        .join(", ")}). Run \`vedecaps trust\` after reviewing it, or set VEDECAPS_TRUST_PROJECT=1 in CI.\n`,
+        .join(", ")}). Run \`deberopa trust\` after reviewing it, or set DEBEROPA_TRUST_PROJECT=1 in CI.\n`,
     )
   }
 
   let message = positionals.join(" ").trim()
   const piped = (await readStdin({ firstByteTimeoutMs: message ? 400 : 3000 })).trim()
   if (piped) message = message ? `${message}\n\n${piped}` : piped
-  if (!message && !values.command) throw new UsageError("No message given. Pass it as arguments or pipe it in: vedecaps run \"your request\"")
+  if (!message && !values.command) throw new UsageError("No message given. Pass it as arguments or pipe it in: deberopa run \"your request\"")
 
   const files: { mime: string; filename?: string; data: string }[] = []
   for (const file of (values.file as string[] | undefined) ?? []) {
@@ -90,7 +90,7 @@ export async function main(argv: string[]): Promise<number> {
     sessionID = (await createSession({ title: values.title })).id
   }
 
-  // Slash commands work here too: `vedecaps run "/review main"`.
+  // Slash commands work here too: `deberopa run "/review main"`.
   let commandName: string | undefined = values.command
   let commandArgs = message
   const slash = /^\/([\w./-]+)(?:\s+([\s\S]*))?$/.exec(message)
@@ -114,7 +114,7 @@ export async function main(argv: string[]): Promise<number> {
       if (skip) return void replyPermission(info.id, "once")
       denied++
       stderr(`! permission denied (${info.permission}): ${info.title}`)
-      stderr("  re-run with --dangerously-skip-permissions to allow, or configure `permission` in vedecaps.json")
+      stderr("  re-run with --dangerously-skip-permissions to allow, or configure `permission` in deberopa.json")
       replyPermission(info.id, "reject")
     }),
   )

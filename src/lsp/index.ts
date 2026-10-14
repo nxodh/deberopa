@@ -196,7 +196,7 @@ async function connect(spec: ActiveServer, root: string): Promise<LspClient | un
   }
 }
 
-/** How to launch a built-in server right now: what is on this machine, then what Vedecaps installed. */
+/** How to launch a built-in server right now: what is on this machine, then what Deberopa installed. */
 export async function resolveServer(id: string, root: string): Promise<string[] | undefined> {
   const builtin = BUILTIN_SERVERS.find((s) => s.id === id)
   return (await builtin?.resolve(root)) ?? (await installedCommand(id))

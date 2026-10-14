@@ -1,4 +1,4 @@
-"""Vedecaps HTTP API client. Requires Python 3.10+, no runtime dependencies."""
+"""Deberopa HTTP API client. Requires Python 3.10+, no runtime dependencies."""
 from __future__ import annotations
 
 import base64
@@ -20,7 +20,7 @@ class _NoRedirect(HTTPRedirectHandler):
         return None
 
 
-class VedecapsError(Exception):
+class DeberopaError(Exception):
     def __init__(self, message: str, status: int, body: Any = None):
         super().__init__(message)
         self.status = status
@@ -38,7 +38,7 @@ class Client:
         self.timeout = timeout
         self._headers = {}
         if password:
-            token = base64.b64encode(("vedecaps:" + password).encode()).decode()
+            token = base64.b64encode(("deberopa:" + password).encode()).decode()
             self._headers["Authorization"] = "Basic " + token
         self.session = Sessions(self)
         self.permission = Permissions(self)
@@ -63,7 +63,7 @@ class Client:
             except ValueError:
                 data = text
             message = data.get("error", f"HTTP {error.code}") if isinstance(data, dict) else f"HTTP {error.code}"
-            raise VedecapsError(str(message), error.code, data) from None
+            raise DeberopaError(str(message), error.code, data) from None
         try:
             return json.loads(text) if text else None
         except ValueError:
@@ -85,7 +85,7 @@ class Client:
             response = self._open(req, timeout=self.timeout)
         except HTTPError as error:
             error.close()
-            raise VedecapsError(f"HTTP {error.code}", error.code) from None
+            raise DeberopaError(f"HTTP {error.code}", error.code) from None
         with response:
             lines: list[str] = []
             size = 0
@@ -95,7 +95,7 @@ class Client:
                     return
                 size += len(raw)
                 if size > 8 * 1024 * 1024:
-                    raise VedecapsError("Event frame is too large", 0)
+                    raise DeberopaError("Event frame is too large", 0)
                 line = raw.decode("utf-8").rstrip("\r\n")
                 if not line:
                     if lines:
@@ -173,11 +173,11 @@ class RunningServer:
     def __exit__(self, *_): self.close()
 
 
-def start_server(command: str | Sequence[str] = "vedecaps", cwd: str | None = None, password: str | None = None, timeout: float = 20, env: dict[str, str] | None = None) -> RunningServer:
+def start_server(command: str | Sequence[str] = "deberopa", cwd: str | None = None, password: str | None = None, timeout: float = 20, env: dict[str, str] | None = None) -> RunningServer:
     inherited = {**os.environ, **(env or {})}
-    password = password if password is not None else inherited.get("VEDECAPS_SERVER_PASSWORD")
+    password = password if password is not None else inherited.get("DEBEROPA_SERVER_PASSWORD")
     if password:
-        inherited["VEDECAPS_SERVER_PASSWORD"] = password
+        inherited["DEBEROPA_SERVER_PASSWORD"] = password
     args = ([command] if isinstance(command, str) else list(command)) + ["serve", "--hostname", "127.0.0.1", "--port", "0"]
     process = subprocess.Popen(args, cwd=cwd, env=inherited, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
     output: queue.Queue[str | None] = queue.Queue()
@@ -192,13 +192,13 @@ def start_server(command: str | Sequence[str] = "vedecaps", cwd: str | None = No
             try:
                 line = output.get(timeout=max(0.01, deadline - time.monotonic()))
             except queue.Empty:
-                raise RuntimeError("Vedecaps server startup timed out") from None
+                raise RuntimeError("Deberopa server startup timed out") from None
             if line is None:
-                raise RuntimeError("Vedecaps exited before its server started")
+                raise RuntimeError("Deberopa exited before its server started")
             match = re.search(r"listening on (http://\S+)", line)
             if match:
                 return RunningServer(process, match[1], password)
-        raise RuntimeError("Vedecaps server startup timed out")
+        raise RuntimeError("Deberopa server startup timed out")
     except (Exception, KeyboardInterrupt):
         process.terminate()
         try: process.wait(timeout=5)

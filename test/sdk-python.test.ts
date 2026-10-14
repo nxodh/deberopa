@@ -14,14 +14,14 @@ test("Python SDK uses the real HTTP API, authentication and event stream", async
   mock.queue(reply.text("hello from mock"))
   const script = `
 import os
-from vedecaps import Client, VedecapsError, message_text
+from deberopa import Client, DeberopaError, message_text
 url = os.environ["SDK_TEST_URL"]
 client = Client(url, password="fixture-password")
 assert client.health()["ok"]
 try:
     Client(url).health()
     raise AssertionError("authentication bypass")
-except VedecapsError as e:
+except DeberopaError as e:
     assert e.status == 401
 events = client.events()
 assert next(events)["type"] == "server.connected"

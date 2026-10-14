@@ -1,8 +1,8 @@
 /**
- * Client for the Vedecaps HTTP API (`vedecaps serve`). Zero dependencies; runs on Node 18+,
+ * Client for the Deberopa HTTP API (`deberopa serve`). Zero dependencies; runs on Node 18+,
  * Bun and Deno wherever `fetch` exists.
  *
- *   const { client, close } = await startServer()          // spawns `vedecaps serve`
+ *   const { client, close } = await startServer()          // spawns `deberopa serve`
  *   const session = await client.session.create({ title: "demo" })
  *   const reply = await client.session.prompt(session.id, { text: "explain src/index.ts" })
  *   await close()
@@ -92,21 +92,21 @@ export interface Event {
   properties: any
 }
 
-export class VedecapsError extends Error {
+export class DeberopaError extends Error {
   constructor(
     message: string,
     public status: number,
     public body?: unknown,
   ) {
     super(message)
-    this.name = "VedecapsError"
+    this.name = "DeberopaError"
   }
 }
 
 export interface ClientOptions {
   /** Default: http://127.0.0.1:4096 */
   baseUrl?: string
-  /** The server's VEDECAPS_SERVER_PASSWORD, if it has one. */
+  /** The server's DEBEROPA_SERVER_PASSWORD, if it has one. */
   password?: string
   fetch?: typeof fetch
 }
@@ -119,7 +119,7 @@ export function createClient(options: ClientOptions = {}) {
   if (!["http:", "https:"].includes(address.protocol) || address.username || address.password || address.search || address.hash) throw new Error("Invalid server URL")
   if (address.protocol === "http:" && !["127.0.0.1", "localhost", "[::1]"].includes(address.hostname)) throw new Error("Remote servers require HTTPS")
   const doFetch = options.fetch ?? globalThis.fetch.bind(globalThis)
-  const auth: Record<string, string> = options.password ? { authorization: "Basic " + btoa(`vedecaps:${options.password}`) } : {}
+  const auth: Record<string, string> = options.password ? { authorization: "Basic " + btoa(`deberopa:${options.password}`) } : {}
 
   async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
     const res = await doFetch(base + path, {
@@ -138,7 +138,7 @@ export function createClient(options: ClientOptions = {}) {
     }
     if (!res.ok) {
       const message = typeof data === "object" && data !== null && "error" in data ? String((data as any).error) : `HTTP ${res.status}`
-      throw new VedecapsError(message, res.status, data)
+      throw new DeberopaError(message, res.status, data)
     }
     return data as T
   }
@@ -195,7 +195,7 @@ export function createClient(options: ClientOptions = {}) {
        */
       async *subscribe(signal?: AbortSignal): AsyncGenerator<Event> {
         const res = await doFetch(base + "/event", { headers: { ...auth, accept: "text/event-stream" }, signal, redirect: "error" })
-        if (!res.ok || !res.body) throw new VedecapsError(`HTTP ${res.status}`, res.status)
+        if (!res.ok || !res.body) throw new DeberopaError(`HTTP ${res.status}`, res.status)
         const decoder = new TextDecoder()
         const reader = res.body.getReader()
         let buffer = ""
@@ -243,7 +243,7 @@ export function messageText(message: Message | null | undefined): string {
 }
 
 export interface StartServerOptions extends Omit<ClientOptions, "baseUrl"> {
-  /** Path of the vedecaps executable. Default: "vedecaps" from PATH. */
+  /** Path of the deberopa executable. Default: "deberopa" from PATH. */
   command?: string
   /** Project directory to serve. Default: the current directory. */
   cwd?: string
@@ -253,13 +253,13 @@ export interface StartServerOptions extends Omit<ClientOptions, "baseUrl"> {
   timeout?: number
 }
 
-/** Spawn `vedecaps serve` on a free port and return a client for it. Node/Bun only. */
+/** Spawn `deberopa serve` on a free port and return a client for it. Node/Bun only. */
 export async function startServer(options: StartServerOptions = {}): Promise<{ client: Client; url: string; close(): Promise<void> }> {
   const { spawn } = await import("node:child_process")
-  const password = options.password ?? options.env?.VEDECAPS_SERVER_PASSWORD ?? process.env.VEDECAPS_SERVER_PASSWORD
-  const child = spawn(options.command ?? "vedecaps", ["serve", "--port", String(options.port ?? 0), "--hostname", "127.0.0.1"], {
+  const password = options.password ?? options.env?.DEBEROPA_SERVER_PASSWORD ?? process.env.DEBEROPA_SERVER_PASSWORD
+  const child = spawn(options.command ?? "deberopa", ["serve", "--port", String(options.port ?? 0), "--hostname", "127.0.0.1"], {
     cwd: options.cwd,
-    env: { ...process.env, ...options.env, VEDECAPS_SERVER_PASSWORD: password },
+    env: { ...process.env, ...options.env, DEBEROPA_SERVER_PASSWORD: password },
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   })
@@ -267,7 +267,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<{ c
     let output = ""
     const timer = setTimeout(() => {
       child.kill()
-      reject(new Error(`vedecaps serve did not start within ${(options.timeout ?? 20_000) / 1000}s:\n${output.trim()}`))
+      reject(new Error(`deberopa serve did not start within ${(options.timeout ?? 20_000) / 1000}s:\n${output.trim()}`))
     }, options.timeout ?? 20_000)
     const onData = (chunk: Buffer) => {
       output += chunk.toString()
@@ -281,11 +281,11 @@ export async function startServer(options: StartServerOptions = {}): Promise<{ c
     child.stderr?.on("data", (c) => (output += c.toString()))
     child.on("error", (err) => {
       clearTimeout(timer)
-      reject(new Error(`could not run "${options.command ?? "vedecaps"}": ${err.message}`))
+      reject(new Error(`could not run "${options.command ?? "deberopa"}": ${err.message}`))
     })
     child.on("exit", (code) => {
       clearTimeout(timer)
-      reject(new Error(`vedecaps serve exited with code ${code}:\n${output.trim()}`))
+      reject(new Error(`deberopa serve exited with code ${code}:\n${output.trim()}`))
     })
   })
   const client = createClient({ baseUrl: url, password, fetch: options.fetch })

@@ -7,10 +7,10 @@ import { loadPlugins, pluginProblems } from "../../plugin"
 import { redact } from "../../util/redact"
 
 export const spec: CommandSpec = {
-  usage: "vedecaps plugin <list|install|remove> [package@version]",
+  usage: "deberopa plugin <list|install|remove> [package@version]",
   description: "manage explicitly installed npm plugins (full user privileges)",
   options: { yes: { type: "boolean", short: "y", description: "confirm that this package may execute as you" } },
-  examples: ["vedecaps plugin install @scope/plugin@1.2.3", "vedecaps plugin list"],
+  examples: ["deberopa plugin install @scope/plugin@1.2.3", "deberopa plugin list"],
 }
 
 export async function main(argv: string[]): Promise<number> {

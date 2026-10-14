@@ -19,9 +19,9 @@ jobs:
     steps:
       - run: |
           apk add --no-cache curl ca-certificates libstdc++ libgcc
-          curl -fsSL https://raw.githubusercontent.com/nxodh/vedecaps/main/install.sh | sh
-          "$HOME/.vedecaps/bin/vedecaps" --version
-          "$HOME/.vedecaps/bin/vedecaps" upgrade --check
+          curl -fsSL https://raw.githubusercontent.com/nxodh/deberopa/main/install.sh | sh
+          "$HOME/.deberopa/bin/deberopa" --version
+          "$HOME/.deberopa/bin/deberopa" upgrade --check
   debian:
     name: curl | sh on Debian 13
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
@@ -31,10 +31,10 @@ jobs:
       - name: Install with the documented one-liner
         run: |
           apt-get update -qq && apt-get install -y -qq curl ca-certificates >/dev/null
-          curl -fsSL https://raw.githubusercontent.com/nxodh/vedecaps/main/install.sh | sh
-          "$HOME/.vedecaps/bin/vedecaps" --version
-          "$HOME/.vedecaps/bin/vedecaps" --help | head -5
-          "$HOME/.vedecaps/bin/vedecaps" upgrade --check
+          curl -fsSL https://raw.githubusercontent.com/nxodh/deberopa/main/install.sh | sh
+          "$HOME/.deberopa/bin/deberopa" --version
+          "$HOME/.deberopa/bin/deberopa" --help | head -5
+          "$HOME/.deberopa/bin/deberopa" upgrade --check
 
   windows:
     name: irm | iex on Windows
@@ -48,9 +48,9 @@ jobs:
       - name: Install with the documented one-liner
         shell: pwsh
         run: |
-          & ${{ matrix.shell }} -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/nxodh/vedecaps/main/install.ps1 | iex"
+          & ${{ matrix.shell }} -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/nxodh/deberopa/main/install.ps1 | iex"
           if ($LASTEXITCODE -ne 0) { throw 'install failed' }
-          $exe = Join-Path $env:LOCALAPPDATA 'vedecaps\bin\vedecaps.exe'
+          $exe = Join-Path $env:LOCALAPPDATA 'deberopa\bin\deberopa.exe'
           & $exe --version
           & $exe upgrade --check
           if ($LASTEXITCODE -ne 0) { throw 'installed binary failed' }

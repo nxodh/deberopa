@@ -1,7 +1,7 @@
 import * as vscode from "vscode"
 import { formatReference, relativeTo, type Selection } from "./reference"
 
-const TERMINAL_NAME = "Vedecaps"
+const TERMINAL_NAME = "Deberopa"
 let terminal: vscode.Terminal | undefined
 
 function workspaceRootFor(uri: vscode.Uri | undefined): string | undefined {
@@ -16,14 +16,14 @@ function ensureTerminal(): { terminal: vscode.Terminal; created: boolean } {
     terminal = existing
     return { terminal, created: false }
   }
-  const config = vscode.workspace.getConfiguration("vedecaps")
-  const command = config.get<string>("command", "vedecaps").trim() || "vedecaps"
+  const config = vscode.workspace.getConfiguration("deberopa")
+  const command = config.get<string>("command", "deberopa").trim() || "deberopa"
   const args = config.get<string[]>("arguments", [])
   terminal = vscode.window.createTerminal({
     name: TERMINAL_NAME,
     cwd: workspaceRootFor(vscode.window.activeTextEditor?.document.uri),
     location: { viewColumn: vscode.ViewColumn.Beside, preserveFocus: false },
-    env: { VEDECAPS_CALLER: "vscode" },
+    env: { DEBEROPA_CALLER: "vscode" },
   })
   terminal.sendText([command, ...args].join(" "))
   return { terminal, created: true }
@@ -44,12 +44,12 @@ function selectionOf(editor: vscode.TextEditor): Selection {
 
 export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
-    vscode.commands.registerCommand("vedecaps.open", () => {
+    vscode.commands.registerCommand("deberopa.open", () => {
       const { terminal: t } = ensureTerminal()
       t.show()
     }),
 
-    vscode.commands.registerCommand("vedecaps.addSelection", async () => {
+    vscode.commands.registerCommand("deberopa.addSelection", async () => {
       const editor = vscode.window.activeTextEditor
       if (!editor || editor.document.uri.scheme !== "file") {
         void vscode.window.showInformationMessage("Open a file in the editor first.")
@@ -64,7 +64,7 @@ export function activate(context: vscode.ExtensionContext) {
       await typeIntoPrompt(reference)
     }),
 
-    vscode.commands.registerCommand("vedecaps.addFile", async (uri?: vscode.Uri) => {
+    vscode.commands.registerCommand("deberopa.addFile", async (uri?: vscode.Uri) => {
       const target = uri ?? vscode.window.activeTextEditor?.document.uri
       if (!target || target.scheme !== "file") {
         void vscode.window.showInformationMessage("Select a file first.")

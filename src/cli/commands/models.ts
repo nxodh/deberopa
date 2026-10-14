@@ -5,7 +5,7 @@ import { parse, type CommandSpec } from "../args"
 import { bootstrap } from "../bootstrap"
 
 export const spec: CommandSpec = {
-  usage: "vedecaps models [provider] [options]",
+  usage: "deberopa models [provider] [options]",
   description: "list the models you can use",
   options: {
     refresh: { type: "boolean", description: "download the latest model catalog from models.dev first" },
@@ -13,7 +13,7 @@ export const spec: CommandSpec = {
     verbose: { type: "boolean", short: "v", description: "show context size and pricing" },
     help: { type: "boolean", short: "h", description: "show this help" },
   },
-  examples: ["vedecaps models", "vedecaps models anthropic -v", "vedecaps models --refresh --all"],
+  examples: ["deberopa models", "deberopa models anthropic -v", "deberopa models --refresh --all"],
 }
 
 export async function main(argv: string[]): Promise<number> {
@@ -34,7 +34,7 @@ export async function main(argv: string[]): Promise<number> {
     return 1
   }
   if (selected.length === 0) {
-    process.stdout.write("No providers with credentials. Run `vedecaps auth login`, or use --all to list everything.\n")
+    process.stdout.write("No providers with credentials. Run `deberopa auth login`, or use --all to list everything.\n")
     return 0
   }
   for (const provider of selected) {

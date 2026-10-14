@@ -82,7 +82,7 @@ test("handshake, capabilities and modes", async () => {
   expect(init.protocolVersion).toBe(1)
   expect(init.agentCapabilities.promptCapabilities).toMatchObject({ image: true, embeddedContext: true })
   expect(init.authMethods).toEqual([])
-  expect(init.agentInfo.name).toBe("vedecaps")
+  expect(init.agentInfo.name).toBe("deberopa")
   expect(sessionId).toMatch(/^ses_/)
   expect(created.modes.availableModes.map((m: any) => m.id)).toEqual(expect.arrayContaining(["build", "plan"]))
   await client.close()

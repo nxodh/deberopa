@@ -177,7 +177,7 @@ export async function* streamAnthropic(input: StreamInput): AsyncGenerator<Strea
     baseURL: provider.baseURL,
     maxRetries: 0, // retries are handled (and surfaced to the user) by the session loop
     timeout: provider.timeout ?? 10 * 60 * 1000,
-    defaultHeaders: { "User-Agent": `vedecaps/${VERSION}`, ...provider.headers },
+    defaultHeaders: { "User-Agent": `deberopa/${VERSION}`, ...provider.headers },
     fetch: (url, init) => fetch(url, { ...init, redirect: "error", ...tlsInit(provider.tls) }),
   })
 
