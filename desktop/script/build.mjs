@@ -50,7 +50,7 @@ if (process.version !== `v${pin.node}`) console.warn(`warning: pinned Node is ${
 if (want("fetch")) {
   mkdirSync(work, { recursive: true })
   if (!existsSync(join(src, ".git"))) {
-    run("git", ["-c", "filter.lfs.smudge=", "-c", "filter.lfs.process=", "-c", "filter.lfs.required=false", "clone", "--depth", "1", "--branch", pin.tag, "https://github.com/microsoft/vscode.git", src], work)
+    run("git", ["clone", "-c", "core.autocrlf=false", "-c", "core.eol=lf", "-c", "filter.lfs.smudge=", "-c", "filter.lfs.process=", "-c", "filter.lfs.required=false", "--depth", "1", "--branch", pin.tag, "https://github.com/microsoft/vscode.git", src], work)
   }
   const head = out("git", ["rev-parse", "HEAD"])
   if (head !== pin.commit) {

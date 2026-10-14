@@ -1,0 +1,4 @@
+# Patches must stay byte-exact: they are applied to upstream files that use LF endings.
+*.patch -text
+*.png binary
+*.ico binary
