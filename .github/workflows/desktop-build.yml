@@ -1,0 +1,44 @@
+name: Desktop build
+
+# Builds Deberopa Desktop (Code - OSS + patches) on the platforms we support. It is slow (about an hour),
+# so it runs on demand and when the Desktop sources change, never on every pull request.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["desktop/**", ".github/workflows/desktop-build.yml"]
+  pull_request:
+    paths: ["desktop/**", ".github/workflows/desktop-build.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Desktop (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Debian 13 x64
+            os: ubuntu-latest
+            target: linux-x64
+          - name: Windows 11 x64
+            os: windows-latest
+            target: win32-x64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.18.0"
+      - name: Linux build dependencies
+        if: matrix.target == 'linux-x64'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libx11-dev libxkbfile-dev libsecret-1-dev libkrb5-dev pkg-config
+      - name: Fetch, patch and install
+        run: node desktop/script/build.mjs --work ${{ runner.temp }}/deberopa-desktop --target ${{ matrix.target }} --stage fetch && node desktop/script/build.mjs --work ${{ runner.temp }}/deberopa-desktop --target ${{ matrix.target }} --stage patch && node desktop/script/build.mjs --work ${{ runner.temp }}/deberopa-desktop --target ${{ matrix.target }} --stage install
+      - name: Package
+        run: node desktop/script/build.mjs --work ${{ runner.temp }}/deberopa-desktop --target ${{ matrix.target }} --stage package
+      - name: Check the packaged product
+        run: node desktop/script/check-product.mjs ${{ runner.temp }}/deberopa-desktop/VSCode-${{ matrix.target }}
