@@ -2,7 +2,7 @@
   "name": "deberopa",
   "displayName": "Deberopa",
   "description": "Open the Deberopa AI coding agent beside your editor and send it the file or selection you are looking at.",
-  "version": "0.3.0",
+  "version": "0.3.0-beta.1",
   "publisher": "nxodh",
   "license": "MIT",
   "icon": "icon.png",

@@ -43,9 +43,30 @@ export function isCompiled(): boolean {
 }
 
 export function compareVersions(a: string, b: string): number {
-  const parse = (v: string) => v.replace(/^v/, "").split(/[.+-]/).slice(0, 3).map((n) => Number.parseInt(n, 10) || 0)
-  const [x, y] = [parse(a), parse(b)]
-  for (let i = 0; i < 3; i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) - (y[i] ?? 0)
+  const split = (v: string) => {
+    const clean = v.replace(/^v/, "").split("+")[0]!
+    const dash = clean.indexOf("-")
+    const core = dash === -1 ? clean : clean.slice(0, dash)
+    const pre = dash === -1 ? [] : clean.slice(dash + 1).split(".")
+    return { core: core.split(".").slice(0, 3).map((n) => Number.parseInt(n, 10) || 0), pre }
+  }
+  const [x, y] = [split(a), split(b)]
+  for (let i = 0; i < 3; i++) if ((x.core[i] ?? 0) !== (y.core[i] ?? 0)) return (x.core[i] ?? 0) - (y.core[i] ?? 0)
+  // semver: a pre-release (0.3.0-beta.1) comes before the release it leads up to (0.3.0)
+  if (x.pre.length === 0 && y.pre.length === 0) return 0
+  if (x.pre.length === 0) return 1
+  if (y.pre.length === 0) return -1
+  for (let i = 0; i < Math.max(x.pre.length, y.pre.length); i++) {
+    const p = x.pre[i]
+    const q = y.pre[i]
+    if (p === undefined) return -1
+    if (q === undefined) return 1
+    const [pn, qn] = [/^\d+$/.test(p), /^\d+$/.test(q)]
+    if (pn && qn) {
+      if (Number(p) !== Number(q)) return Number(p) - Number(q)
+    } else if (pn !== qn) return pn ? -1 : 1
+    else if (p !== q) return p < q ? -1 : 1
+  }
   return 0
 }
 

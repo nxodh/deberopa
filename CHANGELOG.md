@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.3.0
+## 0.3.0-beta.1
+
+**Beta.** The first release that includes Deberopa Desktop. It is a GitHub pre-release: `install.sh`, `install.ps1` and `deberopa upgrade` keep installing the last full release (0.2.0). Install a beta explicitly with `DEBEROPA_VERSION=v0.3.0-beta.1`. The full 0.3.0 follows once the owner has tested it.
 
 Goal, for the CLI and Deberopa Desktop alike: make local LLMs as comfortable as possible as a coding agent. Hosted models stay supported; local ones come first.
 

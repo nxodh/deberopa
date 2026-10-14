@@ -219,7 +219,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --title "Deberopa $VERSION" --notes-file notes.md \
+          # a version with a hyphen (0.3.0-beta.1) is a pre-release: it never becomes "latest", so the
+          # installers and `deberopa upgrade` keep serving the last full release
+          flags=""
+          case "$VERSION" in *-*) flags="--prerelease --latest=false" ;; esac
+          title="Deberopa $VERSION"
+          case "$VERSION" in *-beta*) title="Deberopa $VERSION (Beta)" ;; esac
+          gh release create "$GITHUB_REF_NAME" $flags --title "$title" --notes-file notes.md \
             dist/deberopa-linux-x64.tar.gz dist/deberopa-linux-arm64.tar.gz \
             dist/deberopa-linux-x64-musl.tar.gz dist/deberopa-linux-arm64-musl.tar.gz \
             dist/deberopa-darwin-arm64.tar.gz dist/deberopa-darwin-x64.tar.gz \

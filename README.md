@@ -49,7 +49,7 @@ irm https://raw.githubusercontent.com/nxodh/deberopa/main/install.ps1 | iex
 
 ## Deberopa Desktop
 
-터미널 대신 창으로 쓰는 데스크톱 앱입니다. Code - OSS 기반 에디터 안에 대화 패널(권한 요청, 도구 카드, 세션, 로컬 모델 카드)이 들어 있고, 같은 버전의 `deberopa`를 함께 담고 있어 따로 설치할 것이 없습니다. CLI와 같은 번호로 함께 릴리스됩니다.
+터미널 대신 창으로 쓰는 데스크톱 앱입니다. Code - OSS 기반 에디터 안에 대화 패널(권한 요청, 도구 카드, 세션, 로컬 모델 카드)이 들어 있고, 같은 버전의 `deberopa`를 함께 담고 있어 따로 설치할 것이 없습니다. CLI와 같은 번호로 함께 릴리스됩니다. **0.3.0-beta.1은 베타(GitHub 사전 릴리스)** 이며, 설치 스크립트와 `deberopa upgrade`는 계속 마지막 정식 릴리스(0.2.0)를 설치합니다. 베타는 릴리스 페이지에서 직접 내려받으세요.
 
 | 대상 | 파일 | 실행 |
 |---|---|---|
@@ -462,7 +462,7 @@ deberopa pr 123 --no-ui > review.md   # UI 없이 결과만 출력
 ## GitHub Action
 
 ```yaml
-- uses: nxodh/deberopa@v0.3.0
+- uses: nxodh/deberopa@v0.2.0
   env:
     ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
   with:
@@ -488,7 +488,7 @@ deberopa pr 123 --no-ui > review.md   # UI 없이 결과만 출력
 permissions: { contents: write, pull-requests: write }
 steps:
   - uses: actions/checkout@v4
-  - uses: nxodh/deberopa@v0.3.0
+  - uses: nxodh/deberopa@v0.2.0
     env: { ANTHROPIC_API_KEY: "${{ secrets.ANTHROPIC_API_KEY }}" }
     with:
       prompt: 의존성 경고를 고쳐줘

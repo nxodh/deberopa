@@ -41,7 +41,7 @@ Run `/init` once per project to generate an `AGENTS.md` that is given to the age
 
 ## Deberopa Desktop
 
-A desktop app for people who prefer a window to a terminal: a Code - OSS based editor with a conversation panel (permission prompts, tool cards, sessions, a local-models card). It bundles the `deberopa` command of the same version, so there is nothing else to install, and it is released together with the CLI under the same number.
+A desktop app for people who prefer a window to a terminal: a Code - OSS based editor with a conversation panel (permission prompts, tool cards, sessions, a local-models card). It bundles the `deberopa` command of the same version, so there is nothing else to install, and it is released together with the CLI under the same number. **0.3.0-beta.1 is a beta (a GitHub pre-release)**: the install scripts and `deberopa upgrade` keep installing the last full release (0.2.0); download the beta from the release page.
 
 | Target | File | Run |
 |---|---|---|
@@ -75,7 +75,7 @@ The full reference (configuration, permissions, commands, HTTP routes) is in the
 - **Language servers on request**: TypeScript, Pyright, gopls and rust-analyzer are offered for installation (with consent, into Deberopa' own directory).
 - **Project trust**: an untrusted repository's config cannot start programs, route requests/keys elsewhere, or silence permission prompts until you run `deberopa trust`.
 - **Plugins**: local JS/TS files adding tools and hooks (`tool.execute.before/after`, `chat.system`, `event`); work in the compiled binary without Node or Bun.
-- **SDK** (`sdk/js`), **ACP server** (`deberopa acp`, for Zed and other editors), **VS Code extension** (`ide/vscode`), **GitHub Action** (`uses: nxodh/deberopa@v0.3.0`).
+- **SDK** (`sdk/js`), **ACP server** (`deberopa acp`, for Zed and other editors), **VS Code extension** (`ide/vscode`), **GitHub Action** (`uses: nxodh/deberopa@v0.2.0`).
 - `@file#L10-20` mentions attach only those lines.
 
 The Korean README documents all of these in detail.

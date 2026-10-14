@@ -64,7 +64,8 @@ jobs:
       - name: Download, check the checksum, unpack, run the bundled CLI
         run: |
           apt-get update -qq && apt-get install -y -qq curl ca-certificates jq >/dev/null
-          tag="$(curl -fsSL https://api.github.com/repos/nxodh/deberopa/releases/latest | jq -r .tag_name)"
+          # the newest release, pre-releases included (a beta is not "latest")
+          tag="$(curl -fsSL "https://api.github.com/repos/nxodh/deberopa/releases?per_page=1" | jq -r '.[0].tag_name')"
           base="https://github.com/nxodh/deberopa/releases/download/$tag"
           curl -fsSLO "$base/deberopa-desktop-linux-x64.tar.gz"
           curl -fsSL "$base/checksums.txt" | grep ' deberopa-desktop-linux-x64.tar.gz$' | sha256sum -c -
