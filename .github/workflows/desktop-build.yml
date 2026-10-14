@@ -42,3 +42,22 @@ jobs:
         run: node desktop/script/build.mjs --work ${{ runner.temp }}/deberopa-desktop --target ${{ matrix.target }} --stage package
       - name: Check the packaged product
         run: node desktop/script/check-product.mjs ${{ runner.temp }}/deberopa-desktop/VSCode-${{ matrix.target }}
+      - name: Size of the packaged app
+        shell: bash
+        run: du -sh "${{ runner.temp }}/deberopa-desktop/VSCode-${{ matrix.target }}" && ls "${{ runner.temp }}/deberopa-desktop/VSCode-${{ matrix.target }}" | head -30
+      - name: Run the packaged app (Linux, headless)
+        if: matrix.target == 'linux-x64'
+        run: |
+          sudo apt-get install -y --no-install-recommends xvfb libgbm1 libasound2t64 libgtk-3-0t64 libnss3 libxss1 libxkbfile1 >/dev/null
+          APP="${{ runner.temp }}/deberopa-desktop/VSCode-linux-x64"
+          "$APP/bin/deberopa-desktop" --version --no-sandbox
+          xvfb-run -a "$APP/bin/deberopa-desktop" --no-sandbox --user-data-dir "$RUNNER_TEMP/ud" --extensions-dir "$RUNNER_TEMP/ex" --list-extensions --show-versions
+          ls "$APP/resources/app/extensions" | wc -l
+      - name: Run the packaged app (Windows)
+        if: matrix.target == 'win32-x64'
+        shell: pwsh
+        run: |
+          $app = "${{ runner.temp }}\deberopa-desktop\VSCode-win32-x64"
+          Get-ChildItem $app | Select-Object -First 30 | Format-Table Name, Length
+          & "$app\bin\deberopa-desktop.cmd" --version
+          & "$app\bin\deberopa-desktop.cmd" --user-data-dir "$env:RUNNER_TEMP\ud" --extensions-dir "$env:RUNNER_TEMP\ex" --list-extensions --show-versions
