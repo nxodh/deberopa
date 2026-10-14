@@ -27,6 +27,15 @@ const RULES: { name: string; re: RegExp }[] = [
 ]
 
 const SELF = "script/scan-secrets.ts"
+
+/**
+ * The one place private keys may be committed: throw-away TLS fixtures for the tests. The rule is
+ * deliberately narrow: this directory only, only the private-key rule, and only for files that
+ * declare themselves test-only on their first line. Every other rule still applies there.
+ */
+const TLS_FIXTURES = "test/fixtures/tls/"
+const TEST_ONLY_BANNER = "# TEST ONLY."
+const isTestOnlyKey = (file: string, text: string) => file.startsWith(TLS_FIXTURES) && file.endsWith(".pem") && text.startsWith(TEST_ONLY_BANNER)
 const SKIP_EXT = new Set([".png", ".jpg", ".ico", ".zip", ".gz", ".lock", ".lockb"])
 
 export function trackedFiles(root: string): string[] {
@@ -45,8 +54,10 @@ export function scan(root: string, files = trackedFiles(root)): Finding[] {
     } catch {
       continue
     }
+    const keyAllowed = isTestOnlyKey(file.split(path.sep).join("/"), text)
     text.split("\n").forEach((line, i) => {
       for (const rule of RULES) {
+        if (keyAllowed && rule.name === "private key") continue
         const m = rule.re.exec(line)
         if (m) findings.push({ file, line: i + 1, rule: rule.name, text: m[0].slice(0, 12) + "…" })
       }

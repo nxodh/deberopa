@@ -8,6 +8,8 @@ dist/
 !.env.example
 auth.json
 *.pem
+# throw-away test certificates (every file is marked TEST ONLY and checked by script/scan-secrets.ts)
+!/test/fixtures/tls/*.pem
 *.key
 *.p12
 *.pfx
