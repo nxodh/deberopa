@@ -14,6 +14,12 @@ import { busySessions, BusyError, cancel, compactSession, isBusy, prompt, shell 
 import { revert, unrevert, visibleMessages } from "../session/revert"
 import { exportMarkdown, forkSession } from "../session/export"
 import { fuzzyFilter } from "../tui/fuzzy"
+import { allCredentials, removeCredential, setCredential } from "../auth/auth"
+import { resetProviders } from "../provider/provider"
+import { isTrusted, trustedProjects, trustProject, untrustProject } from "../config/trust"
+import { loadConfig, resetConfig } from "../config/config"
+import { listSkills } from "../skill/skill"
+import { usageStats } from "../session/stats"
 
 export interface ServerOptions {
   port?: number
@@ -163,6 +169,56 @@ async function route(req: Request): Promise<Response> {
     const files = await listFiles({ cwd: project().directory, limit: 20_000 })
     return json(fuzzyFilter(query, files, (f) => f, Number(url.searchParams.get("limit") ?? 50)))
   }
+  if (is("GET", "skill")) return json(Object.values(await listSkills()).map(({ content: _content, ...rest }) => rest))
+  if (is("GET", "stats")) {
+    const days = url.searchParams.get("days")
+    return json(await usageStats({ all: url.searchParams.get("all") === "true", days: days ? Number(days) : undefined }))
+  }
+
+  // Stored credentials: names and kinds only, never the key itself.
+  if (is("GET", "auth")) {
+    const stored = await allCredentials()
+    const providers = await allProviders()
+    const rows = Object.entries(stored).map(([id, cred]) => ({ id, name: providers[id]?.name ?? id, type: cred.type, source: "stored" }))
+    for (const info of Object.values(providers)) {
+      if (stored[info.id]) continue
+      if (info.source === "env" || info.source === "config") rows.push({ id: info.id, name: info.name, type: "api", source: info.source })
+    }
+    return json(rows)
+  }
+  if (is("PUT", "auth", "*")) {
+    const input = await body(req)
+    const id = parts[1]!
+    if (typeof input.key !== "string" || input.key.trim() === "") throw new HttpError(400, "key is required")
+    if (!(await allProviders())[id]) throw new HttpError(404, `Unknown provider: ${id}`)
+    registerSecret(input.key.trim())
+    await setCredential(id, { type: "api", key: input.key.trim() })
+    resetProviders()
+    return json(true)
+  }
+  if (is("DELETE", "auth", "*")) {
+    if (!(await removeCredential(parts[1]!))) throw new HttpError(404, `No stored credentials for ${parts[1]}`)
+    resetProviders()
+    return json(true)
+  }
+
+  // Project trust: whether the project's own config may run commands and set endpoints.
+  if (is("GET", "trust")) {
+    resetConfig()
+    const loaded = await loadConfig()
+    return json({ directory: project().worktree, trusted: loaded.trusted, blocked: loaded.blocked, projects: await trustedProjects() })
+  }
+  if (is("POST", "trust")) {
+    await trustProject(project().worktree)
+    resetConfig()
+    return json({ directory: project().worktree, trusted: await isTrusted(project().worktree) })
+  }
+  if (is("DELETE", "trust")) {
+    const removed = await untrustProject(project().worktree)
+    resetConfig()
+    return json({ directory: project().worktree, removed })
+  }
+
   if (is("GET", "permission")) return json(pendingPermissions())
   if (is("POST", "permission", "*")) {
     const input = await body(req)
