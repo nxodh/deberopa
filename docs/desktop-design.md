@@ -553,7 +553,14 @@ D0에서 새로 알게 된 것(설계 가정과 달랐던 것):
 6. Windows에서 git의 줄바꿈 변환(autocrlf)이 패치를 깨뜨린다. 복제 시 `core.autocrlf=false`로 두고, 패치 파일은 `.gitattributes`로 바이트 그대로 보존한다.
 7. 이 Mac의 4 GB 컨테이너(arm64)에서는 `extensions/copilot`의 esbuild가 중단돼(메모리 부족 추정) 완료하지 못했다. x64 CI 러너(16 GB)에서는 문제가 없었다. 로컬 빌드는 신뢰하지 않고 CI를 기준으로 한다.
 
-아직 하지 않은 것: Windows 11 산출물의 실제 실행 확인(CI 단계는 추가함), Smart App Control 측정(실제 Windows 11 PC 필요: 앱이 완성된 뒤 소유자가 설치해 확인), 대표 확장 15개의 VSIX 설치 시험, 코어의 Copilot SDK 제거, 워크벤치 모서리 곡률 공식 설정 조사.
+**결정(소유자, 2026-10-15): 코어의 Copilot SDK는 걷어내지 않고 UI만 가린 채 둔다.** 걷어내려면 `agentHost/node/copilot/`(51개 파일)와 공통 스키마·OTel·텔레메트리 라우터, 빌드 스크립트까지 패치해야 하고 상류 업데이트마다 충돌한다는 비용을 고려했다. 대신 아래를 유지한다.
+
+- `defaultChatAgent`와 GitHub 권한·토큰·MCP 레지스트리 주소를 `product.json`에서 제거했다(산출물 검사로 보증).
+- `chat.disableAIFeatures`를 기본으로 켜 내장 채팅 화면이 나타나지 않게 했다.
+- 산출물에 SDK 런타임이 남는다는 사실은 `check-product.mjs`가 매번 출력한다(`copilotVersions`).
+- 같은 에이전트 호스트의 Claude·Codex 에이전트는 빌드된 앱에서 SDK 묶음을 `product.agentSdks`의 주소(Microsoft CDN)에서 내려받아야 등록되며, 이 항목은 상류의 배포 파이프라인이 `product.json`에 채우는 것이라 우리 빌드에는 없다. 코드상으로는 등록되지 않는 구성이지만 **실제 앱에서 확인하지 못했다.** 확인 방법은 12절 D1의 앱 실행 시험에 포함한다.
+
+아직 하지 않은 것: Windows 11 산출물의 실제 실행 확인(CI 단계는 추가함), Smart App Control 측정(실제 Windows 11 PC 필요: 앱이 완성된 뒤 소유자가 설치해 확인), 대표 확장 15개의 VSIX 설치 시험, 워크벤치 모서리 곡률 공식 설정 조사.
 
 ## 16. 출처
 
