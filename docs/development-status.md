@@ -74,3 +74,26 @@ SDK는 레지스트리에 게시하지 않았고 Go SDK의 별도 모듈 태그�
 브랜치 검증에서는 테스트 293개와 Windows·Ubuntu·Debian·Alpine 실행파일, SDK 및
 확장의 전체 CI가 통과했습니다. 릴리스는 버전을 0.1.3으로 맞춘 main 커밋의 CI가
 성공한 뒤 생성하도록 검사합니다. 0.1.2 이전 구현 범위는 위 기록을 참고하세요.
+
+## 0.1.4: Diparnux 호환과 동시 요청 상한
+
+설계서 `vedecaps-repo-changes-design.md`의 VE1·VE4(PR A)와 VE3(PR B)를 구현합니다.
+VE2(`options.ca`)는 Diparnux의 TLS가 나올 때까지 미룹니다.
+
+**PR A (VE1 + VE4)**: 키가 필요한 서버 감지(`DIPARNUX_API_KEY`, `LLAMA_API_KEY`), 401/403 보고,
+Diparnux 표식과 `/diparnux/info` 인식(값 검증, 제어 문자 제거), 구성된 로컬 제공자의 컨텍스트
+보강, `debug local`의 슬롯 정보와 `--check-tools`. 호스팅 주소에는 요청하지 않고 리다이렉트는
+오류로 처리합니다. 모의 서버로 시험 23개를 추가했습니다(T1.1~T1.11, T4.1~T4.7).
+
+**PR B (VE3)**: `provider.<id>.options.max_concurrency`와 Diparnux 슬롯 수 자동값. 우선순위가 있는
+세마포어(`src/provider/limiter.ts`)를 `streamModel` 앞에 두며 취소, 오류, 소비자의 조기 종료에서
+자리를 반납합니다. 시험 22개(T3.1~T3.10, 수용 기준 4.7과 상한이 없을 때 429가 나는 대조군)를
+추가했습니다. `max_concurrency: 1`에서 서브에이전트 2개를 부르는 세션이 끝까지 가는 것을 확인했습니다.
+
+선택 사항이던 대기 중 상태 표시(TUI)는 넣지 않았습니다. `vedecaps debug`의 제공자 줄에 상한과
+그 출처가 표시됩니다.
+
+릴리스는 PR #1을 병합한 main 커밋의 전체 CI(Windows·Ubuntu·Debian·Alpine 실행파일, SDK, 확장)가
+성공한 뒤 만들도록 검사합니다. 실제 llama.cpp 서버(`--jinja`, `--api-key`)로 감지, 401 안내,
+도구 호출 시험, 키 기반 실행을 확인했으나 실제 Diparnux 서버는 확인하지 못했습니다(Diparnux 쪽
+CI의 범위).

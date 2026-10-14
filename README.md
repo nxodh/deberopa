@@ -133,6 +133,16 @@ API 키는 `vedecaps auth login`, TUI의 `/connect`, 또는 환경 변수로 등
 - **컨텍스트 사용량 보정**: Ollama가 캐시된 프롬프트를 사용량에서 빼고 보고해도 실제 크기를 추정해 자동 압축 시점과 상태 표시줄이 틀어지지 않게 합니다.
 - **친절한 오류**: 모델이 없을 때(`ollama pull …`), 도구를 지원하지 않을 때, 서버가 꺼져 있을 때 해결 방법을 알려 줍니다.
 
+**API 키가 있는 서버와 Diparnux 게이트웨이**: llama-server(`--api-key`)나 Diparnux처럼 키를 요구하는 서버는 환경 변수 `DIPARNUX_API_KEY`(없으면 `LLAMA_API_KEY`)에 키를 두면 감지되고 요청에도 쓰입니다. 키는 감지된 주소와 직접 적은 제공자 주소로만 보내며, 리다이렉트는 따르지 않고, 로그와 `debug` 출력에서는 가려집니다. 키가 필요한데 없으면 `vedecaps debug local`이 "이 서버는 API 키가 필요하다(401)"고 알려 줍니다. Diparnux는 `X-Diparnux` 헤더나 `GET /diparnux/info`(인증 없음)로 알아보며, 슬롯 수와 슬롯당 컨텍스트를 읽습니다. 설정에 컨텍스트를 적지 않은 로컬 제공자는 그 값을 쓰고, 적은 값이 항상 우선합니다. 호스팅 API에는 이 경로를 요청하지 않습니다.
+
+**동시 요청 상한**: 로컬 서버는 슬롯 수가 정해져 있어, 서브에이전트와 제목 생성이 그보다 많이 동시에 가면 429가 돌아옵니다. 제공자 설정의 `options.max_concurrency`(1~64의 정수)를 적으면 Vedecaps가 그 수만큼만 동시에 보내고 나머지는 순서를 기다립니다. 기다리는 동안 중단하면 즉시 빠지고, 끝난 요청은 오류로 끝나도 자리를 반드시 돌려줍니다. 제목·요약은 본작업보다 뒤로 밀립니다. 설정하지 않으면 무제한이며, Diparnux가 슬롯 수를 고정값으로 알려 주면 그 값을 씁니다(슬롯을 서버가 자동으로 정하면 숫자를 지어내지 않고 무제한). 적은 값이 항상 우선하며, 사용할 수 없는 값(0, 음수, 소수, 문자열)은 무시하고 `vedecaps debug`에 이유를 표시합니다.
+
+```jsonc
+{ "provider": { "diparnux": { "api": "http://127.0.0.1:8080/v1", "options": { "max_concurrency": 2 } } } }
+```
+
+**도구 호출 시험**: `vedecaps debug local --check-tools`는 서버마다 모델 요청을 한 번 보내 도구 호출이 되는지 확인합니다(토큰이 소비되므로 기본은 꺼져 있습니다). 결과는 `ok`(구조화된 `tool_calls`), `recovered`(텍스트로 쓴 호출을 Vedecaps가 복구해서 동작), `failed`(에이전트가 파일을 읽거나 고칠 수 없음)입니다.
+
 감지를 끄려면 설정에 `"local_detect": false`를 넣습니다. 그 밖의 OpenAI 호환 서버(사내 프록시 등)는 직접 추가합니다. 모델을 적지 않으면 `/models` 엔드포인트에서 목록을 가져옵니다.
 
 ```jsonc
@@ -385,7 +395,7 @@ vedecaps pr 123 --no-ui > review.md   # UI 없이 결과만 출력
 ## GitHub Action
 
 ```yaml
-- uses: nxodh/vedecaps@v0.1.3
+- uses: nxodh/vedecaps@v0.1.4
   env:
     ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
   with:
@@ -411,7 +421,7 @@ vedecaps pr 123 --no-ui > review.md   # UI 없이 결과만 출력
 permissions: { contents: write, pull-requests: write }
 steps:
   - uses: actions/checkout@v4
-  - uses: nxodh/vedecaps@v0.1.3
+  - uses: nxodh/vedecaps@v0.1.4
     env: { ANTHROPIC_API_KEY: "${{ secrets.ANTHROPIC_API_KEY }}" }
     with:
       prompt: 의존성 경고를 고쳐줘

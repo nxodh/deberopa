@@ -30,6 +30,9 @@ const server = Bun.serve({
   port: 0,
   hostname: "127.0.0.1",
   async fetch(req) {
+    // Only chat completions are model turns. Probes (/models, /diparnux/info, ...) must not
+    // consume the scripted replies, exactly like a real server that has no such route.
+    if (!new URL(req.url).pathname.endsWith("/chat/completions")) return new Response("not found", { status: 404 })
     const body: any = await req.json().catch(() => ({}))
     const first = String(body.messages?.[0]?.content ?? "")
     const events = first.startsWith("You generate short titles") ? text("Smoke") : (seen.push(body), queue.shift() ?? text("ok"))

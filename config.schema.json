@@ -101,6 +101,12 @@
               "timeout": {
                 "type": "number",
                 "description": "Request timeout in milliseconds"
+              },
+              "max_concurrency": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 64,
+                "description": "At most this many model requests to this server at once; others wait their turn instead of earning 429 responses. Unset means unlimited, except that a Diparnux gateway with a fixed slot count sets it to the slot count."
               }
             }
           },

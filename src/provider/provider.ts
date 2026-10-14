@@ -1,9 +1,12 @@
 import { getConfig, readState, type ModelConfig } from "../config/config"
 import { allCredentials } from "../auth/auth"
-import { detectLocalServers, discoverOpenAIModels, isLocalURL, type DetectedModel } from "./local"
+import { detectLocalServers, discoverOpenAIModels, fetchDiparnuxInfo, isLocalURL, lastDetectFailures, localAPIKey, type DetectedModel } from "./local"
 import { getCatalog, type CatalogModel, type CatalogProvider } from "./models"
 import { registerSecret } from "../util/redact"
+import { createLogger } from "../util/log"
 import type { Model, ProviderInfo } from "./types"
+
+const log = createLogger("provider")
 
 /** Base URLs for providers whose catalog entry does not carry one. All speak OpenAI chat completions. */
 const KNOWN_BASE_URLS: Record<string, string> = {
@@ -66,6 +69,8 @@ export function allProviders(): Promise<Record<string, ProviderInfo>> {
 async function build(): Promise<Record<string, ProviderInfo>> {
   const [config, catalog, credentials] = await Promise.all([getConfig(), getCatalog(), allCredentials()])
   const result: Record<string, ProviderInfo> = {}
+  /** `provider/model` keys whose context window is a guess (nothing in config, catalog or server said). */
+  const assumedContext = new Set<string>()
   const ids = new Set([...Object.keys(catalog), ...Object.keys(config.provider ?? {})])
 
   for (const id of ids) {
@@ -105,10 +110,13 @@ async function build(): Promise<Record<string, ProviderInfo>> {
     for (const [modelID, model] of Object.entries(entry?.models ?? {})) {
       if (model.status === "deprecated") continue
       models[modelID] = toModel(id, modelID, model, override?.models?.[modelID])
+      if (model.limit?.context === undefined && override?.models?.[modelID]?.limit?.context === undefined) assumedContext.add(`${id}/${modelID}`)
     }
     for (const [modelID, model] of Object.entries(override?.models ?? {})) {
       const realID = model.id ?? modelID
-      if (!models[modelID]) models[modelID] = toModel(id, realID, entry?.models?.[realID], model)
+      if (models[modelID]) continue
+      models[modelID] = toModel(id, realID, entry?.models?.[realID], model)
+      if (model.limit?.context === undefined && entry?.models?.[realID]?.limit?.context === undefined) assumedContext.add(`${id}/${modelID}`)
     }
 
     result[id] = {
@@ -126,7 +134,8 @@ async function build(): Promise<Record<string, ProviderInfo>> {
     }
   }
 
-  await addLocalProviders(result, config)
+  await addLocalProviders(result, config, assumedContext)
+  for (const [id, provider] of Object.entries(result)) applyConcurrency(id, provider, config.provider?.[id]?.options?.max_concurrency)
 
   const disabled = new Set(config.disabled_providers ?? [])
   const enabled = config.enabled_providers ? new Set(config.enabled_providers) : undefined
@@ -134,6 +143,30 @@ async function build(): Promise<Record<string, ProviderInfo>> {
     if (disabled.has(id) || (enabled && !enabled.has(id))) delete result[id]
   }
   return result
+}
+
+export const MAX_CONCURRENCY = 64
+
+/**
+ * `options.max_concurrency` wins when it is a usable integer. Otherwise a Diparnux gateway that
+ * reports a fixed slot count sets the limit (slots chosen by the server give no number to use).
+ * A value that cannot be used is ignored and recorded, never guessed at.
+ */
+function applyConcurrency(id: string, provider: ProviderInfo, raw: unknown) {
+  if (raw !== undefined && raw !== null) {
+    if (typeof raw === "number" && Number.isInteger(raw) && raw >= 1 && raw <= MAX_CONCURRENCY) {
+      provider.maxConcurrency = raw
+      provider.maxConcurrencySource = "config"
+      return
+    }
+    provider.maxConcurrencyIgnored = `options.max_concurrency must be a whole number from 1 to ${MAX_CONCURRENCY} (got ${JSON.stringify(raw)}); requests are not limited`
+    log.warn(`provider ${id}: ${provider.maxConcurrencyIgnored}`)
+  }
+  const slots = provider.diparnux?.slots
+  if (slots && !provider.diparnux?.slotsAuto && !provider.maxConcurrencyIgnored) {
+    provider.maxConcurrency = Math.min(slots, MAX_CONCURRENCY)
+    provider.maxConcurrencySource = "diparnux"
+  }
 }
 
 function detectedToModel(providerID: string, d: DetectedModel, existing?: ModelConfig): Model {
@@ -156,43 +189,71 @@ function detectedToModel(providerID: string, d: DetectedModel, existing?: ModelC
  * Servers the user runs themselves. Found ones are added when not configured, and fill in
  * models for ones that are. Config always wins, so a pinned `limit.context` is respected.
  */
-async function addLocalProviders(result: Record<string, ProviderInfo>, config: Awaited<ReturnType<typeof getConfig>>) {
+async function addLocalProviders(result: Record<string, ProviderInfo>, config: Awaited<ReturnType<typeof getConfig>>, assumedContext: Set<string>) {
   const configured = Object.entries(result).filter(([, p]) => p.local && p.protocol !== "anthropic")
+  const probing = !process.env.VEDECAPS_DISABLE_LOCAL_DETECT
+  // Server detection and the per-provider lookups below are independent: run them side by side so
+  // startup waits for the slowest one, not for the sum.
+  const detecting = config.local_detect === false ? Promise.resolve([]) : detectLocalServers()
 
-  // providers configured by URL only: ask the server what it has
   await Promise.all(
     configured.map(async ([id, provider]) => {
-      if (Object.keys(provider.models).length > 0 || !provider.baseURL || process.env.VEDECAPS_DISABLE_LOCAL_DETECT) return
-      if (provider.protocol === "ollama") return // filled in by detection below
-      const found = await discoverOpenAIModels(provider.baseURL, provider.headers, provider.apiKey)
-      for (const d of found) provider.models[d.id] = detectedToModel(id, d, config.provider?.[id]?.models?.[d.id])
-      if (found.length) provider.source = provider.source === "none" ? "config" : provider.source
+      if (!provider.baseURL || !probing) return
+
+      // providers configured by URL only: ask the server what it has
+      if (Object.keys(provider.models).length === 0 && provider.protocol !== "ollama") {
+        const found = await discoverOpenAIModels(provider.baseURL, provider.headers, provider.apiKey)
+        for (const d of found) {
+          provider.models[d.id] = detectedToModel(id, d, config.provider?.[id]?.models?.[d.id])
+          if (d.context === undefined && config.provider?.[id]?.models?.[d.id]?.limit?.context === undefined) assumedContext.add(`${id}/${d.id}`)
+        }
+        if (found.length) provider.source = provider.source === "none" ? "config" : provider.source
+      }
+
+      // A Diparnux gateway says how big each slot's context really is. Ask only addresses on this
+      // machine or its network (never a hosted API), without credentials, and only to fill in a
+      // guess: a window written in the config always wins.
+      if (config.local_detect === false || provider.protocol === "ollama") return
+      const info = await fetchDiparnuxInfo(provider.baseURL)
+      if (!info) return
+      provider.diparnux = info
+      if (!info.ctxPerSlot) return
+      for (const [modelID, model] of Object.entries(provider.models)) {
+        if (!assumedContext.has(`${id}/${modelID}`)) continue
+        model.limit = { ...model.limit, context: info.ctxPerSlot }
+      }
     }),
   )
 
   if (config.local_detect === false) return
-  for (const server of await detectLocalServers()) {
+  for (const server of await detecting) {
     const existing = result[server.id]
     if (existing && existing.source !== "none") {
       // configured by the user: add any models they did not list
       for (const d of Object.values(server.models)) {
         if (!existing.models[d.id]) existing.models[d.id] = detectedToModel(server.id, d, config.provider?.[server.id]?.models?.[d.id])
       }
+      if (server.diparnux && !existing.diparnux) existing.diparnux = server.diparnux
       continue
     }
     const models: Record<string, Model> = {}
     for (const d of Object.values(server.models)) models[d.id] = detectedToModel(server.id, d, config.provider?.[server.id]?.models?.[d.id])
+    // llama-server (and Diparnux in front of it) can require a key; it is read from the environment
+    // and goes only to the address that was detected.
+    const key = server.id === "llamacpp" ? localAPIKey() : undefined
     result[server.id] = {
       id: server.id,
       name: config.provider?.[server.id]?.name ?? server.name,
       protocol: server.protocol,
       baseURL: server.baseURL,
-      env: [],
+      env: server.id === "llamacpp" ? ["DIPARNUX_API_KEY", "LLAMA_API_KEY"] : [],
+      apiKey: key,
       headers: config.provider?.[server.id]?.options?.headers,
       timeout: config.provider?.[server.id]?.options?.timeout,
-      source: "local",
+      source: key ? "env" : "local",
       local: true,
       models: { ...models, ...Object.fromEntries(Object.entries(result[server.id]?.models ?? {})) },
+      ...(server.diparnux ? { diparnux: server.diparnux } : {}),
     }
   }
 }
@@ -231,6 +292,15 @@ export async function getModel(providerID: string, modelID: string): Promise<{ p
   const all = await allProviders()
   const provider = all[providerID]
   if (!provider) {
+    // a server that is running but refused the probe is not "unknown": say what is actually wrong
+    const refused = lastDetectFailures().find((f) => f.id === providerID)
+    if (refused) {
+      throw new ModelNotFoundError(
+        providerID,
+        modelID,
+        `The server at ${refused.baseURL} answered ${refused.status}: it needs an API key. Set DIPARNUX_API_KEY (or LLAMA_API_KEY) and try again.`,
+      )
+    }
     throw new ModelNotFoundError(providerID, modelID, `Unknown provider "${providerID}". Run \`vedecaps models\` to list what is available.`)
   }
   if (provider.source === "none") {

@@ -16,13 +16,17 @@ import { parse, type CommandSpec } from "../args"
 import { bootstrap } from "../bootstrap"
 
 export const spec: CommandSpec = {
-  usage: "vedecaps debug [config|local]",
+  usage: "vedecaps debug [config|local] [options]",
   description: "show paths, loaded config, providers and tooling (useful for bug reports)",
-  options: { help: { type: "boolean", short: "h", description: "show this help" } },
+  options: {
+    "check-tools": { type: "boolean", description: "with `local`: send one request per server to test tool calling (generates tokens)" },
+    help: { type: "boolean", short: "h", description: "show this help" },
+  },
+  examples: ["vedecaps debug", "vedecaps debug local", "vedecaps debug local --check-tools"],
 }
 
 export async function main(argv: string[]): Promise<number> {
-  const { positionals } = parse(argv, spec.options!)
+  const { positionals, values } = parse(argv, spec.options!)
   await bootstrap()
   const out = (s = "") => process.stdout.write(s + "\n")
   const loaded = await loadConfig()
@@ -31,35 +35,8 @@ export async function main(argv: string[]): Promise<number> {
     return 0
   }
   if (positionals[0] === "local") {
-    const { detectLocalServers, ollamaBaseURL } = await import("../../provider/local")
-    out("Probing local model servers (Ollama, LM Studio, llama.cpp, vLLM)...")
-    const servers = await detectLocalServers({}, 1500)
-    if (servers.length === 0) {
-      out("")
-      out("None found. Start one and run this again:")
-      out(`  Ollama     ollama serve            (looked at ${ollamaBaseURL()}; set OLLAMA_HOST for another address)`)
-      out("  LM Studio  start its local server  (looked at http://127.0.0.1:1234)")
-      out("  llama.cpp  llama-server -m <model.gguf> -c 16384  (looked at http://127.0.0.1:8080)")
-      out("  vLLM       vllm serve <model>      (looked at http://127.0.0.1:8000)")
-      out("Any other OpenAI-compatible server can be added under \"provider\" in vedecaps.json.")
-      return 0
-    }
-    for (const server of servers) {
-      out("")
-      out(`${server.name}  ${server.baseURL}  (${server.protocol} protocol)`)
-      const models = Object.values(server.models)
-      if (models.length === 0) out("  no models loaded or installed")
-      for (const m of models) {
-        const flags = [m.toolCall ? "tools" : "no tools", m.reasoning ? "thinking" : undefined, m.attachment ? "vision" : undefined].filter(Boolean).join(", ")
-        const ctx = m.context ? `${m.context.toLocaleString("en-US")} ctx${m.maxContext && m.maxContext > m.context ? ` of ${m.maxContext.toLocaleString("en-US")}` : ""}` : "ctx unknown"
-        out(`  ${m.id.padEnd(34)} ${ctx.padEnd(26)} ${flags}${m.details ? "  · " + m.details : ""}`)
-        if (!m.toolCall) out("    ! this model does not support tool calls, so the agent cannot use it")
-        else if (m.context !== undefined && m.context < 8192) out("    ! context under 8K tokens: raise it (Ollama: limit.context in your config) or expect frequent compaction")
-      }
-    }
-    out("")
-    out("Use one with:  vedecaps -m <provider>/<model>   (e.g. " + `${servers[0]!.id}/${Object.keys(servers[0]!.models)[0] ?? "model"})`)
-    return 0
+    const { runLocalDebug } = await import("./local-debug")
+    return runLocalDebug({ checkTools: values["check-tools"] === true, out })
   }
   const p = project()
   out(`vedecaps ${VERSION}`)
@@ -82,7 +59,11 @@ export async function main(argv: string[]): Promise<number> {
   out("Providers with credentials")
   const providers = Object.values(await allProviders()).filter((x) => x.source !== "none")
   if (providers.length === 0) out("  none")
-  for (const x of providers) out(`  ${x.id.padEnd(14)} ${x.protocol.padEnd(9)} via ${x.source.padEnd(7)} ${Object.keys(x.models).length} models`)
+  for (const x of providers) {
+    const limit = x.maxConcurrency ? `  max ${x.maxConcurrency} at once${x.maxConcurrencySource === "diparnux" ? " (from the gateway's slots)" : ""}` : ""
+    out(`  ${x.id.padEnd(14)} ${x.protocol.padEnd(9)} via ${x.source.padEnd(7)} ${Object.keys(x.models).length} models${limit}`)
+    if (x.maxConcurrencyIgnored) out(`    ! ${x.maxConcurrencyIgnored}`)
+  }
   out()
   const { loadPlugins, pluginProblems } = await import("../../plugin")
   const plugins = await loadPlugins()
