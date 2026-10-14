@@ -375,6 +375,16 @@ function activate(context) {
     }),
     { dispose: () => controller && controller.dispose() },
   )
+  // A small read-only surface for the in-app end-to-end test (desktop/test/e2e).
+  return {
+    ensureSession: () => controller.ensureSession().then(() => undefined),
+    status: () => ({
+      running: !!controller.client,
+      sessionID: controller.state.sessionID,
+      models: controller.choices.models.length,
+      agents: controller.choices.agents.length,
+    }),
+  }
 }
 
 function deactivate() {

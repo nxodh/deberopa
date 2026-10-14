@@ -69,6 +69,16 @@ jobs:
           test -f "$APP/resources/app/extensions/deberopa-agent/extension.js"
           test ! -e "$APP/resources/app/extensions/copilot"
           ! grep -qi copilot "$RUNNER_TEMP/exts.txt"
+      - name: In-app test (Linux): the agent extension starts the bundled server
+        if: matrix.target == 'linux-x64'
+        run: |
+          APP="${{ runner.temp }}/deberopa-desktop/VSCode-linux-x64"
+          WORK="$RUNNER_TEMP/e2e-work"; mkdir -p "$WORK"
+          export DEBEROPA_HOME="$RUNNER_TEMP/e2e-home" DEBEROPA_DISABLE_LOCAL_DETECT=1 DEBEROPA_DISABLE_MODELS_FETCH=1
+          xvfb-run -a "$APP/bin/deberopa-desktop" --no-sandbox --disable-gpu --disable-workspace-trust \
+            --user-data-dir "$RUNNER_TEMP/e2e-ud" --extensions-dir "$RUNNER_TEMP/e2e-ex" \
+            --extensionDevelopmentPath="$APP/resources/app/extensions/deberopa-agent" \
+            --extensionTestsPath="$GITHUB_WORKSPACE/desktop/test/e2e/index.js" "$WORK"
       - name: Run the packaged app (Windows)
         if: matrix.target == 'win32-x64'
         shell: pwsh
@@ -85,3 +95,19 @@ jobs:
           if (-not (Test-Path "$app\resources\app\extensions\deberopa-agent\extension.js")) { throw "deberopa-agent is not built in" }
           if (Test-Path "$app\resources\app\extensions\copilot") { throw "the Copilot extension is present" }
           if ($exts -match 'copilot') { throw "a Copilot extension is listed" }
+      - name: In-app test (Windows): the agent extension starts the bundled server
+        if: matrix.target == 'win32-x64'
+        shell: pwsh
+        run: |
+          $app = "${{ runner.temp }}\deberopa-desktop\VSCode-win32-x64"
+          $work = Join-Path $env:RUNNER_TEMP "e2e-work"; New-Item -ItemType Directory -Force $work | Out-Null
+          $env:DEBEROPA_HOME = Join-Path $env:RUNNER_TEMP "e2e-home"
+          $env:DEBEROPA_DISABLE_LOCAL_DETECT = "1"; $env:DEBEROPA_DISABLE_MODELS_FETCH = "1"
+          $exe = Get-ChildItem $app -Filter "Deberopa Desktop.exe" | Select-Object -First 1
+          if (-not $exe) { $exe = Get-ChildItem $app -Filter *.exe | Where-Object { $_.Name -notmatch 'unins|elevate|inno|crash' } | Select-Object -First 1 }
+          $args = @("--disable-gpu", "--disable-workspace-trust", "--user-data-dir", "$env:RUNNER_TEMP\e2e-ud", "--extensions-dir", "$env:RUNNER_TEMP\e2e-ex",
+                    "--extensionDevelopmentPath=$app\resources\app\extensions\deberopa-agent",
+                    "--extensionTestsPath=$env:GITHUB_WORKSPACE\desktop\test\e2e\index.js", $work)
+          $p = Start-Process -FilePath $exe.FullName -ArgumentList $args -Wait -PassThru -NoNewWindow
+          Write-Host "exit code $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { throw "in-app test failed" }
