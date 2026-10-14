@@ -1,8 +1,6 @@
 {
   "$remove": [
     "defaultChatAgent",
-    "trustedExtensionAuthAccess",
-    "builtInExtensionsEnabledWithAutoUpdates",
     "webviewContentExternalBaseUrlTemplate",
     "voiceWsUrl",
     "agentsTelemetryAppName",
@@ -47,5 +45,7 @@
     "extensions.autoUpdate": false,
     "extensions.autoCheckUpdates": false,
     "workbench.enableExperiments": false
-  }
+  },
+  "trustedExtensionAuthAccess": {},
+  "builtInExtensionsEnabledWithAutoUpdates": []
 }

@@ -28,7 +28,7 @@ jobs:
             cli: linux-x64
             exe: deberopa
           - name: Windows 11 x64
-            os: windows-latest
+            os: windows-2022
             target: win32-x64
             cli: windows-x64
             exe: deberopa.exe

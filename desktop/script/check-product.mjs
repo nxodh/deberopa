@@ -32,11 +32,13 @@ else {
   const product = JSON.parse(readFileSync(productPath, "utf8"))
   console.log(`product.json: ${productPath}`)
   console.log(`  nameLong=${product.nameLong} applicationName=${product.applicationName} version=${product.version}`)
-  for (const key of ["extensionsGallery", "defaultChatAgent", "trustedExtensionAuthAccess", "voiceWsUrl", "webviewContentExternalBaseUrlTemplate", "updateUrl", "extensionRecommendations"]) {
+  for (const key of ["extensionsGallery", "defaultChatAgent", "voiceWsUrl", "webviewContentExternalBaseUrlTemplate", "updateUrl", "extensionRecommendations"]) {
     if (key in product) fail(`product.json still has "${key}"`)
   }
   if (product.nameLong !== "Deberopa Desktop") fail(`nameLong is ${JSON.stringify(product.nameLong)}`)
   const text = JSON.stringify(product)
+  if (/copilot/i.test(text)) fail("product.json mentions Copilot")
+  if (!Array.isArray(product.builtInExtensionsEnabledWithAutoUpdates)) fail("builtInExtensionsEnabledWithAutoUpdates must stay an array (the workbench iterates it)")
   for (const bad of ["marketplace.visualstudio.com", "open-vsx.org", "api.github.com/copilot", "vscode-cdn.net", "mai.microsoft.com", "update.code.visualstudio.com", "vortex.data.microsoft.com", "dc.services.visualstudio.com"]) {
     if (text.includes(bad)) fail(`product.json mentions ${bad}`)
   }
