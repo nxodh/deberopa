@@ -2,7 +2,7 @@
 // Conversation state for one session, kept in step with the server's event stream.
 
 function createState() {
-  return { sessionID: undefined, title: "", busy: false, retry: undefined, messages: [], permissions: [], todos: [], error: undefined }
+  return { sessionID: undefined, title: "", busy: false, retry: undefined, messages: [], permissions: [], todos: [], error: undefined, pulls: {} }
 }
 
 function upsertMessage(state, message) {
@@ -54,6 +54,14 @@ function applyEvent(state, event) {
     case "permission.replied":
       state.permissions = state.permissions.filter((x) => x.id !== p.id)
       return
+    case "local.pull": {
+      // model downloads belong to the server, not to one session
+      const key = (p.provider || "") + "/" + p.model
+      if (p.done) {
+        state.pulls[key] = { ...p, finished: Date.now() }
+      } else state.pulls[key] = p
+      return
+    }
     case "todo.updated":
       if (p.sessionID === state.sessionID) state.todos = p.todos ?? []
       return

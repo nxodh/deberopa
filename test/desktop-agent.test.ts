@@ -169,3 +169,45 @@ test("agent and model choices from the pickers are accepted by the prompt route"
   expect(assistant.modelID).toBe("mock-1")
   await expect(client.prompt(session.id, "x", { model: "no-slash" })).rejects.toMatchObject({ status: 400 })
 }, 30_000)
+
+test("tool check, slots and model downloads reach the client and the conversation state", async () => {
+  const ollama = Bun.serve({
+    port: 0,
+    hostname: "127.0.0.1",
+    async fetch(req) {
+      const url = new URL(req.url)
+      if (url.pathname === "/api/chat") return Response.json({ message: { role: "assistant", content: "", tool_calls: [{ function: { name: "get_time", arguments: { city: "Seoul" } } }] } })
+      if (url.pathname === "/api/pull") {
+        const lines = [{ status: "pulling manifest" }, { status: "pulling abc", total: 10, completed: 5 }, { status: "success" }]
+        return new Response(lines.map((l) => JSON.stringify(l)).join("\n") + "\n")
+      }
+      if (url.pathname === "/slots") return Response.json([{ id: 0, n_ctx: 4096, is_processing: true }])
+      return new Response("nope", { status: 404 })
+    },
+  })
+  const dir2 = tmpDir()
+  useProject(dir2, { model: "fo/m", snapshot: false, provider: { fo: { name: "Fake", protocol: "ollama", api: `http://127.0.0.1:${ollama.port}`, models: { m: { name: "M", tool_call: true, limit: { context: 8192, output: 1000 } } } } } })
+  const local = startServer({ port: 0 })
+  try {
+    const c = new DeberopaClient({ baseUrl: `http://127.0.0.1:${local.port}` })
+    expect((await c.toolcheck("fo/m")).status).toBe("ok")
+    expect((await c.slots("fo")).slots).toEqual({ total: 1, busy: 1, ctxPerSlot: 4096 })
+    const state = createState()
+    const abort = new AbortController()
+    const types = new Set<string>()
+    c.events((e: any) => {
+      types.add(e.type)
+      applyEvent(state, e)
+    }, abort.signal).catch(() => {})
+    expect(await waitFor(() => types.has("server.connected"))).toBe(true)
+    await c.pull("fo", "qwen3:8b")
+    expect(await waitFor(() => state.pulls["fo/qwen3:8b"]?.done === true)).toBe(true)
+    abort.abort()
+    expect(state.pulls["fo/qwen3:8b"].status).toBe("success")
+    await expect(c.pull("fo", "bad name")).rejects.toMatchObject({ status: 400 })
+  } finally {
+    local.stop(true)
+    ollama.stop(true)
+    useProject(dir, { permission: { edit: "ask" }, model: "mock/mock-1", snapshot: false, provider: { mock: { name: "Mock", api: mock.url, options: { apiKey: "sk-test-not-a-real-key-000000000000" }, models: { "mock-1": { name: "Mock 1", tool_call: true } } } } })
+  }
+}, 30_000)

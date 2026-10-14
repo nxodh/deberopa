@@ -1,0 +1,43 @@
+diff --git a/build/gulpfile.vscode.ts b/build/gulpfile.vscode.ts
+index 93f0d020..560ab54e 100644
+--- a/build/gulpfile.vscode.ts
++++ b/build/gulpfile.vscode.ts
+@@ -463,7 +463,8 @@ function packageTask(platform: string, arch: string, sourceFolderName: string, d
+ function hasAuthenticodeSignature(filePath: string): Promise<boolean> {
+ 	return new Promise((resolve, reject) => {
+ 		const proc = cp.spawn('signtool.exe', ['verify', '/pa', filePath]);
+-		proc.on('error', reject);
++		// Deberopa Desktop: no Windows SDK on the build machine means nothing to strip, not a failure.
++		proc.on('error', () => resolve(false));
+ 		proc.on('exit', code => resolve(code === 0));
+ 	});
+ }
+@@ -517,11 +518,11 @@ function patchWin32DependenciesTask(destinationFolderName: string) {
+ 			await rcedit(fullPath, {
+ 				'file-version': baseVersion,
+ 				'version-string': {
+-					'CompanyName': 'Microsoft Corporation',
++					'CompanyName': 'nxodh',
+ 					'FileDescription': product.nameLong,
+ 					'FileVersion': packageJson.version,
+ 					'InternalName': basename,
+-					'LegalCopyright': 'Copyright (C) 2026 Microsoft. All rights reserved',
++					'LegalCopyright': 'Copyright (C) 2026 nxodh. MIT License',
+ 					'OriginalFilename': basename,
+ 					'ProductName': product.nameLong,
+ 					'ProductVersion': packageJson.version,
+diff --git a/build/lib/electron.ts b/build/lib/electron.ts
+index 27151cc4..f1a24c6e 100644
+--- a/build/lib/electron.ts
++++ b/build/lib/electron.ts
+@@ -143,8 +143,8 @@ const electronAssetResolver = electronFeed
+ export const config = {
+ 	version: electronVersion,
+ 	productAppName: product.nameLong,
+-	companyName: 'Microsoft Corporation',
+-	copyright: 'Copyright (C) 2026 Microsoft. All rights reserved',
++	companyName: 'nxodh',
++	copyright: 'Copyright (C) 2026 nxodh. MIT License',
+ 	darwinExecutable: product.nameShort,
+ 	darwinIcon: 'resources/darwin/code.icns',
+ 	darwinBundleIdentifier: product.darwinBundleIdentifier,

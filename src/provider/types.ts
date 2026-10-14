@@ -108,6 +108,14 @@ export interface Usage {
   cacheWrite: number
 }
 
+/** Server-reported timings, when the server says them (Ollama, llama.cpp / Opereta). */
+export interface Timings {
+  /** Time spent reading the prompt. */
+  promptMs?: number
+  /** Time spent generating the answer. */
+  generationMs?: number
+}
+
 export type FinishReason = "stop" | "tool-calls" | "length" | "refusal" | "content-filter" | "unknown"
 
 export type StreamEvent =
@@ -115,8 +123,8 @@ export type StreamEvent =
   | { type: "reasoning-delta"; text: string }
   | { type: "reasoning-end" }
   | { type: "tool-input-start"; id: string; name: string }
-  | { type: "tool-call"; id: string; name: string; input: unknown; invalid?: string; meta?: Record<string, unknown> }
-  | { type: "finish"; reason: FinishReason; usage: Usage; raw?: unknown; servedBy?: string; message?: string }
+  | { type: "tool-call"; id: string; name: string; input: unknown; invalid?: string; meta?: Record<string, unknown>; viaText?: boolean }
+  | { type: "finish"; reason: FinishReason; usage: Usage; raw?: unknown; servedBy?: string; message?: string; timings?: Timings }
 
 export class ProviderError extends Error {
   status?: number

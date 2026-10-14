@@ -77,6 +77,9 @@ jobs:
           Get-ChildItem $app | Select-Object -First 30 | Format-Table Name, Length
           & "$app\bin\deberopa-desktop.cmd" --version
           & "$app\resources\deberopa\deberopa.exe" --version
+          $exe = Get-ChildItem $app -Filter *.exe | Where-Object { $_.Name -notmatch 'deberopa|unins|elevate|inno' } | Select-Object -First 1
+          $exe.VersionInfo | Format-List FileName, CompanyName, ProductName, LegalCopyright, FileVersion
+          if ($exe.VersionInfo.CompanyName -match 'Microsoft') { throw "the executable's file properties still name Microsoft as the company" }
           $exts = & "$app\bin\deberopa-desktop.cmd" --user-data-dir "$env:RUNNER_TEMP\ud" --extensions-dir "$env:RUNNER_TEMP\ex" --list-extensions --show-versions
           $exts
           if (-not (Test-Path "$app\resources\app\extensions\deberopa-agent\extension.js")) { throw "deberopa-agent is not built in" }

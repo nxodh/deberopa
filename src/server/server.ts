@@ -21,6 +21,8 @@ import { loadConfig, resetConfig } from "../config/config"
 import { listSkills } from "../skill/skill"
 import { usageStats } from "../session/stats"
 import { detectLocalServers, lastDetectFailures } from "../provider/local"
+import { DEFAULT_PORTS, modelMode, probeSlots, pullOllamaModel, startHint, toolCheckModel, validPullName } from "../provider/localmode"
+import { publish } from "../util/bus"
 
 export interface ServerOptions {
   port?: number
@@ -149,6 +151,9 @@ const withoutRaw = (message: any) => {
   return rest
 }
 
+/** Model downloads in progress, so the same one is not started twice. */
+const pulls = new Map<string, AbortController>()
+
 async function route(req: Request): Promise<Response> {
   const url = new URL(req.url)
   const parts = url.pathname.split("/").filter(Boolean).map(decodeURIComponent)
@@ -162,7 +167,12 @@ async function route(req: Request): Promise<Response> {
   if (is("GET", "agent")) return json(Object.values(await listAgents()))
   if (is("GET", "command")) return json(Object.values(await listCommands()))
   if (is("GET", "provider")) {
-    const providers = Object.values(await allProviders()).map(({ apiKey: _key, headers: _headers, ...rest }) => ({ ...rest, connected: rest.source !== "none" }))
+    const providers = Object.values(await allProviders()).map(({ apiKey: _key, headers: _headers, ...rest }) => ({
+      ...rest,
+      // how Deberopa adapts to each model (compact prompt, tool calls), so a client can say so
+      models: Object.fromEntries(Object.entries(rest.models).map(([id, model]) => [id, { ...model, mode: modelMode(rest, model) }])),
+      connected: rest.source !== "none",
+    }))
     return json({ providers, default: await defaultModel() })
   }
   if (is("GET", "find", "file")) {
@@ -174,7 +184,43 @@ async function route(req: Request): Promise<Response> {
   // The probe addresses are fixed on purpose: a caller must not be able to aim the local API key at another host.
   if (is("GET", "local")) {
     const servers = await detectLocalServers()
-    return json({ servers: servers.map((s) => ({ ...s, models: Object.values(s.models) })), failures: lastDetectFailures(), disabled: !!process.env.DEBEROPA_DISABLE_LOCAL_DETECT })
+    return json({
+      servers: servers.map((s) => ({ ...s, models: Object.values(s.models), hint: startHint(s.opereta ? "opereta" : s.id) })),
+      failures: lastDetectFailures(),
+      disabled: !!process.env.DEBEROPA_DISABLE_LOCAL_DETECT,
+      // where to look and how to start each kind, for when nothing answers
+      expected: DEFAULT_PORTS.map((p) => ({ ...p, hint: startHint(p.kind) })),
+    })
+  }
+  // One request to the model that asks it to call a tool: can this model drive the agent? Generates a few tokens.
+  if (is("POST", "local", "toolcheck")) {
+    const input = await body(req)
+    const ref = modelOf(input.model ?? (typeof input.provider === "string" && typeof input.modelID === "string" ? { providerID: input.provider, modelID: input.modelID } : undefined))
+    if (!ref) throw new HttpError(400, 'model must look like "provider/model"')
+    return json(await toolCheckModel(ref.providerID, ref.modelID))
+  }
+  // Busy and total slots of a llama.cpp / Opereta server, when it exposes them.
+  if (is("GET", "local", "slots")) {
+    const id = url.searchParams.get("provider") ?? ""
+    const provider = (await allProviders())[id]
+    if (!provider?.baseURL) throw new HttpError(404, `Unknown provider: ${id}`)
+    return json({ provider: id, slots: (await probeSlots(provider.baseURL, provider.apiKey)) ?? null, configured: provider.maxConcurrency ?? null })
+  }
+  // Download a model into a local Ollama. Progress arrives on the event stream as "local.pull".
+  if (is("POST", "local", "pull")) {
+    const input = await body(req)
+    const providerID = typeof input.provider === "string" ? input.provider : "ollama"
+    if (!validPullName(input.model)) throw new HttpError(400, "model is required (for example qwen3:8b)")
+    const key = providerID + "/" + input.model
+    if (pulls.has(key)) throw new HttpError(409, "That model is already being downloaded")
+    const provider = (await allProviders())[providerID]
+    if (!provider || provider.protocol !== "ollama") throw new HttpError(404, `${providerID} is not an Ollama server`)
+    const controller = new AbortController()
+    pulls.set(key, controller)
+    pullOllamaModel(providerID, input.model, (p) => publish("local.pull", { provider: providerID, ...p }), controller.signal)
+      .catch((err) => publish("local.pull", { provider: providerID, model: input.model, status: "error", done: true, error: err instanceof Error ? err.message : String(err) }))
+      .finally(() => pulls.delete(key))
+    return json({ accepted: true, provider: providerID, model: input.model }, 202)
   }
   if (is("GET", "skill")) return json(Object.values(await listSkills()).map(({ content: _content, ...rest }) => rest))
   if (is("GET", "stats")) {

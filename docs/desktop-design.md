@@ -23,6 +23,9 @@
 
 ## 1. 목표와 비목표
 
+> **제품의 큰 목표 (소유자, 2026-10-15)**: Deberopa(CLI와 Desktop 모두)는 코딩 에이전트로서 **로컬 LLM의 사용성을 극대화**한다. 클라우드 모델도 지원하지만 로컬 모델 쪽 기능과 편의성이 중요하다. 이 설계의 우선순위 판단은 이 목표를 따른다: 첫 실행에서 로컬 서버를 찾아 바로 쓰게 하고, 도구 호출 점검·짧은 프롬프트·속도·슬롯·컨텍스트를 항상 보이게 하며, 서버가 꺼져 있으면 시작 방법을, 모델이 없으면 내려받기를 화면에서 제공한다(구현은 대화 패널의 "Local models" 카드와 선택기, `desktop/extensions/deberopa-agent`).
+
+
 ### 목표
 
 1. 터미널을 쓰지 않는 사람도 Deberopa를 설치해서 바로 쓸 수 있다(접근성).
@@ -219,6 +222,10 @@ VSCodium이 같은 방식(소스 빌드, 텔레메트리 제거, Open VSX)으로
 | `!셸` 모드 | 입력창 모드 전환 | `POST /session/:id/shell` | 없음 |
 | 에이전트 선택(build/plan/…), 사용자 정의 에이전트 | 입력창 상단 선택기, 설정 | `GET /agent` | 에이전트 파일 편집은 에디터로 연다 |
 | 모델, 제공자 선택, 로컬 서버 감지 | 모델 선택기, "모델 서버" 화면 | `GET /provider` | 감지 결과와 상태(`debug local`), 사용 가능 여부 |
+| **로컬 서버 확인과 시작 안내** (`deberopa local`, `/local`) | 대화 패널의 "Local models" 카드(상태, 슬롯, 시작 명령, 다시 검색) | `GET /local` | 없음(추가함) |
+| **도구 호출 점검** (`deberopa local check`, `/toolcheck`) | 모델 선택기 옆 "Check tools" | `POST /local/toolcheck` | 없음(추가함) |
+| **Ollama 모델 내려받기** (`deberopa local pull`, `/pull`) | 카드의 내려받기 입력과 진행률 | `POST /local/pull`, 이벤트 `local.pull` | 없음(추가함) |
+| **모델 사용 방식·속도·슬롯** (`deberopa local status`, 상태 표시줄) | 헤더의 `compact`, `tok/s`, `slots`, 컨텍스트 사용량 | `GET /provider`의 `mode`, 메시지의 `timings`, `GET /local/slots` | 없음(추가함) |
 | `auth login/list/logout` | 로그인 화면(키 입력) | 없음 | **인증 라우트**(키 저장, 삭제, 목록) |
 | 권한 요청(`once/always/reject`) | 대화 안의 카드, 알림 | `GET/POST /permission` | 없음 |
 | 세션: 목록, 이어가기, 이름 변경, 삭제 | 세션 목록 | `GET/PATCH/DELETE /session` | 없음 |

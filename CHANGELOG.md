@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+Goal, for the CLI and Deberopa Desktop alike: make local LLMs as comfortable as possible as a coding agent. Hosted models stay supported; local ones come first.
+
+- Local servers: `deberopa local` (and `/local` in the terminal UI, `GET /local`) shows what is running and, for what is not, the command that starts it (`opereta serve start`, `ollama serve`, `llama-server … --jinja`, LM Studio, vLLM).
+- Tool-call check: `deberopa local check [provider/model]`, `/toolcheck` and `POST /local/toolcheck` ask the model once to call a tool and say whether it works, was recovered from text, or fails. It now covers Ollama's native API too (before, `debug local` skipped it).
+- Model downloads: `deberopa local pull <model>`, `/pull` and `POST /local/pull` download into a local Ollama with progress (`local.pull` events). Only an Ollama on this machine or its network; names are validated.
+- Speed and slots: the status bar shows tokens per second (the server's own timing when it reports one: Ollama `eval_duration`, llama.cpp `timings`; otherwise `~` from elapsed time), `slots busy/total` while a turn runs on a llama.cpp / Opereta server with `/slots`, and `compact` when the short prompt is in use. `deberopa local status` explains why.
+- Tool calls the model wrote as text and Deberopa recovered are marked `viaText` on the tool part.
+- First run: with nothing chosen, a model on a local server is the default before a hosted one; with no server at all, the start-up hints appear instead of a key prompt.
+- HTTP API for Deberopa Desktop: `GET /local`, `POST /local/toolcheck`, `GET /local/slots`, `POST /local/pull`, `GET|PUT|DELETE /auth` (names only, keys are never returned), `GET|POST|DELETE /trust`, `GET /skill`, `GET /stats`; `GET /provider` carries each model's `mode`.
+- `deberopa stats` and the API share one implementation (`src/session/stats.ts`).
+- Deberopa Desktop (in development, `desktop/`): pinned Code - OSS build without Copilot, a built-in conversation panel with permission prompts, pickers, local-model card, tool check, downloads, speed and slots. Not released yet; it ships together with the CLI.
+
 ## 0.2.0
 
 Vedecaps is now **Deberopa**. Entries below this one keep the old name on purpose: they describe what shipped under it.

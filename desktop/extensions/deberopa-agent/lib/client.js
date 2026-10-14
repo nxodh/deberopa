@@ -70,6 +70,9 @@ class DeberopaClient {
   agents() { return this.request("GET", "/agent") }
   providers() { return this.request("GET", "/provider") }
   local() { return this.request("GET", "/local") }
+  toolcheck(model) { return this.request("POST", "/local/toolcheck", { model }) }
+  slots(provider) { return this.request("GET", "/local/slots?provider=" + encodeURIComponent(provider)) }
+  pull(provider, model) { return this.request("POST", "/local/pull", { provider, model }) }
   commands() { return this.request("GET", "/command") }
   sessions() { return this.request("GET", "/session") }
   createSession(title) { return this.request("POST", "/session", title ? { title } : {}) }

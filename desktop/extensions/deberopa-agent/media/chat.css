@@ -10,8 +10,8 @@
 html, body { height: 100%; margin: 0; padding: 0; }
 body { font: 13px/1.5 var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-sideBar-background); }
 #app { display: flex; flex-direction: column; height: 100%; }
-header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
-header .title { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+header { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+header .title { flex: 1 1 8em; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 header .busy { color: var(--dim); font-size: 12px; }
 button { font: inherit; color: inherit; background: var(--soft); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 3px 10px; cursor: pointer; }
 button:hover { background: color-mix(in srgb, currentColor 14%, transparent); }
@@ -54,3 +54,8 @@ select:focus-visible { outline: 2px solid var(--vscode-focusBorder); }
 .local .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .srv { display: flex; gap: 8px; align-items: baseline; padding: 2px 0; }
 .srv .sub { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.chip { border: 1px solid var(--line); border-radius: 999px; padding: 0 8px; font-size: 11px; color: var(--dim); }
+.hint { color: var(--dim); font-size: 12px; padding: 2px 0 2px 26px; overflow-wrap: anywhere; }
+.pull { display: flex; gap: 6px; margin-top: 8px; }
+.pull input { flex: 1; min-width: 0; font: inherit; color: inherit; background: var(--vscode-input-background, transparent); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 3px 8px; }
+.pull input:focus-visible { outline: 2px solid var(--vscode-focusBorder); }

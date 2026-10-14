@@ -19,7 +19,10 @@ class ChatController {
     this.streamAbort = undefined
     this.pendingInsert = []
     this.choices = { agents: [], models: [], defaultModel: undefined }
-    this.local = { servers: [], failures: [] }
+    this.local = { servers: [], failures: [], expected: [] }
+    this.slots = null
+    this.toolcheck = null
+    this.slotTimer = undefined
     this.selection = context.globalState.get("deberopa.selection", {})
     this.status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100)
     this.status.command = "deberopa.focus"
@@ -37,7 +40,7 @@ class ChatController {
   }
 
   push() {
-    if (this.view) this.view.webview.postMessage({ type: "state", state: this.state, choices: this.choices, selection: this.selection, local: this.local })
+    if (this.view) this.view.webview.postMessage({ type: "state", state: this.state, choices: this.choices, selection: this.selection, local: this.local, slots: this.slots, toolcheck: this.toolcheck })
   }
 
   async loadLocal() {
@@ -61,7 +64,10 @@ class ChatController {
             value: p.id + "/" + m.id,
             label: (p.local ? "● " : "") + p.name + " · " + m.name,
             local: !!p.local,
+            provider: p.id,
+            protocol: p.protocol,
             context: m.limit && m.limit.context ? m.limit.context : 0,
+            mode: m.mode || null,
           })),
         ),
       defaultModel: providers.default ? providers.default.providerID + "/" + providers.default.modelID : undefined,
@@ -108,6 +114,34 @@ class ChatController {
     }
   }
 
+  /** While a turn runs against a local server, watch how many of its slots are busy. */
+  watchSlots() {
+    const selected = this.selection.model || this.choices.defaultModel
+    const entry = this.choices.models.find((m) => m.value === selected)
+    const wanted = this.state.busy && entry && entry.local && entry.protocol === "openai"
+    if (!wanted) {
+      if (this.slotTimer) clearInterval(this.slotTimer)
+      this.slotTimer = undefined
+      if (this.slots) {
+        this.slots = null
+        this.push()
+      }
+      return
+    }
+    if (this.slotTimer) return
+    const poll = async () => {
+      try {
+        const result = await this.client.slots(entry.provider)
+        this.slots = result.slots
+      } catch {
+        this.slots = null
+      }
+      this.push()
+    }
+    poll()
+    this.slotTimer = setInterval(poll, 3000)
+  }
+
   startStream() {
     this.stopStream()
     const abort = new AbortController()
@@ -133,6 +167,12 @@ class ChatController {
 
   async onEvent(event) {
     if (applyEvent(this.state, event) === "reload") await this.loadMessages()
+    this.watchSlots()
+    // a finished download changes which models exist
+    if (event.type === "local.pull" && event.properties && event.properties.done && !event.properties.error) {
+      await this.loadChoices().catch(() => {})
+      await this.loadLocal()
+    }
     this.push()
   }
 
@@ -228,6 +268,24 @@ class ChatController {
         return this.send(message.text)
       case "abort":
         return this.abort()
+      case "toolcheck": {
+        if (!this.client || typeof message.model !== "string") return
+        this.toolcheck = { model: message.model, running: true }
+        this.push()
+        try {
+          const result = await this.client.toolcheck(message.model)
+          this.toolcheck = { model: message.model, result }
+        } catch (err) {
+          this.toolcheck = { model: message.model, result: { status: "error", detail: err.message } }
+        }
+        this.push()
+        return
+      }
+      case "pull": {
+        if (!this.client || typeof message.model !== "string") return
+        await this.client.pull(message.provider || "ollama", message.model.trim()).catch((e) => this.notice(e.message))
+        return
+      }
       case "rescanLocal":
         await this.loadLocal()
         await this.loadChoices().catch(() => {})
@@ -266,6 +324,7 @@ class ChatController {
   }
 
   dispose() {
+    if (this.slotTimer) clearInterval(this.slotTimer)
     this.stopStream()
     if (this.server) this.server.stop()
   }

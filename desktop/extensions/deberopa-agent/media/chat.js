@@ -6,7 +6,10 @@
   let state = null
   let choices = { agents: [], models: [], defaultModel: undefined }
   let selection = {}
-  let local = { servers: [], failures: [] }
+  let local = { servers: [], failures: [], expected: [] }
+  let slots = null
+  let toolcheck = null
+  let pullName = ""
   let notice = ""
 
   const el = (tag, props, ...children) => {
@@ -91,11 +94,54 @@
   }
   const compact = (n) => (n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + "k" : String(n))
 
+  // Tokens per second of the last reply: the server's own timing when it reported one, else elapsed time (marked ~).
+  function lastSpeed() {
+    const last = [...state.messages].reverse().find((m) => m.role === "assistant" && m.tokens && m.tokens.output > 0 && m.time && m.time.completed)
+    if (!last) return null
+    const ms = last.timings && last.timings.generationMs
+    if (ms > 0) return { value: last.tokens.output / (ms / 1000), approx: false }
+    const elapsed = last.time.completed - last.time.created
+    return elapsed > 0 ? { value: last.tokens.output / (elapsed / 1000), approx: true } : null
+  }
+  function currentModel() {
+    return choices.models.find((m) => m.value === (selection.model || choices.defaultModel))
+  }
+  const MODE_WORDS = { "small-context": "small context window", "small-model": "small model", config: "set in config" }
+  function modeChip() {
+    const model = currentModel()
+    if (!model || !model.mode || !model.mode.compactPrompt) return null
+    return el("span", { class: "chip", title: "Compact prompt: shorter instructions and fewer tools (" + (MODE_WORDS[model.mode.compactReason] || "") + ")" }, "compact")
+  }
+  function toolcheckLine() {
+    if (!toolcheck) return null
+    if (toolcheck.running) return el("div", { class: "notice" }, "Asking " + toolcheck.model + " to call a tool…")
+    const r = toolcheck.result || {}
+    const words = {
+      ok: "Tool calls work: the model answered with a structured call.",
+      recovered: "Tool calls work, with help: the model wrote the call as text and Deberopa recovered it.",
+      failed: "Tool calls do not work" + (r.detail ? ": " + r.detail : "") + ". The agent cannot read or edit files with this model.",
+      unauthorized: "The server needs an API key (set OPERETA_API_KEY or LLAMA_API_KEY).",
+      error: "The check could not run: " + (r.detail || "unknown error") + ".",
+    }
+    return el("div", { class: r.status === "ok" || r.status === "recovered" ? "notice" : "error", role: "status" }, words[r.status] || r.status)
+  }
+
   function picker(key, options, current, label) {
     const select = el("select", { "aria-label": label, onchange: (e) => vscode.postMessage({ type: "select", key, value: e.target.value }) },
       options.map((o) => el("option", { value: o.value }, o.label)))
     select.value = current || ""
     return select
+  }
+
+  function pullProgress() {
+    const rows = []
+    for (const [key, p] of Object.entries(state.pulls || {})) {
+      if (p.done && Date.now() - (p.finished || 0) > 15000) continue
+      const pct = p.total && p.completed !== undefined ? Math.round((p.completed / p.total) * 100) : null
+      const text = p.error ? "failed: " + p.error : p.done ? "ready — pick it in the model list" : p.status + (pct !== null ? " " + pct + "%" : "")
+      rows.push(el("div", { class: "srv" }, el("span", { class: "mark" }, p.error ? "✕" : p.done ? "●" : "◐"), el("span", { class: "name" }, p.model), el("span", { class: "sub" }, text)))
+    }
+    return rows
   }
 
   function localCard() {
@@ -104,12 +150,22 @@
       const detail = o
         ? ["Opereta " + o.version, o.state, o.slots ? o.slots + " slot" + (o.slots === 1 ? "" : "s") : o.slotsAuto ? "slots auto" : null, o.ctxPerSlot ? compact(o.ctxPerSlot) + " ctx/slot" : null].filter(Boolean).join(" · ")
         : s.models.length + " model" + (s.models.length === 1 ? "" : "s")
-      return el("div", { class: "srv" }, el("span", { class: "mark" }, "●"), el("span", { class: "name" }, s.name), el("span", { class: "sub" }, detail))
+      const down = o && o.state && !/^running/.test(o.state)
+      return el("div", {}, el("div", { class: "srv" }, el("span", { class: "mark" }, down ? "!" : "●"), el("span", { class: "name" }, s.name), el("span", { class: "sub" }, detail)),
+        down && s.hint ? el("div", { class: "hint" }, s.hint) : null)
     })
     for (const f of local.failures) rows.push(el("div", { class: "srv" }, el("span", { class: "mark" }, "!"), el("span", { class: "name" }, f.id), el("span", { class: "sub" }, "needs an API key (HTTP " + f.status + ")")))
+    const ollama = local.servers.find((s) => s.id === "ollama")
+    const nothing = rows.length === 0
     return el("div", { class: "local" },
       el("div", { class: "head" }, el("strong", {}, "Local models"), el("button", { onclick: () => vscode.postMessage({ type: "rescanLocal" }) }, "Rescan")),
-      rows.length ? rows : el("div", { class: "sub" }, "No local server found on the usual ports (Ollama 11434, LM Studio 1234, llama.cpp / Opereta 8080, vLLM 8000)."))
+      rows,
+      nothing ? el("div", { class: "sub" }, "No local model server answered. Start one and press Rescan:") : null,
+      nothing ? (local.expected || []).map((e) => el("div", { class: "hint" }, el("strong", {}, e.name + " (port " + e.port + ")"), " — " + e.hint)) : null,
+      ollama ? el("form", { class: "pull", onsubmit: (e) => { e.preventDefault(); const model = pullName.trim(); if (model) { vscode.postMessage({ type: "pull", provider: "ollama", model }); } } },
+        el("input", { type: "text", value: pullName, placeholder: ollama.models.length ? "Download another model, e.g. qwen3:8b" : "No models yet. Download one, e.g. qwen3:8b", "aria-label": "Model to download", oninput: (e) => { pullName = e.target.value } }),
+        el("button", { type: "submit" }, "Download")) : null,
+      pullProgress())
   }
 
   function render() {
@@ -125,6 +181,12 @@
       el("header", {},
         el("span", { class: "title" }, state.title || "Deberopa"),
         state.busy ? el("span", { class: "busy" }, state.retry ? "retrying…" : "working…") : null,
+        modeChip(),
+        (() => {
+          const sp = lastSpeed()
+          return sp ? el("span", { class: "busy", title: sp.approx ? "Output tokens divided by response time" : "Reported by the model server" }, (sp.approx ? "~" : "") + (sp.value < 10 ? sp.value.toFixed(1) : Math.round(sp.value)) + " tok/s") : null
+        })(),
+        slots && slots.total > 0 ? el("span", { class: "busy", title: "Busy slots on the model server" }, "slots " + slots.busy + "/" + slots.total) : null,
         (() => {
           const u = contextUse()
           return u ? el("span", { class: "busy", title: `Context: ${u.used.toLocaleString()} of ${u.limit.toLocaleString()} tokens` }, `${compact(u.used)}/${compact(u.limit)} · ${u.pct}%`) : null
@@ -140,6 +202,7 @@
           el("button", { onclick: () => vscode.postMessage({ type: "permission", id: p.id, reply: "always" }) }, "Always allow"),
           el("button", { onclick: () => vscode.postMessage({ type: "permission", id: p.id, reply: "reject" }) }, "Reject")))),
       state.error ? el("div", { class: "error", role: "alert" }, state.error.message) : null,
+      toolcheckLine(),
       notice ? el("div", { class: "notice" }, notice) : null,
       el("footer", {},
         el("div", { class: "box" },
@@ -147,7 +210,8 @@
           el("div", { class: "row" },
             el("span", { class: "pickers" },
               choices.agents.length ? picker("agent", choices.agents.map((a) => ({ value: a.name, label: a.name })), selection.agent || (choices.agents[0] && choices.agents[0].name), "Agent") : null,
-              choices.models.length ? picker("model", choices.models, selection.model || choices.defaultModel, "Model") : null),
+              choices.models.length ? picker("model", choices.models, selection.model || choices.defaultModel, "Model") : null,
+              choices.models.length ? el("button", { title: "Ask the model to call a tool once, to see whether it can drive the agent", onclick: () => vscode.postMessage({ type: "toolcheck", model: selection.model || choices.defaultModel }) }, "Check tools") : null),
             state.busy
               ? el("button", { onclick: () => vscode.postMessage({ type: "abort" }) }, "Stop")
               : el("button", { class: "primary", id: "send" }, "Send")))))
@@ -173,7 +237,7 @@
 
   window.addEventListener("message", (event) => {
     const m = event.data
-    if (m.type === "state") { local = m.local || local; state = m.state; choices = m.choices || choices; selection = m.selection || {}; notice = ""; render() }
+    if (m.type === "state") { slots = m.slots || null; toolcheck = m.toolcheck || null; local = m.local || local; state = m.state; choices = m.choices || choices; selection = m.selection || {}; notice = ""; render() }
     else if (m.type === "notice") { notice = m.text; render() }
     else if (m.type === "insert") {
       const input = document.getElementById("input")

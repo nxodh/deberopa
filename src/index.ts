@@ -58,6 +58,10 @@ const COMMANDS: Record<string, () => Promise<Entry>> = {
     const m = await import("./cli/commands/debug")
     return { spec: m.spec, run: m.main }
   },
+  local: async () => {
+    const m = await import("./cli/commands/local")
+    return { spec: m.spec, run: m.main }
+  },
   pr: async () => {
     const m = await import("./cli/commands/pr")
     return { spec: m.spec, run: m.main }
@@ -91,6 +95,7 @@ const SUMMARY: [string, string][] = [
   ["deberopa run [message..]", "run a prompt non-interactively"],
   ["deberopa auth login|list|logout", "manage provider credentials"],
   ["deberopa models [provider]", "list available models"],
+  ["deberopa local [check|pull|status]", "local model servers: status, tool-call check, download a model"],
   ["deberopa agent list|create", "list or create agents"],
   ["deberopa session list|delete", "manage saved sessions"],
   ["deberopa export [id]", "export a session as JSON or Markdown"],

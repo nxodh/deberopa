@@ -34,7 +34,10 @@ import { Header, MessageView, Muted, Plain, SPINNER } from "./view"
 import { Prompt, type Completion } from "./prompt"
 import { Conversation } from "./conversation"
 import { InputDialog, PermissionDialog, SelectDialog, TextDialog, type SelectItem } from "./dialog"
-import type { Model } from "../provider/types"
+import type { Model, ProviderInfo } from "../provider/types"
+import { detectLocalServers, lastDetectFailures } from "../provider/local"
+import { generationSpeed, modelMode, probeSlots, pullOllamaModel, toolCheckModel, validPullName, type SlotUsage } from "../provider/localmode"
+import { localServersMarkdown, toolCheckSummary } from "../provider/localreport"
 
 type Dialog =
   | { type: "models" }
@@ -63,6 +66,9 @@ const BUILTIN_COMMANDS: Completion[] = [
   { label: "/rename", value: "/rename ", description: "rename this session" },
   { label: "/theme", value: "/theme", description: "switch theme" },
   { label: "/mcp", value: "/mcp", description: "MCP and LSP status" },
+  { label: "/local", value: "/local", description: "local model servers on this machine" },
+  { label: "/toolcheck", value: "/toolcheck", description: "check that the current model can call tools" },
+  { label: "/pull", value: "/pull ", description: "download a model into Ollama" },
   { label: "/trust", value: "/trust", description: "let this project's config run commands" },
   { label: "/help", value: "/help", description: "keys and commands" },
   { label: "/exit", value: "/exit", description: "quit" },
@@ -127,6 +133,8 @@ export function App(props: { options: AppOptions }) {
   const [agents, setAgents] = useState<string[]>(["build", "plan"])
   const [customCommands, setCustomCommands] = useState<Completion[]>([])
   const [modelInfo, setModelInfo] = useState<Model | undefined>()
+  const [providerInfo, setProviderInfo] = useState<ProviderInfo | undefined>()
+  const [slots, setSlots] = useState<SlotUsage | undefined>()
   const [items, setItems] = useState<SelectItem<string>[]>([])
   const queue = useRef<string[]>([])
   const [queued, setQueued] = useState(0)
@@ -149,6 +157,7 @@ export function App(props: { options: AppOptions }) {
       app.agent = props.options.agent ?? (state.agent && primaries.includes(state.agent) ? state.agent : (primaries[0] ?? "build"))
       const { defaultModel } = await import("../provider/provider")
       app.model = props.options.model ?? (await defaultModel())
+      void firstRunGuidance(state, config)
       app.mcp = mcpStatus()
       const commands = Object.values(await listCommands())
       setCustomCommands(commands.map((c) => ({ label: "/" + c.name, value: "/" + c.name + " ", description: c.description ?? "custom command" })))
@@ -172,6 +181,19 @@ export function App(props: { options: AppOptions }) {
     return () => clearInterval(timer)
   }, [busy])
 
+  // How many of the server's slots are in use, while a turn runs (llama.cpp / Opereta with /slots enabled).
+  useEffect(() => {
+    if (!busy || !providerInfo?.local || providerInfo.protocol !== "openai" || !providerInfo.baseURL) return setSlots(undefined)
+    let cancelled = false
+    const poll = () => void probeSlots(providerInfo.baseURL!, providerInfo.apiKey).then((u) => !cancelled && setSlots(u))
+    poll()
+    const timer = setInterval(poll, 3000)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [busy, providerInfo?.id, providerInfo?.baseURL])
+
   // branch and change count in the status bar: on start, after every turn, and now and then
   // (the user may commit or switch branches in another terminal)
   useEffect(() => {
@@ -187,8 +209,16 @@ export function App(props: { options: AppOptions }) {
     let cancelled = false
     if (!app.model) return setModelInfo(undefined)
     getModel(app.model.providerID, app.model.modelID).then(
-      (m) => !cancelled && setModelInfo(m.model),
-      () => !cancelled && setModelInfo(undefined),
+      (m) => {
+        if (cancelled) return
+        setModelInfo(m.model)
+        setProviderInfo(m.provider)
+      },
+      () => {
+        if (cancelled) return
+        setModelInfo(undefined)
+        setProviderInfo(undefined)
+      },
     )
     return () => {
       cancelled = true
@@ -220,6 +250,25 @@ export function App(props: { options: AppOptions }) {
     app.session = session
     app.messages = []
     return session.id
+  }
+
+  /**
+   * First start with nothing chosen: say which local server is being used, or what to start. Deberopa's
+   * main job is local models, so "no model" is answered with how to get one, not with a key prompt.
+   */
+  const firstRunGuidance = async (state: { model?: unknown }, config: { model?: string }) => {
+    try {
+      if (props.options.model || config.model || state.model) return
+      if (app.model) {
+        const found = (await allProviders())[app.model.providerID]
+        if (found?.local) app.showToast(`Using ${app.model.modelID} on ${found.name} (local). /models to change, /local for details.`, "info", 9000)
+        return
+      }
+      const servers = await detectLocalServers({}, 1500)
+      setDialog({ type: "text", title: "Welcome to Deberopa", markdown: localServersMarkdown(servers, lastDetectFailures()) })
+    } catch {
+      // guidance is a courtesy; never block start
+    }
   }
 
   const send = async (text: string) => {
@@ -350,6 +399,40 @@ export function App(props: { options: AppOptions }) {
       case "mcp":
       case "status":
         return status()
+      case "local": {
+        app.showToast("Looking for local model servers…")
+        const servers = await detectLocalServers({}, 1500)
+        return setDialog({ type: "text", title: "Local models", markdown: localServersMarkdown(servers, lastDetectFailures()) })
+      }
+      case "toolcheck": {
+        if (!app.model) return app.showToast("No model selected. /models or /connect first.", "error")
+        const ref = app.model
+        app.showToast(`Asking ${ref.modelID} to call a tool…`, "info", 20000)
+        const result = await toolCheckModel(ref.providerID, ref.modelID)
+        return setDialog({ type: "text", title: `Tool calls: ${ref.providerID}/${ref.modelID}`, markdown: toolCheckSummary(result) })
+      }
+      case "pull": {
+        const model = args.trim()
+        if (!validPullName(model)) return app.showToast("Usage: /pull <model>, for example /pull qwen3:8b", "error")
+        const providers = Object.values(await allProviders()).filter((p) => p.protocol === "ollama" && p.baseURL)
+        const target = providers.find((p) => p.id === app.model?.providerID) ?? providers[0]
+        if (!target) return app.showToast("No Ollama server is configured or running. Start Ollama first (/local shows how).", "error", 8000)
+        app.showToast(`Downloading ${model}…`, "info", 60000)
+        let last = 0
+        try {
+          await pullOllamaModel(target.id, model, (p) => {
+            const now = Date.now()
+            if (now - last < 700 && !p.done) return
+            last = now
+            const pct = p.total && p.completed !== undefined ? ` ${Math.round((p.completed / p.total) * 100)}%` : ""
+            app.showToast(`${model}: ${p.status}${pct}`, "info", 60000)
+          })
+          app.showToast(`${model} is ready. /models to switch to it.`, "info", 8000)
+        } catch (err) {
+          app.showToast(err instanceof Error ? err.message : String(err), "error", 10000)
+        }
+        return
+      }
       case "trust": {
         const root = project().worktree
         if (await isTrusted(root)) return app.showToast("This project is already trusted.")
@@ -650,7 +733,13 @@ export function App(props: { options: AppOptions }) {
   }
 
   const modelLabel = modelInfo?.name ?? app.model?.modelID ?? "no model · /connect"
+  const lastReply = useMemo(() => app.messages.findLast((m): m is AssistantMessage => m.role === "assistant" && !!m.time.completed && m.tokens.output > 0), [app.version])
+  const speed = lastReply ? generationSpeed(lastReply) : undefined
+  const mode = modelInfo && providerInfo ? modelMode(providerInfo, modelInfo) : undefined
   const right = [
+    mode?.compactPrompt ? "compact" : undefined,
+    slots && slots.total > 0 ? `slots ${slots.busy}/${slots.total}` : undefined,
+    speed ? `${speed.source === "elapsed" ? "~" : ""}${speed.tokensPerSecond.toFixed(speed.tokensPerSecond < 10 ? 1 : 0)} tok/s` : undefined,
     usage.percent !== undefined && usage.tokens > 0 ? `${formatTokens(usage.tokens)} · ${usage.percent}%` : undefined,
     usage.cost > 0 ? `$${usage.cost.toFixed(usage.cost < 1 ? 3 : 2)}` : undefined,
   ]

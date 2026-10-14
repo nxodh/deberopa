@@ -1,6 +1,6 @@
 import { VERSION } from "../global"
 import { createLogger } from "../util/log"
-import { EMPTY_USAGE, ProviderError, type FinishReason, type StreamEvent, type StreamInput, type Usage } from "./types"
+import { EMPTY_USAGE, ProviderError, type FinishReason, type StreamEvent, type StreamInput, type Timings, type Usage } from "./types"
 import { describeTlsError, hostOf, tlsInit } from "./tls"
 
 const log = createLogger("ollama")
@@ -186,6 +186,7 @@ export async function* streamOllama(input: StreamInput): AsyncGenerator<StreamEv
 
   const estimated = estimatePromptTokens(body as { messages: unknown; tools: unknown })
   let usage: Usage = { ...EMPTY_USAGE }
+  let timings: Timings | undefined
   let reason: FinishReason = "stop"
   let calls = 0
   let thinking = false
@@ -230,13 +231,20 @@ export async function* streamOllama(input: StreamInput): AsyncGenerator<StreamEv
     if (line.done) {
       const reported = line.prompt_eval_count ?? 0
       usage = { ...EMPTY_USAGE, input: Math.max(reported, estimated), output: line.eval_count ?? 0 }
+      // Ollama reports nanoseconds.
+      const generationMs = Number(line.eval_duration) / 1e6
+      const promptMs = Number(line.prompt_eval_duration) / 1e6
+      timings = {
+        ...(Number.isFinite(promptMs) && promptMs >= 0 ? { promptMs } : {}),
+        ...(Number.isFinite(generationMs) && generationMs > 0 ? { generationMs } : {}),
+      }
       if (line.done_reason === "length") reason = "length"
       // The prompt exactly filled the window: Ollama has already dropped the oldest part of it.
       if (usage.input >= ctx - 8) log.warn(`prompt filled the whole ${ctx}-token window of ${model.id}; older context was truncated`)
     }
   }
   if (thinking) yield { type: "reasoning-end" }
-  yield { type: "finish", reason: calls > 0 && reason !== "length" ? "tool-calls" : reason, usage }
+  yield { type: "finish", reason: calls > 0 && reason !== "length" ? "tool-calls" : reason, usage, timings }
 }
 
 export const __test = { buildBody, toMessages, estimatePromptTokens }

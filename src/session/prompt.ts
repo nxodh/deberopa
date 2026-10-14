@@ -504,11 +504,13 @@ async function runStep(input: StepInput): Promise<{ next: "continue" | "stop" | 
             }
             part.state = { status: "pending", input: event.input }
             if (event.meta) part.meta = event.meta
+            if (event.viaText) part.viaText = true
             executions.push(execute(part, tools.find((t) => t.id === event.name), event.input, event.invalid))
             break
           }
           case "finish": {
             assistant.tokens = event.usage
+            if (event.timings) assistant.timings = event.timings
             assistant.cost = costOf(model, event.usage)
             assistant.raw = event.raw
             finish = event.reason

@@ -34,7 +34,7 @@ export async function main(argv: string[]): Promise<number> {
     return 1
   }
   if (selected.length === 0) {
-    process.stdout.write("No providers with credentials. Run `deberopa auth login`, or use --all to list everything.\n")
+    process.stdout.write("No models available. Start a local server (`deberopa local` shows how), run `deberopa auth login` for a hosted one, or use --all to list everything.\n")
     return 0
   }
   for (const provider of selected) {
