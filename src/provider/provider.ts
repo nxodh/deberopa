@@ -3,6 +3,7 @@ import { allCredentials } from "../auth/auth"
 import { detectLocalServers, discoverOpenAIModels, fetchDiparnuxInfo, isLocalURL, lastDetectFailures, localAPIKey, type DetectedModel } from "./local"
 import { getCatalog, type CatalogModel, type CatalogProvider } from "./models"
 import { registerSecret } from "../util/redact"
+import { loadProviderCA, TlsConfigError } from "./tls"
 import { createLogger } from "../util/log"
 import type { Model, ProviderInfo } from "./types"
 
@@ -106,6 +107,23 @@ async function build(): Promise<Record<string, ProviderInfo>> {
     }
 
     registerSecret(apiKey)
+
+    // `options.ca`: trust exactly these authorities for this provider. A file that cannot be used
+    // makes the provider unusable; it never falls back to the system store.
+    let tls: ProviderInfo["tls"]
+    let tlsSources: ProviderInfo["tlsSources"]
+    let problem: string | undefined
+    if (override?.options?.ca !== undefined) {
+      try {
+        const loaded = await loadProviderCA(override.options.ca, id)
+        tls = loaded.tls
+        tlsSources = loaded.sources
+      } catch (err) {
+        problem = err instanceof TlsConfigError ? err.message : `provider.${id}.options.ca: ${err instanceof Error ? err.message : String(err)}`
+        log.warn(`provider ${id}: ${problem}`)
+        source = "none"
+      }
+    }
     const models: Record<string, Model> = {}
     for (const [modelID, model] of Object.entries(entry?.models ?? {})) {
       if (model.status === "deprecated") continue
@@ -129,8 +147,11 @@ async function build(): Promise<Record<string, ProviderInfo>> {
       headers: override?.options?.headers,
       timeout: override?.options?.timeout,
       source,
-      local: isLocalURL(baseURL),
+      // a server with its own CA is one the user runs or was given: treat it like a local one
+      local: isLocalURL(baseURL) || !!tls,
       models,
+      ...(tls ? { tls, tlsSources } : {}),
+      ...(problem ? { problem } : {}),
     }
   }
 
@@ -198,11 +219,11 @@ async function addLocalProviders(result: Record<string, ProviderInfo>, config: A
 
   await Promise.all(
     configured.map(async ([id, provider]) => {
-      if (!provider.baseURL || !probing) return
+      if (!provider.baseURL || !probing || provider.problem) return
 
       // providers configured by URL only: ask the server what it has
       if (Object.keys(provider.models).length === 0 && provider.protocol !== "ollama") {
-        const found = await discoverOpenAIModels(provider.baseURL, provider.headers, provider.apiKey)
+        const found = await discoverOpenAIModels(provider.baseURL, provider.headers, provider.apiKey, undefined, provider.tls)
         for (const d of found) {
           provider.models[d.id] = detectedToModel(id, d, config.provider?.[id]?.models?.[d.id])
           if (d.context === undefined && config.provider?.[id]?.models?.[d.id]?.limit?.context === undefined) assumedContext.add(`${id}/${d.id}`)
@@ -214,7 +235,7 @@ async function addLocalProviders(result: Record<string, ProviderInfo>, config: A
       // machine or its network (never a hosted API), without credentials, and only to fill in a
       // guess: a window written in the config always wins.
       if (config.local_detect === false || provider.protocol === "ollama") return
-      const info = await fetchDiparnuxInfo(provider.baseURL)
+      const info = await fetchDiparnuxInfo(provider.baseURL, undefined, undefined, provider.tls)
       if (!info) return
       provider.diparnux = info
       if (!info.ctxPerSlot) return
@@ -303,6 +324,7 @@ export async function getModel(providerID: string, modelID: string): Promise<{ p
     }
     throw new ModelNotFoundError(providerID, modelID, `Unknown provider "${providerID}". Run \`vedecaps models\` to list what is available.`)
   }
+  if (provider.problem) throw new ModelNotFoundError(providerID, modelID, `${provider.name} cannot be used: ${provider.problem}`)
   if (provider.source === "none") {
     throw new ModelNotFoundError(
       providerID,

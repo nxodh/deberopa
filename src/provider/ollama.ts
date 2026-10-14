@@ -1,6 +1,7 @@
 import { VERSION } from "../global"
 import { createLogger } from "../util/log"
 import { EMPTY_USAGE, ProviderError, type FinishReason, type StreamEvent, type StreamInput, type Usage } from "./types"
+import { describeTlsError, hostOf, tlsInit } from "./tls"
 
 const log = createLogger("ollama")
 
@@ -159,6 +160,7 @@ export async function* streamOllama(input: StreamInput): AsyncGenerator<StreamEv
   try {
     response = await fetch(`${baseURL}/api/chat`, {
       redirect: "error",
+      ...tlsInit(provider.tls),
       method: "POST",
       headers,
       body: JSON.stringify(body),
@@ -168,6 +170,8 @@ export async function* streamOllama(input: StreamInput): AsyncGenerator<StreamEv
     if (input.signal?.aborted || (err instanceof Error && err.name === "AbortError")) {
       throw Object.assign(new Error("Aborted"), { name: "AbortError" })
     }
+    const advice = describeTlsError(err, { providerID: provider.id, host: hostOf(baseURL), hasCA: !!provider.tls })
+    if (advice) throw new ProviderError(`Could not connect to Ollama at ${baseURL}: ${advice}`, { kind: "network", retryable: false })
     throw new ProviderError(`Could not reach Ollama at ${baseURL}. Is it running? Start it with: ollama serve`, { kind: "network", retryable: false })
   }
 

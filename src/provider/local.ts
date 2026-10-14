@@ -1,6 +1,7 @@
 import { VERSION } from "../global"
 import { createLogger } from "../util/log"
 import { registerSecret } from "../util/redact"
+import { tlsInit, type ProviderTls } from "./tls"
 
 const log = createLogger("local")
 
@@ -107,15 +108,17 @@ export interface ProbeResult {
   status: number
   json?: any
   headers?: Headers
+  /** What `fetch` threw, when nothing answered. Kept for certificate diagnostics; may name the URL, so print it through `redact`. */
+  error?: unknown
 }
 
 /**
  * One GET/POST with a deadline. Never throws. Redirects are errors: a probe that carries a key
  * must not be bounced to another host. The body is only parsed for 2xx answers.
  */
-export async function probe(url: string, timeoutMs: number, init: RequestInit = {}, opts: { jsonOnly?: boolean } = {}): Promise<ProbeResult> {
+export async function probe(url: string, timeoutMs: number, init: RequestInit = {}, opts: { jsonOnly?: boolean; tls?: ProviderTls } = {}): Promise<ProbeResult> {
   try {
-    const res = await fetch(url, { ...init, redirect: "error", signal: AbortSignal.timeout(timeoutMs), headers: { "User-Agent": `vedecaps/${VERSION}`, ...init.headers } })
+    const res = await fetch(url, { ...init, ...tlsInit(opts.tls), redirect: "error", signal: AbortSignal.timeout(timeoutMs), headers: { "User-Agent": `vedecaps/${VERSION}`, ...init.headers } })
     if (!res.ok) return { ok: false, status: res.status, headers: res.headers }
     // An endpoint that is merely "something that answers 200" (a catch-all proxy, a streaming
     // mock) is not worth waiting for: do not read a body that cannot be what we asked for.
@@ -128,13 +131,13 @@ export async function probe(url: string, timeoutMs: number, init: RequestInit = 
     } catch {
       return { ok: true, status: res.status, headers: res.headers }
     }
-  } catch {
-    return { ok: false, status: 0 }
+  } catch (error) {
+    return { ok: false, status: 0, error }
   }
 }
 
-async function getJSON(url: string, timeoutMs: number, init: RequestInit = {}): Promise<any | undefined> {
-  const result = await probe(url, timeoutMs, init)
+async function getJSON(url: string, timeoutMs: number, init: RequestInit = {}, tls?: ProviderTls): Promise<any | undefined> {
+  const result = await probe(url, timeoutMs, init, { tls })
   return result.ok ? result.json : undefined
 }
 
@@ -190,8 +193,8 @@ export function parseDiparnuxInfo(json: unknown, headerVersion?: string | null):
 }
 
 /** GET {root}/diparnux/info. Sent without credentials: the contract makes it public. */
-export async function fetchDiparnuxInfo(root: string, timeoutMs = 700, headerVersion?: string | null): Promise<DiparnuxInfo | undefined> {
-  const result = await probe(`${root.replace(/\/+$/, "").replace(/\/v1$/, "")}/diparnux/info`, timeoutMs, {}, { jsonOnly: true })
+export async function fetchDiparnuxInfo(root: string, timeoutMs = 700, headerVersion?: string | null, tls?: ProviderTls): Promise<DiparnuxInfo | undefined> {
+  const result = await probe(`${root.replace(/\/+$/, "").replace(/\/v1$/, "")}/diparnux/info`, timeoutMs, {}, { jsonOnly: true, tls })
   return parseDiparnuxInfo(result.ok ? result.json : undefined, headerVersion)
 }
 
@@ -387,9 +390,9 @@ export async function detectLocalServers(endpoints: LocalEndpoints = {}, timeout
 }
 
 /** Model ids of any OpenAI-compatible server, for providers configured by URL only. */
-export async function discoverOpenAIModels(baseURL: string, headers: Record<string, string> = {}, apiKey?: string, timeoutMs = 1500): Promise<DetectedModel[]> {
+export async function discoverOpenAIModels(baseURL: string, headers: Record<string, string> = {}, apiKey?: string, timeoutMs = 1500, tls?: ProviderTls): Promise<DetectedModel[]> {
   const auth: Record<string, string> = apiKey ? { authorization: `Bearer ${apiKey}` } : {}
-  const listed = await getJSON(`${baseURL.replace(/\/+$/, "")}/models`, timeoutMs, { headers: { ...headers, ...auth } })
+  const listed = await getJSON(`${baseURL.replace(/\/+$/, "")}/models`, timeoutMs, { headers: { ...headers, ...auth } }, tls)
   const rows: any[] = Array.isArray(listed?.data) ? listed.data : Array.isArray(listed?.models) ? listed.models : []
   const out: DetectedModel[] = []
   for (const m of rows) {

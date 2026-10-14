@@ -88,13 +88,18 @@ export function stripUntrusted(input: Config): { config: Config; blocked: string
     delete config.plugin
   }
 
-  // Endpoints and header/env lookups decide where an API key is sent.
+  // Endpoints and header/env lookups decide where an API key is sent; a CA decides who may receive it.
   for (const [id, provider] of Object.entries(config.provider ?? {})) {
     const moved: string[] = []
     if (provider.api) moved.push("api")
     if (provider.env) moved.push("env")
     if (provider.options?.baseURL) moved.push("baseURL")
     if (provider.options?.headers) moved.push("headers")
+    // A repository must not decide which certificate authority this machine trusts.
+    if (provider.options?.ca !== undefined) {
+      blocked.push(`provider.${id}.ca (decides which servers are trusted)`)
+      delete provider.options.ca
+    }
     if (moved.length) {
       blocked.push(`provider.${id}.${moved.join("/")} (decides where requests and keys go)`)
       delete provider.api

@@ -58,7 +58,7 @@ The full reference (configuration, permissions, commands, HTTP routes) is in the
 - **Language servers on request**: TypeScript, Pyright, gopls and rust-analyzer are offered for installation (with consent, into Vedecaps' own directory).
 - **Project trust**: an untrusted repository's config cannot start programs, route requests/keys elsewhere, or silence permission prompts until you run `vedecaps trust`.
 - **Plugins**: local JS/TS files adding tools and hooks (`tool.execute.before/after`, `chat.system`, `event`); work in the compiled binary without Node or Bun.
-- **SDK** (`sdk/js`), **ACP server** (`vedecaps acp`, for Zed and other editors), **VS Code extension** (`ide/vscode`), **GitHub Action** (`uses: nxodh/vedecaps@v0.1.4`).
+- **SDK** (`sdk/js`), **ACP server** (`vedecaps acp`, for Zed and other editors), **VS Code extension** (`ide/vscode`), **GitHub Action** (`uses: nxodh/vedecaps@v0.1.5`).
 - `@file#L10-20` mentions attach only those lines.
 
 The Korean README documents all of these in detail.
@@ -91,6 +91,30 @@ Pushing a `v*` tag that matches `package.json` builds and publishes a release.
 ## License
 
 [MIT](LICENSE)
+
+## Added in 0.1.5
+
+`provider.<id>.options.ca` trusts a private certificate authority for one HTTPS server (for Diparnux: the file `diparnux tls ca` prints). It is a PEM file path, a list of paths, or inline PEM; `~` is the home directory and relative paths are relative to the config file the setting is in. Verification and host-name checks cannot be turned off.
+
+```jsonc
+{ "provider": { "diparnux": { "api": "https://spark.local:8444/v1", "options": { "ca": "~/.config/vedecaps/diparnux-ca.pem" } } } }
+```
+
+- A provider with `ca` trusts **only** those authorities (Bun's `tls.ca` replaces the system store), for chat requests, model listing, `/diparnux/info` and the tool check alike.
+- A `ca` file that is missing, unreadable or not a PEM certificate makes that provider **unusable**, with the reason in `vedecaps debug` and in errors. There is no silent fall back to the system store.
+- A project that is not trusted cannot set `options.ca`; it is ignored and listed by `vedecaps debug`.
+- HTTP to HTTPS redirects are still never followed, and auto-detected loopback servers stay on plain `http://127.0.0.1`.
+- If the CA uses name constraints, constrain DNS names only: Bun cannot verify a leaf with an IP address name under a CA that has IP constraints (`UNSUPPORTED_CONSTRAINT_TYPE`).
+
+| Message | Meaning | Fix |
+|---|---|---|
+| `The certificate of … is not trusted` | the server's CA is unknown | set `options.ca` to the server's CA file (Diparnux: `diparnux tls ca`) |
+| `… is not signed by a CA listed in …options.ca` | that CA did not sign this server's certificate | check you have the right CA file |
+| `The certificate does not cover <host>` | the name or address you used is not in the certificate | connect with a listed name (Diparnux: `diparnux tls status`) |
+| `The certificate of … has expired` | validity ended | renew on the server (`diparnux tls renew`), check both clocks |
+| `cannot read … The provider is not used…` | problem with the `ca` file | check the path and the PEM format |
+
+`vedecaps debug local` shows `TLS: certificate accepted, trusted by ca.pem` and the CA's SHA-256 fingerprint (`AA:BB:…`) for providers with `ca` or an HTTPS address; compare it with what the server prints.
 
 ## Added in 0.1.4
 

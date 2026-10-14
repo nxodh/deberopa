@@ -1,4 +1,7 @@
-import { detectLocalServers, diparnuxUsable, lastDetectFailures, localAPIKey, ollamaBaseURL, type LocalEndpoints, type LocalServer } from "../../provider/local"
+import { detectLocalServers, diparnuxUsable, fetchDiparnuxInfo, lastDetectFailures, localAPIKey, ollamaBaseURL, probe, type LocalEndpoints, type LocalServer } from "../../provider/local"
+import { describeTlsError, hostOf } from "../../provider/tls"
+import { redact } from "../../util/redact"
+import type { ProviderInfo } from "../../provider/types"
 import { checkToolCalling, type ToolCheckResult } from "../../provider/toolcheck"
 
 export interface LocalDebugOptions {
@@ -6,6 +9,8 @@ export interface LocalDebugOptions {
   endpoints?: LocalEndpoints
   /** Send one model request per server to see whether tool calls work. Generates tokens, so opt-in. */
   checkTools?: boolean
+  /** Providers from the config (the CLI passes all of them). Those with their own CA or an HTTPS address get a section. */
+  providers?: ProviderInfo[]
   out: (line?: string) => void
   timeoutMs?: number
 }
@@ -51,6 +56,59 @@ function serverLines(server: LocalServer): string[] {
   return lines
 }
 
+/** Configured servers that are reached over HTTPS or carry their own CA: certificate state first, then what the server says. */
+function wantsCertificateReport(p: ProviderInfo): boolean {
+  if (p.protocol === "anthropic") return false
+  if (p.problem || p.tls) return true
+  return !!p.local && /^https:/i.test(p.baseURL ?? "")
+}
+
+async function reportConfigured(p: ProviderInfo, opts: LocalDebugOptions): Promise<void> {
+  const { out } = opts
+  const timeout = opts.timeoutMs ?? 1500
+  out("")
+  out(`${p.name}  ${p.baseURL ?? "(no address)"}  (configured as ${p.id}, ${p.protocol} protocol)`)
+  if (p.problem) {
+    out(`  TLS: ! ${redact(p.problem)}`)
+    out("    this provider is not used until the file is fixed; it does not fall back to the system certificate store")
+    return
+  }
+  const baseURL = p.baseURL ?? ""
+  const root = baseURL.replace(/\/+$/, "").replace(/\/v1$/, "")
+  const auth: Record<string, string> = p.apiKey ? { authorization: `Bearer ${p.apiKey}` } : {}
+  const reached = await probe(`${root}/diparnux/info`, timeout, {}, { jsonOnly: true, tls: p.tls })
+  if (reached.status === 0) {
+    const advice = describeTlsError(reached.error, { providerID: p.id, host: hostOf(baseURL), hasCA: !!p.tls })
+    out(`  TLS: ! ${advice ?? "no answer (is the server running, and is the address and port right?)"}`)
+    return
+  }
+  if (p.tls && p.tlsSources) {
+    for (const source of p.tlsSources) {
+      out(`  TLS: certificate accepted, trusted by ${source.label}`)
+      for (const fp of source.fingerprints) out(`    CA SHA-256 ${fp}`)
+    }
+  } else if (/^https:/i.test(baseURL)) out("  TLS: certificate accepted (system certificate store)")
+  else out("  TLS: not used (plain http)")
+
+  const info = await fetchDiparnuxInfo(root, timeout, undefined, p.tls)
+  for (const line of serverLines({ diparnux: info } as LocalServer)) out(line)
+  const listed = await probe(`${baseURL.replace(/\/+$/, "")}/models`, timeout, { headers: { ...p.headers, ...auth } }, { tls: p.tls })
+  if (listed.status === 401 || listed.status === 403) out(`  the server answered ${listed.status}: it needs an API key (set DIPARNUX_API_KEY or LLAMA_API_KEY, or options.apiKey)`)
+  const models = Object.values(p.models)
+  if (models.length === 0 && listed.status !== 401 && listed.status !== 403) out("  no models listed")
+  for (const m of models.slice(0, 20)) out(`  ${m.id.padEnd(34)} ${n(m.limit.context)} ctx`.trimEnd())
+  if (p.maxConcurrency) out(`  at most ${p.maxConcurrency} requests at once${p.maxConcurrencySource === "diparnux" ? " (from the gateway's slots)" : ""}`)
+
+  if (opts.checkTools && p.protocol !== "ollama") {
+    const first = (info?.model && p.models[info.model] ? info.model : models[0]?.id)
+    if (!first) out("  tool call check: no model to try")
+    else {
+      const result = await checkToolCalling({ baseURL, model: first, apiKey: p.apiKey, headers: p.headers, tls: p.tls, providerID: p.id })
+      for (const line of toolCheckLines(result)) out(line)
+    }
+  }
+}
+
 /** The `vedecaps debug local` report. Returns an exit code. */
 export async function runLocalDebug(opts: LocalDebugOptions): Promise<number> {
   const { out } = opts
@@ -65,7 +123,11 @@ export async function runLocalDebug(opts: LocalDebugOptions): Promise<number> {
     if (localAPIKey()) out("  A key is set in the environment but the server did not accept it.")
   }
 
+  const configured = (opts.providers ?? []).filter(wantsCertificateReport)
+  for (const p of configured) await reportConfigured(p, opts)
+
   if (servers.length === 0) {
+    if (configured.length) return 0
     out("")
     if (refused.length === 0) {
       out("None found. Start one and run this again:")

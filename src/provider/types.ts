@@ -1,6 +1,7 @@
 import type { JSONSchema } from "../tool/tool"
 import { redact } from "../util/redact"
 import type { DiparnuxInfo } from "./local"
+import type { CaSource, ProviderTls } from "./tls"
 
 export interface Model {
   id: string
@@ -42,6 +43,12 @@ export interface ProviderInfo {
   maxConcurrencySource?: "config" | "diparnux"
   /** Set when `options.max_concurrency` was present but unusable (so `debug` can say why). */
   maxConcurrencyIgnored?: string
+  /** The CAs this provider trusts instead of the system store (`options.ca`). Passed to every request to it. */
+  tls?: ProviderTls
+  /** Where those CAs came from, for `debug`. */
+  tlsSources?: CaSource[]
+  /** The provider cannot be used, and why. Set when `options.ca` is unusable; there is no fallback. */
+  problem?: string
 }
 
 export type UserContent = { type: "text"; text: string } | { type: "image"; mime: string; data: string }

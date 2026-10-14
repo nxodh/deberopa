@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.5
+
+- VE2: `provider.<id>.options.ca` (PEM file path, list of paths, or inline PEM) makes a provider trust a private certificate authority for its HTTPS server. `~` is the home directory; a relative path is relative to the config file it was written in (`VEDECAPS_CONFIG_CONTENT`: the current directory). The file is read when providers are built. A provider with `ca` trusts only those authorities, for chat, model listing, `/diparnux/info` and the tool check. A file that is missing, unreadable or not a PEM certificate makes the provider unusable (shown by `vedecaps debug` and in errors) and never falls back to the system store. There is no option to disable certificate or host-name verification.
+- Certificate failures now say what to do (untrusted CA, wrong name, expired, bad `ca` file) and are not retried. Redirects are still never followed.
+- `options.ca` in a project that is not trusted is ignored and listed as blocked; the global config's value is kept.
+- `vedecaps debug local` reports certificate state and the CA's SHA-256 fingerprint for HTTPS providers, and `--check-tools` and the slot limit work over HTTPS.
+- Test certificates for the TLS tests live in `test/fixtures/tls/` (marked TEST ONLY; the secret scan allows private keys only there).
+
 ## 0.1.4
 
 - Local servers that need an API key are detected: `DIPARNUX_API_KEY` (then `LLAMA_API_KEY`) is sent as a bearer token to the detected llama.cpp address and to configured local providers. A 401/403 from a server that is there is now reported by `vedecaps debug local` instead of looking like nothing was found. Detection probes do not follow redirects.
