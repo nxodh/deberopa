@@ -19,6 +19,7 @@ class ChatController {
     this.streamAbort = undefined
     this.pendingInsert = []
     this.choices = { agents: [], models: [], defaultModel: undefined }
+    this.local = { servers: [], failures: [] }
     this.selection = context.globalState.get("deberopa.selection", {})
     this.status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100)
     this.status.command = "deberopa.focus"
@@ -36,16 +37,33 @@ class ChatController {
   }
 
   push() {
-    if (this.view) this.view.webview.postMessage({ type: "state", state: this.state, choices: this.choices, selection: this.selection })
+    if (this.view) this.view.webview.postMessage({ type: "state", state: this.state, choices: this.choices, selection: this.selection, local: this.local })
+  }
+
+  async loadLocal() {
+    try {
+      this.local = await this.client.local()
+    } catch {
+      this.local = { servers: [], failures: [] }
+    }
   }
 
   async loadChoices() {
     const [agents, providers] = await Promise.all([this.client.agents(), this.client.providers()])
     this.choices = {
       agents: agents.filter((a) => a.mode !== "subagent" && !a.hidden).map((a) => ({ name: a.name, description: a.description || "" })),
+      // Local model servers come first: running models on your own machine is what this app is for.
       models: providers.providers
         .filter((p) => p.connected)
-        .flatMap((p) => Object.values(p.models).map((m) => ({ value: p.id + "/" + m.id, label: p.name + " · " + m.name }))),
+        .sort((a, b) => Number(!!b.local) - Number(!!a.local))
+        .flatMap((p) =>
+          Object.values(p.models).map((m) => ({
+            value: p.id + "/" + m.id,
+            label: (p.local ? "● " : "") + p.name + " · " + m.name,
+            local: !!p.local,
+            context: m.limit && m.limit.context ? m.limit.context : 0,
+          })),
+        ),
       defaultModel: providers.default ? providers.default.providerID + "/" + providers.default.modelID : undefined,
     }
   }
@@ -80,6 +98,7 @@ class ChatController {
       this.setStatus(`Deberopa ${health.version}`, `Agent server at ${server.baseUrl}`)
       this.startStream()
       await this.loadChoices().catch(() => {})
+      await this.loadLocal()
       return this.client
     })()
     try {
@@ -209,6 +228,11 @@ class ChatController {
         return this.send(message.text)
       case "abort":
         return this.abort()
+      case "rescanLocal":
+        await this.loadLocal()
+        await this.loadChoices().catch(() => {})
+        this.push()
+        return
       case "select":
         if (message.key === "agent" || message.key === "model") {
           this.selection = { ...this.selection, [message.key]: message.value || undefined }

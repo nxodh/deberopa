@@ -6,6 +6,7 @@
   let state = null
   let choices = { agents: [], models: [], defaultModel: undefined }
   let selection = {}
+  let local = { servers: [], failures: [] }
   let notice = ""
 
   const el = (tag, props, ...children) => {
@@ -80,11 +81,35 @@
     return nodes.length || err ? el("div", { class: "msg assistant" }, nodes, err) : null
   }
 
+  // How full the context window is, from the last response's input tokens and the model's limit.
+  function contextUse() {
+    const model = choices.models.find((m) => m.value === (selection.model || choices.defaultModel))
+    const last = [...state.messages].reverse().find((m) => m.role === "assistant" && m.tokens)
+    if (!model || !model.context || !last) return null
+    const used = (last.tokens.input || 0) + (last.tokens.cacheRead || 0) + (last.tokens.output || 0)
+    return { used, limit: model.context, pct: Math.min(100, Math.round((used / model.context) * 100)) }
+  }
+  const compact = (n) => (n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + "k" : String(n))
+
   function picker(key, options, current, label) {
     const select = el("select", { "aria-label": label, onchange: (e) => vscode.postMessage({ type: "select", key, value: e.target.value }) },
       options.map((o) => el("option", { value: o.value }, o.label)))
     select.value = current || ""
     return select
+  }
+
+  function localCard() {
+    const rows = local.servers.map((s) => {
+      const o = s.opereta
+      const detail = o
+        ? ["Opereta " + o.version, o.state, o.slots ? o.slots + " slot" + (o.slots === 1 ? "" : "s") : o.slotsAuto ? "slots auto" : null, o.ctxPerSlot ? compact(o.ctxPerSlot) + " ctx/slot" : null].filter(Boolean).join(" · ")
+        : s.models.length + " model" + (s.models.length === 1 ? "" : "s")
+      return el("div", { class: "srv" }, el("span", { class: "mark" }, "●"), el("span", { class: "name" }, s.name), el("span", { class: "sub" }, detail))
+    })
+    for (const f of local.failures) rows.push(el("div", { class: "srv" }, el("span", { class: "mark" }, "!"), el("span", { class: "name" }, f.id), el("span", { class: "sub" }, "needs an API key (HTTP " + f.status + ")")))
+    return el("div", { class: "local" },
+      el("div", { class: "head" }, el("strong", {}, "Local models"), el("button", { onclick: () => vscode.postMessage({ type: "rescanLocal" }) }, "Rescan")),
+      rows.length ? rows : el("div", { class: "sub" }, "No local server found on the usual ports (Ollama 11434, LM Studio 1234, llama.cpp / Opereta 8080, vLLM 8000)."))
   }
 
   function render() {
@@ -100,8 +125,12 @@
       el("header", {},
         el("span", { class: "title" }, state.title || "Deberopa"),
         state.busy ? el("span", { class: "busy" }, state.retry ? "retrying…" : "working…") : null,
+        (() => {
+          const u = contextUse()
+          return u ? el("span", { class: "busy", title: `Context: ${u.used.toLocaleString()} of ${u.limit.toLocaleString()} tokens` }, `${compact(u.used)}/${compact(u.limit)} · ${u.pct}%`) : null
+        })(),
         el("button", { onclick: () => vscode.postMessage({ type: "newSession" }), title: "New session" }, "New")),
-      el("div", { id: "log" }, messages.length ? messages : el("div", { class: "empty" }, "Ask Deberopa to work on this project.\nUse @file to attach a file.")),
+      el("div", { id: "log" }, messages.length ? messages : [el("div", { class: "empty" }, "Ask Deberopa to work on this project.\nUse @file to attach a file."), localCard()]),
       state.todos.length ? el("div", { class: "todos" }, el("strong", {}, "Todo"), el("ul", {}, state.todos.map((t) => el("li", { class: t.status === "completed" ? "done" : "" }, `${t.status === "completed" ? "● " : t.status === "in_progress" ? "◐ " : "○ "}${t.content}`)))) : null,
       state.permissions.map((p) => el("div", { class: "perm", role: "alert" },
         el("div", { class: "title" }, p.title || `${p.permission} permission`),
@@ -144,7 +173,7 @@
 
   window.addEventListener("message", (event) => {
     const m = event.data
-    if (m.type === "state") { state = m.state; choices = m.choices || choices; selection = m.selection || {}; notice = ""; render() }
+    if (m.type === "state") { local = m.local || local; state = m.state; choices = m.choices || choices; selection = m.selection || {}; notice = ""; render() }
     else if (m.type === "notice") { notice = m.text; render() }
     else if (m.type === "insert") {
       const input = document.getElementById("input")

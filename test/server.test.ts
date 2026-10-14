@@ -145,3 +145,11 @@ test("stats and skills are listed", async () => {
   expect(Array.isArray(skills)).toBe(true)
   expect(JSON.stringify(skills)).not.toContain('"content"')
 })
+
+test("local server detection is exposed and takes no address from the caller", async () => {
+  const res = await call("GET", "/local?llamacpp=http://203.0.113.9:8080")
+  expect(res.status).toBe(200)
+  expect(Array.isArray(res.data.servers)).toBe(true)
+  expect(Array.isArray(res.data.failures)).toBe(true)
+  expect(JSON.stringify(res.data)).not.toContain("203.0.113.9")
+})

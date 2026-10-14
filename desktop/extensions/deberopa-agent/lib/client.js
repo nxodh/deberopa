@@ -69,6 +69,7 @@ class DeberopaClient {
   project() { return this.request("GET", "/project") }
   agents() { return this.request("GET", "/agent") }
   providers() { return this.request("GET", "/provider") }
+  local() { return this.request("GET", "/local") }
   commands() { return this.request("GET", "/command") }
   sessions() { return this.request("GET", "/session") }
   createSession(title) { return this.request("POST", "/session", title ? { title } : {}) }

@@ -20,6 +20,7 @@ import { isTrusted, trustedProjects, trustProject, untrustProject } from "../con
 import { loadConfig, resetConfig } from "../config/config"
 import { listSkills } from "../skill/skill"
 import { usageStats } from "../session/stats"
+import { detectLocalServers, lastDetectFailures } from "../provider/local"
 
 export interface ServerOptions {
   port?: number
@@ -168,6 +169,12 @@ async function route(req: Request): Promise<Response> {
     const query = url.searchParams.get("query") ?? ""
     const files = await listFiles({ cwd: project().directory, limit: 20_000 })
     return json(fuzzyFilter(query, files, (f) => f, Number(url.searchParams.get("limit") ?? 50)))
+  }
+  // Local model servers on this machine (Ollama, LM Studio, llama.cpp / Opereta, vLLM): what `deberopa debug local` finds.
+  // The probe addresses are fixed on purpose: a caller must not be able to aim the local API key at another host.
+  if (is("GET", "local")) {
+    const servers = await detectLocalServers()
+    return json({ servers: servers.map((s) => ({ ...s, models: Object.values(s.models) })), failures: lastDetectFailures(), disabled: !!process.env.DEBEROPA_DISABLE_LOCAL_DETECT })
   }
   if (is("GET", "skill")) return json(Object.values(await listSkills()).map(({ content: _content, ...rest }) => rest))
   if (is("GET", "stats")) {
