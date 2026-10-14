@@ -1,5 +1,5 @@
 // Builds Deberopa Desktop from the pinned Code - OSS source.
-//   node desktop/script/build.mjs --work <dir> [--target linux-x64|win32-x64] [--stage fetch|patch|install|compile|package|all]
+//   node desktop/script/build.mjs --work <dir> [--target linux-x64|win32-x64] [--stage fetch|patch|install|compile|package|bundle-cli|all] [--cli <deberopa executable>]
 // Runs the same way on Debian 13 and Windows 11. No POSIX tools are used.
 import { spawnSync } from "node:child_process"
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
@@ -39,7 +39,8 @@ function out(cmd, cmdArgs, cwd = src) {
   if (r.status !== 0) throw new Error(`${cmd} ${cmdArgs.join(" ")}: ${r.stderr}`)
   return r.stdout.trim()
 }
-const want = (s) => stage === "all" || stage === s
+// "all" is fetch, patch, install and package, plus bundle-cli when --cli is given. compile is only for checking the sources.
+const want = (s) => stage === s || (stage === "all" && s !== "compile" && (s !== "bundle-cli" || opt("cli") !== undefined))
 
 if (process.version.split(".")[0] !== `v${pin.node.split(".")[0]}`) {
   console.error(`Node ${pin.node} is required, found ${process.version}`)
@@ -72,6 +73,9 @@ if (want("patch")) {
     // Files that are removed or replaced wholesale live in desktop/overlay and are copied over the tree.
     const overlay = join(desktop, "overlay")
     if (existsSync(overlay)) cpSync(overlay, src, { recursive: true })
+    // Built-in extensions written for Deberopa Desktop (desktop/extensions/*) join the upstream ones.
+    const own = join(desktop, "extensions")
+    if (existsSync(own)) for (const name of readdirSync(own)) cpSync(join(own, name), join(src, "extensions", name), { recursive: true })
     // Product identity: merge desktop/branding/product.json over the upstream product.json.
     const upstream = JSON.parse(readFileSync(join(src, "product.json"), "utf8"))
     const brand = JSON.parse(readFileSync(join(desktop, "branding", "product.json"), "utf8"))
@@ -85,7 +89,20 @@ if (want("patch")) {
 
 if (want("install")) run(npm, ["ci"])
 if (want("compile")) run(npm, ["run", "compile-client"])
+const packaged = join(work, `VSCode-${target}`)
 if (want("package")) {
   run(npm, ["run", "gulp", `vscode-${target}-min`])
-  console.log(`\npackaged: ${join(work, `VSCode-${target}`)}`)
+  console.log(`\npackaged: ${packaged}`)
+}
+if (want("bundle-cli")) {
+  // The agent extension starts the CLI that ships next to the app (resources/deberopa/deberopa[.exe]).
+  const cli = opt("cli")
+  if (!cli || !existsSync(cli)) {
+    console.error("--cli <path to the deberopa executable for this target> is required for the bundle-cli stage")
+    process.exit(2)
+  }
+  const dest = join(packaged, "resources", "deberopa")
+  mkdirSync(dest, { recursive: true })
+  cpSync(cli, join(dest, target === "win32-x64" ? "deberopa.exe" : "deberopa"))
+  console.log(`bundled CLI: ${dest}`)
 }

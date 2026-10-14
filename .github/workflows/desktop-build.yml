@@ -25,9 +25,13 @@ jobs:
           - name: Debian 13 x64
             os: ubuntu-latest
             target: linux-x64
+            cli: linux-x64
+            exe: deberopa
           - name: Windows 11 x64
             os: windows-latest
             target: win32-x64
+            cli: windows-x64
+            exe: deberopa.exe
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,8 +42,12 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libx11-dev libxkbfile-dev libsecret-1-dev libkrb5-dev pkg-config
       - name: Fetch, patch and install
         run: node desktop/script/build.mjs --work ${{ runner.temp }}/deberopa-desktop --target ${{ matrix.target }} --stage fetch && node desktop/script/build.mjs --work ${{ runner.temp }}/deberopa-desktop --target ${{ matrix.target }} --stage patch && node desktop/script/build.mjs --work ${{ runner.temp }}/deberopa-desktop --target ${{ matrix.target }} --stage install
+      - name: Build the CLI that ships inside the app
+        run: npm ci && npx bun run script/build.ts --target ${{ matrix.cli }}
       - name: Package
         run: node desktop/script/build.mjs --work ${{ runner.temp }}/deberopa-desktop --target ${{ matrix.target }} --stage package
+      - name: Bundle the CLI
+        run: node desktop/script/build.mjs --work ${{ runner.temp }}/deberopa-desktop --target ${{ matrix.target }} --stage bundle-cli --cli dist/${{ matrix.cli }}/${{ matrix.exe }}
       - name: Check the packaged product
         run: node desktop/script/check-product.mjs ${{ runner.temp }}/deberopa-desktop/VSCode-${{ matrix.target }}
       - name: Size of the packaged app
@@ -51,8 +59,12 @@ jobs:
           sudo apt-get install -y --no-install-recommends xvfb libgbm1 libasound2t64 libgtk-3-0t64 libnss3 libxss1 libxkbfile1 >/dev/null
           APP="${{ runner.temp }}/deberopa-desktop/VSCode-linux-x64"
           "$APP/bin/deberopa-desktop" --version --no-sandbox
-          xvfb-run -a "$APP/bin/deberopa-desktop" --no-sandbox --user-data-dir "$RUNNER_TEMP/ud" --extensions-dir "$RUNNER_TEMP/ex" --list-extensions --show-versions
-          ls "$APP/resources/app/extensions" | wc -l
+          "$APP/resources/deberopa/deberopa" --version
+          xvfb-run -a "$APP/bin/deberopa-desktop" --no-sandbox --user-data-dir "$RUNNER_TEMP/ud" --extensions-dir "$RUNNER_TEMP/ex" --list-extensions --show-versions | tee "$RUNNER_TEMP/exts.txt"
+          test -f "$APP/resources/app/extensions/deberopa-agent/package.json"
+          test -f "$APP/resources/app/extensions/deberopa-agent/extension.js"
+          test ! -e "$APP/resources/app/extensions/copilot"
+          ! grep -qi copilot "$RUNNER_TEMP/exts.txt"
       - name: Run the packaged app (Windows)
         if: matrix.target == 'win32-x64'
         shell: pwsh
@@ -60,4 +72,9 @@ jobs:
           $app = "${{ runner.temp }}\deberopa-desktop\VSCode-win32-x64"
           Get-ChildItem $app | Select-Object -First 30 | Format-Table Name, Length
           & "$app\bin\deberopa-desktop.cmd" --version
-          & "$app\bin\deberopa-desktop.cmd" --user-data-dir "$env:RUNNER_TEMP\ud" --extensions-dir "$env:RUNNER_TEMP\ex" --list-extensions --show-versions
+          & "$app\resources\deberopa\deberopa.exe" --version
+          $exts = & "$app\bin\deberopa-desktop.cmd" --user-data-dir "$env:RUNNER_TEMP\ud" --extensions-dir "$env:RUNNER_TEMP\ex" --list-extensions --show-versions
+          $exts
+          if (-not (Test-Path "$app\resources\app\extensions\deberopa-agent\extension.js")) { throw "deberopa-agent is not built in" }
+          if (Test-Path "$app\resources\app\extensions\copilot") { throw "the Copilot extension is present" }
+          if ($exts -match 'copilot') { throw "a Copilot extension is listed" }
