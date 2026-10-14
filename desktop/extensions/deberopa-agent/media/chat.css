@@ -47,3 +47,6 @@ footer { padding: 10px 12px 12px; border-top: 1px solid var(--line); }
 .box textarea { width: 100%; min-height: 56px; max-height: 220px; resize: none; border: 0; background: transparent; color: inherit; font: inherit; outline: none; }
 .box .row { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; color: var(--dim); font-size: 12px; }
 .empty { color: var(--dim); text-align: center; margin: auto; padding: 24px; }
+.pickers { display: flex; gap: 6px; min-width: 0; }
+select { font: inherit; font-size: 12px; color: inherit; background: var(--soft); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 2px 6px; max-width: 150px; text-overflow: ellipsis; }
+select:focus-visible { outline: 2px solid var(--vscode-focusBorder); }

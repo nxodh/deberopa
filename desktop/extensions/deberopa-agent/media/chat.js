@@ -4,6 +4,8 @@
   const vscode = acquireVsCodeApi()
   const app = document.getElementById("app")
   let state = null
+  let choices = { agents: [], models: [], defaultModel: undefined }
+  let selection = {}
   let notice = ""
 
   const el = (tag, props, ...children) => {
@@ -78,6 +80,13 @@
     return nodes.length || err ? el("div", { class: "msg assistant" }, nodes, err) : null
   }
 
+  function picker(key, options, current, label) {
+    const select = el("select", { "aria-label": label, onchange: (e) => vscode.postMessage({ type: "select", key, value: e.target.value }) },
+      options.map((o) => el("option", { value: o.value }, o.label)))
+    select.value = current || ""
+    return select
+  }
+
   function render() {
     if (!state) return
     const log = document.getElementById("log")
@@ -107,7 +116,9 @@
         el("div", { class: "box" },
           el("textarea", { id: "input", rows: "2", placeholder: "Message Deberopa  (Enter to send, Shift+Enter for a new line)", "aria-label": "Message" }),
           el("div", { class: "row" },
-            el("span", {}, "@file  ·  @file#L10-20"),
+            el("span", { class: "pickers" },
+              choices.agents.length ? picker("agent", choices.agents.map((a) => ({ value: a.name, label: a.name })), selection.agent || (choices.agents[0] && choices.agents[0].name), "Agent") : null,
+              choices.models.length ? picker("model", choices.models, selection.model || choices.defaultModel, "Model") : null),
             state.busy
               ? el("button", { onclick: () => vscode.postMessage({ type: "abort" }) }, "Stop")
               : el("button", { class: "primary", id: "send" }, "Send")))))
@@ -133,7 +144,7 @@
 
   window.addEventListener("message", (event) => {
     const m = event.data
-    if (m.type === "state") { state = m.state; notice = ""; render() }
+    if (m.type === "state") { state = m.state; choices = m.choices || choices; selection = m.selection || {}; notice = ""; render() }
     else if (m.type === "notice") { notice = m.text; render() }
     else if (m.type === "insert") {
       const input = document.getElementById("input")

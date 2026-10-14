@@ -18,6 +18,8 @@ class ChatController {
     this.starting = undefined
     this.streamAbort = undefined
     this.pendingInsert = []
+    this.choices = { agents: [], models: [], defaultModel: undefined }
+    this.selection = context.globalState.get("deberopa.selection", {})
     this.status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100)
     this.status.command = "deberopa.focus"
     context.subscriptions.push(this.status)
@@ -34,7 +36,18 @@ class ChatController {
   }
 
   push() {
-    if (this.view) this.view.webview.postMessage({ type: "state", state: this.state })
+    if (this.view) this.view.webview.postMessage({ type: "state", state: this.state, choices: this.choices, selection: this.selection })
+  }
+
+  async loadChoices() {
+    const [agents, providers] = await Promise.all([this.client.agents(), this.client.providers()])
+    this.choices = {
+      agents: agents.filter((a) => a.mode !== "subagent" && !a.hidden).map((a) => ({ name: a.name, description: a.description || "" })),
+      models: providers.providers
+        .filter((p) => p.connected)
+        .flatMap((p) => Object.values(p.models).map((m) => ({ value: p.id + "/" + m.id, label: p.name + " · " + m.name }))),
+      defaultModel: providers.default ? providers.default.providerID + "/" + providers.default.modelID : undefined,
+    }
   }
 
   notice(text) {
@@ -66,6 +79,7 @@ class ChatController {
       const health = await this.client.health()
       this.setStatus(`Deberopa ${health.version}`, `Agent server at ${server.baseUrl}`)
       this.startStream()
+      await this.loadChoices().catch(() => {})
       return this.client
     })()
     try {
@@ -128,13 +142,16 @@ class ChatController {
     this.push()
   }
 
-  async send(text, options) {
+  async send(text) {
     try {
       const client = await this.ensureSession()
       this.state.error = undefined
       this.state.busy = true
       this.push()
-      await client.prompt(this.state.sessionID, text, options)
+      const chosen = {}
+      if (this.selection.agent && this.choices.agents.some((a) => a.name === this.selection.agent)) chosen.agent = this.selection.agent
+      if (this.selection.model && this.choices.models.some((m) => m.value === this.selection.model)) chosen.model = this.selection.model
+      await client.prompt(this.state.sessionID, text, chosen)
     } catch (err) {
       this.state.busy = false
       this.state.error = { name: "Error", message: err.message }
@@ -189,9 +206,16 @@ class ChatController {
         this.push()
         return
       case "send":
-        return this.send(message.text, message.options)
+        return this.send(message.text)
       case "abort":
         return this.abort()
+      case "select":
+        if (message.key === "agent" || message.key === "model") {
+          this.selection = { ...this.selection, [message.key]: message.value || undefined }
+          await this.context.globalState.update("deberopa.selection", this.selection)
+          this.push()
+        }
+        return
       case "newSession":
         return this.newSession().catch((e) => this.notice(e.message))
       case "permission":

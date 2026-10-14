@@ -144,3 +144,28 @@ test("command resolution prefers the setting, then the bundled copy, then PATH",
   fs.writeFileSync(bundled, "")
   expect(resolveCommand({ configured: "", appRoot: app })).toBe(bundled)
 })
+
+test("agent and model choices from the pickers are accepted by the prompt route", async () => {
+  const agents = await client.agents()
+  expect(agents.some((a: any) => a.name === "plan" && a.mode === "primary")).toBe(true)
+  const providers = await client.providers()
+  expect(providers.providers.find((p: any) => p.id === "mock").connected).toBe(true)
+  const session = await client.createSession("choices")
+  const state = createState()
+  state.sessionID = session.id
+  const abort = new AbortController()
+  const types = new Set<string>()
+  client.events((e: any) => {
+    types.add(e.type)
+    applyEvent(state, e)
+  }, abort.signal).catch(() => {})
+  expect(await waitFor(() => types.has("server.connected"))).toBe(true)
+  mock.queue(reply.text("planned"))
+  await client.prompt(session.id, "plan it", { agent: "plan", model: "mock/mock-1" })
+  expect(await waitFor(() => types.has("session.idle"))).toBe(true)
+  abort.abort()
+  const assistant = state.messages.find((m: any) => m.role === "assistant")
+  expect(assistant.agent).toBe("plan")
+  expect(assistant.modelID).toBe("mock-1")
+  await expect(client.prompt(session.id, "x", { model: "no-slash" })).rejects.toMatchObject({ status: 400 })
+}, 30_000)
