@@ -75,7 +75,7 @@ SDK는 레지스트리에 게시하지 않았고 Go SDK의 별도 모듈 태그�
 확장의 전체 CI가 통과했습니다. 릴리스는 버전을 0.1.3으로 맞춘 main 커밋의 CI가
 성공한 뒤 생성하도록 검사합니다. 0.1.2 이전 구현 범위는 위 기록을 참고하세요.
 
-## 0.1.4 (개발 중): Diparnux 호환과 동시 요청 상한
+## 0.1.4: Diparnux 호환과 동시 요청 상한
 
 설계서 `vedecaps-repo-changes-design.md`의 VE1·VE4(PR A)와 VE3(PR B)를 구현합니다.
 VE2(`options.ca`)는 Diparnux의 TLS가 나올 때까지 미룹니다.
@@ -92,3 +92,8 @@ Diparnux 표식과 `/diparnux/info` 인식(값 검증, 제어 문자 제거), �
 
 선택 사항이던 대기 중 상태 표시(TUI)는 넣지 않았습니다. `vedecaps debug`의 제공자 줄에 상한과
 그 출처가 표시됩니다.
+
+릴리스는 PR #1을 병합한 main 커밋의 전체 CI(Windows·Ubuntu·Debian·Alpine 실행파일, SDK, 확장)가
+성공한 뒤 만들도록 검사합니다. 실제 llama.cpp 서버(`--jinja`, `--api-key`)로 감지, 401 안내,
+도구 호출 시험, 키 기반 실행을 확인했으나 실제 Diparnux 서버는 확인하지 못했습니다(Diparnux 쪽
+CI의 범위).

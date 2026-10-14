@@ -2,7 +2,7 @@
   "name": "vedecaps",
   "displayName": "Vedecaps",
   "description": "Open the Vedecaps AI coding agent beside your editor and send it the file or selection you are looking at.",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "publisher": "nxodh",
   "license": "MIT",
   "icon": "icon.png",

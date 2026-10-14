@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.4
 
 - Local servers that need an API key are detected: `DIPARNUX_API_KEY` (then `LLAMA_API_KEY`) is sent as a bearer token to the detected llama.cpp address and to configured local providers. A 401/403 from a server that is there is now reported by `vedecaps debug local` instead of looking like nothing was found. Detection probes do not follow redirects.
 - Asking for a model on a server that refused the probe now says it needs an API key instead of "Unknown provider".

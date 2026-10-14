@@ -58,7 +58,7 @@ The full reference (configuration, permissions, commands, HTTP routes) is in the
 - **Language servers on request**: TypeScript, Pyright, gopls and rust-analyzer are offered for installation (with consent, into Vedecaps' own directory).
 - **Project trust**: an untrusted repository's config cannot start programs, route requests/keys elsewhere, or silence permission prompts until you run `vedecaps trust`.
 - **Plugins**: local JS/TS files adding tools and hooks (`tool.execute.before/after`, `chat.system`, `event`); work in the compiled binary without Node or Bun.
-- **SDK** (`sdk/js`), **ACP server** (`vedecaps acp`, for Zed and other editors), **VS Code extension** (`ide/vscode`), **GitHub Action** (`uses: nxodh/vedecaps@v0.1.3`).
+- **SDK** (`sdk/js`), **ACP server** (`vedecaps acp`, for Zed and other editors), **VS Code extension** (`ide/vscode`), **GitHub Action** (`uses: nxodh/vedecaps@v0.1.4`).
 - `@file#L10-20` mentions attach only those lines.
 
 The Korean README documents all of these in detail.
@@ -91,6 +91,10 @@ Pushing a `v*` tag that matches `package.json` builds and publishes a release.
 ## License
 
 [MIT](LICENSE)
+
+## Added in 0.1.4
+
+Local servers that need an API key (llama-server `--api-key`, Diparnux) are detected with `DIPARNUX_API_KEY` or `LLAMA_API_KEY`, and a refusal is reported instead of "nothing found". Diparnux gateways are recognised and their slots read. `options.max_concurrency` caps simultaneous requests per server, and `vedecaps debug local --check-tools` tests tool calling. Update with `vedecaps upgrade`.
 
 ## Added in 0.1.3
 
