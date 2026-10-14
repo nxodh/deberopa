@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk"
 import { VERSION } from "../global"
 import { createLogger } from "../util/log"
 import { EMPTY_USAGE, ProviderError, type FinishReason, type ModelMessage, type StreamEvent, type StreamInput, type Usage } from "./types"
+import { describeTlsError, hostOf, tlsInit } from "./tls"
 
 const log = createLogger("anthropic")
 
@@ -126,13 +127,16 @@ function buildParams(input: StreamInput, withFallbacks: boolean) {
   return { params, betas }
 }
 
-function toError(err: unknown): Error {
+function toError(err: unknown, tls?: { providerID: string; baseURL?: string; hasCA: boolean }): Error {
   if (err instanceof Anthropic.APIUserAbortError) {
     const abort = new Error("Aborted")
     abort.name = "AbortError"
     return abort
   }
   if (err instanceof Anthropic.APIConnectionError) {
+    const host = hostOf(tls?.baseURL ?? "https://api.anthropic.com")
+    const advice = tls && describeTlsError(err, { providerID: tls.providerID, host, hasCA: tls.hasCA })
+    if (advice) return new ProviderError(`Could not connect to ${host}: ${advice}`, { kind: "network", retryable: false })
     return new ProviderError(`Could not reach the Anthropic API: ${err.message}`, { kind: "network" })
   }
   if (err instanceof Anthropic.APIError) {
@@ -174,7 +178,7 @@ export async function* streamAnthropic(input: StreamInput): AsyncGenerator<Strea
     maxRetries: 0, // retries are handled (and surfaced to the user) by the session loop
     timeout: provider.timeout ?? 10 * 60 * 1000,
     defaultHeaders: { "User-Agent": `vedecaps/${VERSION}`, ...provider.headers },
-    fetch: (url, init) => fetch(url, { ...init, redirect: "error" }),
+    fetch: (url, init) => fetch(url, { ...init, redirect: "error", ...tlsInit(provider.tls) }),
   })
 
   const wantFallbacks = FALLBACK_MODELS.has(model.id) && isFirstParty(provider.baseURL) && !fallbacksRejected
@@ -267,7 +271,7 @@ export async function* streamAnthropic(input: StreamInput): AsyncGenerator<Strea
       }
       return
     } catch (err) {
-      const error = toError(err)
+      const error = toError(err, { providerID: provider.id, baseURL: provider.baseURL, hasCA: !!provider.tls })
       // Gateways and older deployments may not know the fallback beta: drop it once and carry on.
       if (withFallbacks && !emitted && error instanceof ProviderError && error.status === 400 && /fallback|beta/i.test(error.message)) {
         log.warn("server-side fallbacks rejected; continuing without", error.message)

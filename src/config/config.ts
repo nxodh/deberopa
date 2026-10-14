@@ -8,6 +8,7 @@ import { exists, findUp } from "../util/fs"
 import { createLogger } from "../util/log"
 import type { McpServerConfig } from "../mcp/client"
 import { isTrusted, stripUntrusted } from "./trust"
+import { resolveConfigCaPaths } from "../provider/tls"
 import { registerConfigSecrets } from "../util/redact"
 
 const log = createLogger("config")
@@ -43,6 +44,12 @@ export interface ProviderConfig {
     timeout?: number
     /** Integer 1-64: at most this many requests to the server at once. Unset: unlimited, or the gateway's slot count. */
     max_concurrency?: number
+    /**
+     * PEM file path(s) of the certificate authority a server's certificate must chain to. The
+     * provider then trusts only these (not the system store). Relative paths are relative to the
+     * config file. There is no option to skip verification.
+     */
+    ca?: string | string[]
   }
   models?: Record<string, ModelConfig>
 }
@@ -175,6 +182,8 @@ async function load(): Promise<LoadedConfig> {
         parsed = stripped.config
         blocked.push(...stripped.blocked.map((b) => `${path.relative(worktree, file) || file}: ${b}`))
       }
+      // relative CA paths mean "next to the file they were written in"
+      parsed = resolveConfigCaPaths(parsed, path.dirname(file))
       config = mergeConfig(config, parsed)
       files.push(file)
     } catch (err) {
@@ -209,7 +218,9 @@ async function load(): Promise<LoadedConfig> {
 
   if (process.env.VEDECAPS_CONFIG_CONTENT) {
     try {
-      config = mergeConfig(config, parseText(process.env.VEDECAPS_CONFIG_CONTENT, "VEDECAPS_CONFIG_CONTENT"))
+      // no file to be relative to: relative CA paths mean the current directory
+      const inline = resolveConfigCaPaths(parseText(process.env.VEDECAPS_CONFIG_CONTENT, "VEDECAPS_CONFIG_CONTENT"), directory)
+      config = mergeConfig(config, inline)
     } catch (err) {
       errors.push(`VEDECAPS_CONFIG_CONTENT: ${err instanceof Error ? err.message : String(err)}`)
     }

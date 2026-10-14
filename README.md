@@ -141,6 +141,38 @@ API 키는 `vedecaps auth login`, TUI의 `/connect`, 또는 환경 변수로 등
 { "provider": { "diparnux": { "api": "http://127.0.0.1:8080/v1", "options": { "max_concurrency": 2 } } } }
 ```
 
+**HTTPS와 `options.ca`**: 서버가 사설 CA(예: Diparnux의 `diparnux tls ca`)로 서명한 인증서로 HTTPS를 쓰면, 그 CA 파일을 제공자 설정에 적습니다. 인증서 검증과 호스트 이름 검증을 끄는 옵션은 없습니다.
+
+```jsonc
+{
+  "provider": {
+    "diparnux": {
+      "api": "https://spark.local:8444/v1",
+      "options": { "ca": "~/.config/vedecaps/diparnux-ca.pem" }
+    }
+  }
+}
+```
+
+- `ca`는 PEM 파일 경로, 경로 목록, 또는 PEM 본문 자체입니다. `~`는 홈 디렉터리이고, 상대 경로는 **그 설정을 적은 파일이 있는 폴더** 기준입니다(현재 디렉터리가 아닙니다. `VEDECAPS_CONFIG_CONTENT`만 현재 디렉터리 기준).
+- 파일은 제공자를 만들 때 읽습니다. 파일이 없거나, 읽을 수 없거나, PEM 인증서가 아니면(개인 키가 들어 있어도) 그 제공자는 **사용할 수 없음**으로 표시되고 이유가 `vedecaps debug`와 오류에 나옵니다. 시스템 인증서 저장소로 조용히 돌아가지 않습니다.
+- `ca`를 적은 제공자는 **적은 CA만** 신뢰합니다(Bun의 `tls.ca`는 시스템 저장소를 대체합니다). 요청마다, 모델 목록·`/diparnux/info` 조회·도구 호출 시험에도 같은 신뢰를 씁니다.
+- 신뢰하지 않는 프로젝트(`vedecaps trust` 전)의 `options.ca`는 무시되고 `debug`에 표시됩니다. 저장소가 어떤 CA를 믿을지 정할 수 없습니다.
+- 자동 감지 대상(127.0.0.1의 일반 `http://`)에는 필요 없습니다. HTTP에서 HTTPS로의 리다이렉트는 따르지 않습니다.
+- CA에 이름 제한(name constraints)을 쓸 때는 **DNS 이름만** 제한하세요. Bun은 IP 주소 제한이 있는 CA 아래의 IP 주소 SAN 인증서를 검증하지 못합니다(`UNSUPPORTED_CONSTRAINT_TYPE`).
+
+인증서 오류와 해결 방법(`vedecaps debug local`도 같은 문장을 보여 줍니다):
+
+| 증상 | 의미 | 해결 |
+|---|---|---|
+| `The certificate of … is not trusted` | 서버 인증서의 CA를 모름 | `options.ca`에 서버의 CA 파일을 적습니다(Diparnux: `diparnux tls ca`) |
+| `… is not signed by a CA listed in …options.ca` | 적은 CA가 이 서버의 CA가 아님 | 올바른 CA 파일인지 확인 |
+| `The certificate does not cover <host>` | 접속한 이름·주소가 인증서에 없음 | 인증서에 있는 이름이나 주소로 접속(Diparnux: `diparnux tls status`) |
+| `The certificate of … has expired` | 인증서 기간 만료 | 서버에서 갱신(`diparnux tls renew`)하고 양쪽 시계를 확인 |
+| `cannot read … The provider is not used…` | `ca` 파일 문제 | 경로와 PEM 형식을 확인 |
+
+`vedecaps debug local`은 `ca`를 적었거나 HTTPS인 제공자에 대해 `TLS: certificate accepted, trusted by ca.pem`과 CA의 SHA-256 지문(`AA:BB:…`)을 보여 줍니다. 서버 쪽 `diparnux tls ca`가 보여 주는 지문과 비교해 같은 CA인지 확인할 수 있습니다.
+
 **도구 호출 시험**: `vedecaps debug local --check-tools`는 서버마다 모델 요청을 한 번 보내 도구 호출이 되는지 확인합니다(토큰이 소비되므로 기본은 꺼져 있습니다). 결과는 `ok`(구조화된 `tool_calls`), `recovered`(텍스트로 쓴 호출을 Vedecaps가 복구해서 동작), `failed`(에이전트가 파일을 읽거나 고칠 수 없음)입니다.
 
 감지를 끄려면 설정에 `"local_detect": false`를 넣습니다. 그 밖의 OpenAI 호환 서버(사내 프록시 등)는 직접 추가합니다. 모델을 적지 않으면 `/models` 엔드포인트에서 목록을 가져옵니다.
@@ -395,7 +427,7 @@ vedecaps pr 123 --no-ui > review.md   # UI 없이 결과만 출력
 ## GitHub Action
 
 ```yaml
-- uses: nxodh/vedecaps@v0.1.4
+- uses: nxodh/vedecaps@v0.1.5
   env:
     ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
   with:
@@ -421,7 +453,7 @@ vedecaps pr 123 --no-ui > review.md   # UI 없이 결과만 출력
 permissions: { contents: write, pull-requests: write }
 steps:
   - uses: actions/checkout@v4
-  - uses: nxodh/vedecaps@v0.1.4
+  - uses: nxodh/vedecaps@v0.1.5
     env: { ANTHROPIC_API_KEY: "${{ secrets.ANTHROPIC_API_KEY }}" }
     with:
       prompt: 의존성 경고를 고쳐줘

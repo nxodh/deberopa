@@ -1,6 +1,7 @@
 import { VERSION } from "../global"
 import { redact } from "../util/redact"
 import { parseTextToolCalls } from "./compat"
+import { describeTlsError, hostOf, tlsInit, type ProviderTls } from "./tls"
 
 /**
  * Does this server turn a "use the tool" request into a tool call? One non-streaming request, sent
@@ -44,6 +45,10 @@ export async function checkToolCalling(opts: {
   apiKey?: string
   headers?: Record<string, string>
   timeoutMs?: number
+  /** The provider's own CA, so a check against an HTTPS server uses the same trust as real requests. */
+  tls?: ProviderTls
+  /** Provider id, for the certificate advice. */
+  providerID?: string
 }): Promise<ToolCheckResult> {
   const started = Date.now()
   const done = (status: ToolCheckStatus, detail?: string): ToolCheckResult => ({ status, ms: Date.now() - started, detail })
@@ -57,9 +62,12 @@ export async function checkToolCalling(opts: {
       headers,
       body: JSON.stringify(TOOLCHECK_BODY(opts.model)),
       redirect: "error",
+      ...tlsInit(opts.tls),
       signal: AbortSignal.timeout(opts.timeoutMs ?? 90_000),
     })
   } catch (err) {
+    const advice = describeTlsError(err, { providerID: opts.providerID ?? "<id>", host: hostOf(opts.baseURL), hasCA: !!opts.tls })
+    if (advice) return done("error", advice)
     const timedOut = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")
     return done("error", timedOut ? "the server did not answer in time (is the model still loading?)" : redact(err instanceof Error ? err.message : String(err)))
   }

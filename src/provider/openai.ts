@@ -1,5 +1,6 @@
 import { VERSION } from "../global"
 import { EMPTY_USAGE, ProviderError, type FinishReason, type StreamEvent, type StreamInput, type Usage } from "./types"
+import { describeTlsError, hostOf, tlsInit } from "./tls"
 
 /** Split an SSE byte stream into `data:` payloads. */
 export async function* sseData(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
@@ -144,13 +145,16 @@ export async function* streamOpenAI(input: StreamInput): AsyncGenerator<StreamEv
 
   let response: Response
   try {
-    response = await fetch(url, { method: "POST", headers, body: JSON.stringify(buildBody(input)), signal: input.signal, redirect: "error" })
+    response = await fetch(url, { method: "POST", headers, body: JSON.stringify(buildBody(input)), signal: input.signal, redirect: "error", ...tlsInit(provider.tls) })
   } catch (err) {
     if (input.signal?.aborted || (err instanceof Error && err.name === "AbortError")) {
       const abort = new Error("Aborted")
       abort.name = "AbortError"
       throw abort
     }
+    // a certificate that is refused will be refused again: say how to fix it and do not retry
+    const advice = describeTlsError(err, { providerID: provider.id, host: hostOf(url), hasCA: !!provider.tls })
+    if (advice) throw new ProviderError(`Could not connect to ${provider.name} (${url}): ${advice}`, { kind: "network", retryable: false })
     throw new ProviderError(`Could not reach ${provider.name} (${url}): ${err instanceof Error ? err.message : String(err)}`, {
       kind: "network",
     })

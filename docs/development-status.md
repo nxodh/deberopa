@@ -78,7 +78,7 @@ SDK는 레지스트리에 게시하지 않았고 Go SDK의 별도 모듈 태그�
 ## 0.1.4: Diparnux 호환과 동시 요청 상한
 
 설계서 `vedecaps-repo-changes-design.md`의 VE1·VE4(PR A)와 VE3(PR B)를 구현합니다.
-VE2(`options.ca`)는 Diparnux의 TLS가 나올 때까지 미룹니다.
+VE2(`options.ca`)는 Diparnux의 TLS가 나올 때까지 미뤘고 0.1.5에서 구현했습니다.
 
 **PR A (VE1 + VE4)**: 키가 필요한 서버 감지(`DIPARNUX_API_KEY`, `LLAMA_API_KEY`), 401/403 보고,
 Diparnux 표식과 `/diparnux/info` 인식(값 검증, 제어 문자 제거), 구성된 로컬 제공자의 컨텍스트
@@ -97,3 +97,21 @@ Diparnux 표식과 `/diparnux/info` 인식(값 검증, 제어 문자 제거), �
 성공한 뒤 만들도록 검사합니다. 실제 llama.cpp 서버(`--jinja`, `--api-key`)로 감지, 401 안내,
 도구 호출 시험, 키 기반 실행을 확인했으나 실제 Diparnux 서버는 확인하지 못했습니다(Diparnux 쪽
 CI의 범위).
+
+## 0.1.5: 사설 CA(`options.ca`)
+
+설계서의 VE2와 `vedecaps-agent-handoff-0.5.4.md` §3을 구현합니다. 제공자의 `options.ca`(PEM 경로,
+경로 목록, PEM 본문)를 제공자를 만들 때 읽어 `ProviderInfo.tls`로 두고, 채팅 요청(OpenAI·Ollama·
+Anthropic 경로), 모델 목록, `/diparnux/info`, 도구 호출 시험의 모든 `fetch`에 전달합니다.
+파일 문제는 제공자를 사용 불가로 만들며 시스템 저장소로 돌아가지 않습니다. 인증서 검증을 끄는
+옵션은 없고, 신뢰하지 않는 프로젝트의 `ca`는 `stripUntrusted`가 제거합니다.
+
+Bun 1.4.3(macOS arm64)에서 측정한 사실: `tls.ca`는 시스템 저장소를 **대체**합니다. 오류 코드는
+`UNABLE_TO_VERIFY_LEAF_SIGNATURE`(알 수 없는 CA), `ERR_TLS_CERT_ALTNAME_INVALID`(이름 불일치),
+`CERT_HAS_EXPIRED`(만료), `DEPTH_ZERO_SELF_SIGNED_CERT`, `PERMITTED_VIOLATION`(이름 제한 위반),
+`UNSUPPORTED_CONSTRAINT_TYPE`(CA에 IP 이름 제한이 있고 리프에 IP SAN이 있을 때)입니다. DNS 이름
+제한만 있는 CA는 IP SAN이 있는 리프도 검증합니다. 시험은 `test/tls.test.ts`(TC1~TC13, 일회용
+인증서는 `test/fixtures/tls/`)입니다.
+
+**범위**: 실제 Diparnux 서버의 HTTPS 시험은 Diparnux 쪽 CI의 몫입니다. 여기서는 Bun.serve의 `tls`로
+같은 계약(별도 포트의 HTTPS, 리다이렉트 없음, 같은 `/diparnux/info`와 키 규칙)을 모의해 확인했습니다.

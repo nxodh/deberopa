@@ -36,7 +36,8 @@ export async function main(argv: string[]): Promise<number> {
   }
   if (positionals[0] === "local") {
     const { runLocalDebug } = await import("./local-debug")
-    return runLocalDebug({ checkTools: values["check-tools"] === true, out })
+    const { allProviders } = await import("../../provider/provider")
+    return runLocalDebug({ checkTools: values["check-tools"] === true, providers: Object.values(await allProviders()), out })
   }
   const p = project()
   out(`vedecaps ${VERSION}`)
@@ -63,6 +64,10 @@ export async function main(argv: string[]): Promise<number> {
     const limit = x.maxConcurrency ? `  max ${x.maxConcurrency} at once${x.maxConcurrencySource === "diparnux" ? " (from the gateway's slots)" : ""}` : ""
     out(`  ${x.id.padEnd(14)} ${x.protocol.padEnd(9)} via ${x.source.padEnd(7)} ${Object.keys(x.models).length} models${limit}`)
     if (x.maxConcurrencyIgnored) out(`    ! ${x.maxConcurrencyIgnored}`)
+    for (const source of x.tlsSources ?? []) out(`    trusts only ${source.label}${source.fingerprints[0] ? ` (SHA-256 ${source.fingerprints[0]})` : ""}`)
+  }
+  for (const x of Object.values(await allProviders()).filter((y) => y.problem)) {
+    out(`  ${x.id.padEnd(14)} NOT USABLE: ${x.problem}`)
   }
   out()
   const { loadPlugins, pluginProblems } = await import("../../plugin")
