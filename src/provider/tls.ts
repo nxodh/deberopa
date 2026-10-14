@@ -148,12 +148,12 @@ export function describeTlsError(err: unknown, ctx: { providerID: string; host: 
   let text: string
   if (UNTRUSTED.includes(code)) {
     text = ctx.hasCA
-      ? `The certificate of ${ctx.host} is not signed by a CA listed in ${key}. Check that the file is the CA of that server (for Diparnux: \`diparnux tls ca\`).`
-      : `The certificate of ${ctx.host} is not trusted. Set ${key} to the CA file of that server (for Diparnux: \`diparnux tls ca\`).`
+      ? `The certificate of ${ctx.host} is not signed by a CA listed in ${key}. Check that the file is the CA of that server (for Opereta: \`opereta tls ca\`).`
+      : `The certificate of ${ctx.host} is not trusted. Set ${key} to the CA file of that server (for Opereta: \`opereta tls ca\`).`
   } else if (code === "ERR_TLS_CERT_ALTNAME_INVALID") {
-    text = `The certificate does not cover ${ctx.host}. Connect with a name or address the certificate lists (for Diparnux: see \`diparnux tls status\`).`
+    text = `The certificate does not cover ${ctx.host}. Connect with a name or address the certificate lists (for Opereta: see \`opereta tls status\`).`
   } else if (code === "CERT_HAS_EXPIRED") {
-    text = `The certificate of ${ctx.host} has expired. Renew it on the server (for Diparnux: \`diparnux tls renew\`) and check the clock on both computers.`
+    text = `The certificate of ${ctx.host} has expired. Renew it on the server (for Opereta: \`opereta tls renew\`) and check the clock on both computers.`
   } else if (code === "CERT_NOT_YET_VALID") {
     text = `The certificate of ${ctx.host} is not valid yet. Check the clock on both computers.`
   } else if (code === "PERMITTED_VIOLATION") {

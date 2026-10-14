@@ -1,6 +1,6 @@
 /**
  * Build single-file executables.
- *   bun run script/build.ts                  current platform only -> dist/vedecaps[.exe]
+ *   bun run script/build.ts                  current platform only -> dist/deberopa[.exe]
  *   bun run script/build.ts --all            every release target, packaged + checksums.txt
  *   bun run script/build.ts --target linux-arm64 [--package]
  */
@@ -19,13 +19,13 @@ interface Target {
 }
 
 const TARGETS: Target[] = [
-  { name: "linux-x64", bun: "bun-linux-x64", exe: "vedecaps", archive: "tar.gz" },
-  { name: "linux-arm64", bun: "bun-linux-arm64", exe: "vedecaps", archive: "tar.gz" },
-  { name: "linux-x64-musl", bun: "bun-linux-x64-musl", exe: "vedecaps", archive: "tar.gz" },
-  { name: "linux-arm64-musl", bun: "bun-linux-arm64-musl", exe: "vedecaps", archive: "tar.gz" },
-  { name: "darwin-arm64", bun: "bun-darwin-arm64", exe: "vedecaps", archive: "tar.gz" },
-  { name: "darwin-x64", bun: "bun-darwin-x64", exe: "vedecaps", archive: "tar.gz" },
-  { name: "windows-x64", bun: "bun-windows-x64", exe: "vedecaps.exe", archive: "zip" },
+  { name: "linux-x64", bun: "bun-linux-x64", exe: "deberopa", archive: "tar.gz" },
+  { name: "linux-arm64", bun: "bun-linux-arm64", exe: "deberopa", archive: "tar.gz" },
+  { name: "linux-x64-musl", bun: "bun-linux-x64-musl", exe: "deberopa", archive: "tar.gz" },
+  { name: "linux-arm64-musl", bun: "bun-linux-arm64-musl", exe: "deberopa", archive: "tar.gz" },
+  { name: "darwin-arm64", bun: "bun-darwin-arm64", exe: "deberopa", archive: "tar.gz" },
+  { name: "darwin-x64", bun: "bun-darwin-x64", exe: "deberopa", archive: "tar.gz" },
+  { name: "windows-x64", bun: "bun-windows-x64", exe: "deberopa.exe", archive: "zip" },
 ]
 
 const args = process.argv.slice(2)
@@ -92,7 +92,7 @@ for (const target of selected) {
   console.log(`built ${target.name} (${size} MB, ${((Date.now() - started) / 1000).toFixed(1)}s) -> ${path.relative(root, outfile)}`)
 
   if (!packageIt) continue
-  const archive = path.join(dist, `vedecaps-${target.name}.${target.archive}`)
+  const archive = path.join(dist, `deberopa-${target.name}.${target.archive}`)
   fs.rmSync(archive, { force: true })
   const packed =
     target.archive === "zip"
@@ -110,5 +110,5 @@ for (const target of selected) {
 
 if (packageIt && checksums.length) {
   fs.writeFileSync(path.join(dist, "checksums.txt"), checksums.join("\n") + "\n")
-  console.log(`wrote ${path.relative(root, path.join(dist, "checksums.txt"))} (vedecaps ${pkg.version})`)
+  console.log(`wrote ${path.relative(root, path.join(dist, "checksums.txt"))} (deberopa ${pkg.version})`)
 }

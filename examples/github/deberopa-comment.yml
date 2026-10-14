@@ -1,11 +1,11 @@
-# Answer "/vedecaps <request>" comments on issues and pull requests.
-# Copy to .github/workflows/vedecaps.yml and add your provider key as a repository secret.
+# Answer "/deberopa <request>" comments on issues and pull requests.
+# Copy to .github/workflows/deberopa.yml and add your provider key as a repository secret.
 #
 # SECURITY: the agent can run commands with this job's permissions, and issue/PR text is
 # untrusted input that can try to steer it (prompt injection). Keep the job's permissions
 # minimal, only act on comments from people you trust (the check below), and never expose
 # secrets beyond the provider key.
-name: vedecaps
+name: deberopa
 
 on:
   issue_comment:
@@ -17,9 +17,9 @@ permissions:
   issues: write
 
 jobs:
-  vedecaps:
+  deberopa:
     if: >
-      startsWith(github.event.comment.body, '/vedecaps') &&
+      startsWith(github.event.comment.body, '/deberopa') &&
       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
     runs-on: ubuntu-latest
     steps:
@@ -28,9 +28,9 @@ jobs:
           # for a pull request, work on its head branch
           ref: ${{ github.event.issue.pull_request && format('refs/pull/{0}/head', github.event.issue.number) || '' }}
 
-      - name: Run Vedecaps
-        id: vedecaps
-        uses: nxodh/vedecaps@v0.1.1
+      - name: Run Deberopa
+        id: deberopa
+        uses: nxodh/deberopa@v0.1.1
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:
@@ -41,5 +41,5 @@ jobs:
       - name: Reply
         env:
           GH_TOKEN: ${{ github.token }}
-          RESPONSE: ${{ steps.vedecaps.outputs.response }}
+          RESPONSE: ${{ steps.deberopa.outputs.response }}
         run: gh issue comment "${{ github.event.issue.number }}" --repo "${{ github.repository }}" --body "$RESPONSE"

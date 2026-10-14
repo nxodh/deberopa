@@ -8,7 +8,7 @@ interface Entry {
   run(argv: string[]): Promise<number>
 }
 
-/** Subcommands, loaded lazily so `vedecaps --version` and `run` never pay for the TUI. */
+/** Subcommands, loaded lazily so `deberopa --version` and `run` never pay for the TUI. */
 const COMMANDS: Record<string, () => Promise<Entry>> = {
   share: async () => {
     const m = await import("./cli/commands/share")
@@ -85,34 +85,34 @@ const COMMANDS: Record<string, () => Promise<Entry>> = {
 }
 
 const SUMMARY: [string, string][] = [
-  ["vedecaps share [id]", "export HTML or serve an expiring read-only conversation"],
-  ["vedecaps plugin list|install|remove", "manage version-pinned npm plugins"],
-  ["vedecaps [project]", "start the terminal UI (default)"],
-  ["vedecaps run [message..]", "run a prompt non-interactively"],
-  ["vedecaps auth login|list|logout", "manage provider credentials"],
-  ["vedecaps models [provider]", "list available models"],
-  ["vedecaps agent list|create", "list or create agents"],
-  ["vedecaps session list|delete", "manage saved sessions"],
-  ["vedecaps export [id]", "export a session as JSON or Markdown"],
-  ["vedecaps import <file>", "import an exported session"],
-  ["vedecaps mcp list|add|remove", "manage MCP servers"],
-  ["vedecaps stats", "token usage and cost"],
-  ["vedecaps serve", "start the HTTP API server"],
-  ["vedecaps acp", "run as an Agent Client Protocol server (editors)"],
-  ["vedecaps upgrade [version]", "update vedecaps to the latest release"],
-  ["vedecaps uninstall", "remove vedecaps from this machine"],
-  ["vedecaps pr <number|url>", "check out a GitHub pull request and review it"],
-  ["vedecaps trust [path]", "allow a project's config to run commands"],
-  ["vedecaps debug", "show paths, config and tooling"],
+  ["deberopa share [id]", "export HTML or serve an expiring read-only conversation"],
+  ["deberopa plugin list|install|remove", "manage version-pinned npm plugins"],
+  ["deberopa [project]", "start the terminal UI (default)"],
+  ["deberopa run [message..]", "run a prompt non-interactively"],
+  ["deberopa auth login|list|logout", "manage provider credentials"],
+  ["deberopa models [provider]", "list available models"],
+  ["deberopa agent list|create", "list or create agents"],
+  ["deberopa session list|delete", "manage saved sessions"],
+  ["deberopa export [id]", "export a session as JSON or Markdown"],
+  ["deberopa import <file>", "import an exported session"],
+  ["deberopa mcp list|add|remove", "manage MCP servers"],
+  ["deberopa stats", "token usage and cost"],
+  ["deberopa serve", "start the HTTP API server"],
+  ["deberopa acp", "run as an Agent Client Protocol server (editors)"],
+  ["deberopa upgrade [version]", "update deberopa to the latest release"],
+  ["deberopa uninstall", "remove deberopa from this machine"],
+  ["deberopa pr <number|url>", "check out a GitHub pull request and review it"],
+  ["deberopa trust [path]", "allow a project's config to run commands"],
+  ["deberopa debug", "show paths, config and tooling"],
 ]
 
 function mainHelp(): string {
   const width = Math.max(...SUMMARY.map((r) => r[0].length))
   return [
-    `Vedecaps ${VERSION} - an AI coding agent for your terminal`,
+    `Deberopa ${VERSION} - an AI coding agent for your terminal`,
     "",
-    "Usage: vedecaps [project] [options]",
-    "       vedecaps <command> [options]",
+    "Usage: deberopa [project] [options]",
+    "       deberopa <command> [options]",
     "",
     "Commands:",
     ...SUMMARY.map(([c, d]) => `  ${c.padEnd(width)}  ${d}`),
@@ -125,9 +125,9 @@ function mainHelp(): string {
     "  -p, --prompt <text>      send this prompt as soon as the UI opens",
     "      --print-logs         print logs to stderr",
     "  -v, --version            show the version",
-    "  -h, --help               show help (also: vedecaps <command> --help)",
+    "  -h, --help               show help (also: deberopa <command> --help)",
     "",
-    "Docs: https://github.com/nxodh/vedecaps",
+    "Docs: https://github.com/nxodh/deberopa",
   ].join("\n")
 }
 
@@ -155,7 +155,7 @@ async function main(argv: string[]): Promise<number> {
   }
 
   if (first && !first.startsWith("-") && !(await isDirectory(first))) {
-    throw new UsageError(`Unknown command "${first}". Run \`vedecaps --help\` to see what is available.`)
+    throw new UsageError(`Unknown command "${first}". Run \`deberopa --help\` to see what is available.`)
   }
   const tui = await import("./cli/commands/tui")
   if (argv.includes("--help") || argv.includes("-h")) {
@@ -175,7 +175,7 @@ void runAndExit(async () => {
     return await main(process.argv.slice(2))
   } catch (err) {
     if (err instanceof UsageError) {
-      process.stderr.write(`${redact(err.message)}\n\nRun \`vedecaps --help\` for usage.\n`)
+      process.stderr.write(`${redact(err.message)}\n\nRun \`deberopa --help\` for usage.\n`)
       return 2
     }
     throw err

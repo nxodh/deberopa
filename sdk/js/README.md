@@ -1,11 +1,11 @@
-# @vedecaps/sdk
+# @deberopa/sdk
 
-A small, dependency-free client for the [Vedecaps](https://github.com/nxodh/vedecaps) HTTP API.
+A small, dependency-free client for the [Deberopa](https://github.com/nxodh/deberopa) HTTP API.
 
 ```ts
-import { startServer, messageText } from "@vedecaps/sdk"
+import { startServer, messageText } from "@deberopa/sdk"
 
-const { client, close } = await startServer({ cwd: "/path/to/project" }) // spawns `vedecaps serve`
+const { client, close } = await startServer({ cwd: "/path/to/project" }) // spawns `deberopa serve`
 const session = await client.session.create({ title: "docs" })
 
 // follow progress while the agent works

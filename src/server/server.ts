@@ -148,7 +148,7 @@ async function route(req: Request): Promise<Response> {
   const method = req.method
   const is = (m: string, ...pattern: string[]) => method === m && parts.length === pattern.length && pattern.every((p, i) => p === "*" || p === parts[i])
 
-  if (is("GET", "health") || (method === "GET" && parts.length === 0)) return json({ name: "vedecaps", version: VERSION, ok: true })
+  if (is("GET", "health") || (method === "GET" && parts.length === 0)) return json({ name: "deberopa", version: VERSION, ok: true })
   if (is("GET", "event")) return events(req)
   if (is("GET", "project")) return json(project())
   if (is("GET", "config")) return json(redactDeep(await getConfig()))
@@ -240,9 +240,9 @@ async function route(req: Request): Promise<Response> {
 }
 
 export function startServer(options: ServerOptions = {}) {
-  const password = options.password ?? process.env.VEDECAPS_SERVER_PASSWORD
+  const password = options.password ?? process.env.DEBEROPA_SERVER_PASSWORD
   const hostname = options.hostname ?? "127.0.0.1"
-  if (!["127.0.0.1", "localhost", "::1"].includes(hostname) && !password) throw new Error("A non-local server requires VEDECAPS_SERVER_PASSWORD.")
+  if (!["127.0.0.1", "localhost", "::1"].includes(hostname) && !password) throw new Error("A non-local server requires DEBEROPA_SERVER_PASSWORD.")
   registerSecret(password)
   return Bun.serve({
     port: options.port ?? 4096,
@@ -254,7 +254,7 @@ export function startServer(options: ServerOptions = {}) {
       const origin = req.headers.get("origin")
       if (origin && origin !== requestURL.origin) return new Response("Forbidden origin", { status: 403 })
       if (!authorized(req, password)) {
-        return new Response("Unauthorized", { status: 401, headers: { "www-authenticate": 'Basic realm="vedecaps"' } })
+        return new Response("Unauthorized", { status: 401, headers: { "www-authenticate": 'Basic realm="deberopa"' } })
       }
       try {
         return await route(req)

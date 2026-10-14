@@ -4,9 +4,9 @@ import os from "node:os"
 import path from "node:path"
 
 // Must run before any project module loads: global.ts resolves its paths at import time.
-const home = fs.mkdtempSync(path.join(os.tmpdir(), "vedecaps-lsp-home-"))
-process.env.VEDECAPS_HOME = home
-delete process.env.VEDECAPS_CONFIG_CONTENT // a previous test file may have left one behind
+const home = fs.mkdtempSync(path.join(os.tmpdir(), "deberopa-lsp-home-"))
+process.env.DEBEROPA_HOME = home
+delete process.env.DEBEROPA_CONFIG_CONTENT // a previous test file may have left one behind
 
 const { createLspClient, createMessageDecoder, encodeMessage, diagnosticKey } = await import("../src/lsp/client")
 const { touchFile, formatDiagnostics, lspStatus, shutdownLsp } = await import("../src/lsp/index")
@@ -67,7 +67,7 @@ test("decoder: split chunks, coalesced messages and multi-byte bodies", () => {
 })
 
 test("client: diagnostics follow the file on disk, and shutdown leaves no process", async () => {
-  const dir = tempDir("vedecaps-lsp-client-")
+  const dir = tempDir("deberopa-lsp-client-")
   const file = path.join(dir, "sample.fake")
   const pidFile = path.join(dir, "pid")
   fs.writeFileSync(file, "const a = 1\nERROR broken here\n")
@@ -106,14 +106,14 @@ test("client: diagnostics follow the file on disk, and shutdown leaves no proces
 
 test("client: a server that exits during the handshake rejects", async () => {
   await expect(
-    createLspClient({ serverID: "dead", command: [process.execPath, "-e", "process.exit(3)"], root: tempDir("vedecaps-lsp-dead-") }),
+    createLspClient({ serverID: "dead", command: [process.execPath, "-e", "process.exit(3)"], root: tempDir("deberopa-lsp-dead-") }),
   ).rejects.toThrow()
 }, 20000)
 
-test("index: touchFile reports errors through a custom server from vedecaps.json", async () => {
-  const dir = tempDir("vedecaps-lsp-project-")
+test("index: touchFile reports errors through a custom server from deberopa.json", async () => {
+  const dir = tempDir("deberopa-lsp-project-")
   fs.writeFileSync(
-    path.join(dir, "vedecaps.json"),
+    path.join(dir, "deberopa.json"),
     JSON.stringify({ lsp: { fake: { command: [process.execPath, fixture], extensions: [".fake"] } } }),
   )
   const file = path.join(dir, "sample.fake")
@@ -132,8 +132,8 @@ test("index: touchFile reports errors through a custom server from vedecaps.json
 
 test("index: lsp false makes touchFile a no-op", async () => {
   await shutdownLsp()
-  const dir = tempDir("vedecaps-lsp-disabled-")
-  fs.writeFileSync(path.join(dir, "vedecaps.json"), JSON.stringify({ lsp: false }))
+  const dir = tempDir("deberopa-lsp-disabled-")
+  fs.writeFileSync(path.join(dir, "deberopa.json"), JSON.stringify({ lsp: false }))
   const file = path.join(dir, "sample.fake")
   fs.writeFileSync(file, "ERROR here\n")
 

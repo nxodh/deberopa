@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://raw.githubusercontent.com/nxodh/vedecaps/main/config.schema.json",
-  "title": "Vedecaps configuration",
+  "$id": "https://raw.githubusercontent.com/nxodh/deberopa/main/config.schema.json",
+  "title": "Deberopa configuration",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -106,7 +106,7 @@
                 "type": "integer",
                 "minimum": 1,
                 "maximum": 64,
-                "description": "At most this many model requests to this server at once; others wait their turn instead of earning 429 responses. Unset means unlimited, except that a Diparnux gateway with a fixed slot count sets it to the slot count."
+                "description": "At most this many model requests to this server at once; others wait their turn instead of earning 429 responses. Unset means unlimited, except that a Opereta gateway with a fixed slot count sets it to the slot count."
               },
               "ca": {
                 "description": "PEM file path of the certificate authority this server's HTTPS certificate must chain to, or a list of paths (inline PEM text is also accepted). Relative paths are relative to the config file. The provider then trusts only these authorities, not the system store. A file that cannot be read makes the provider unusable; there is no fallback and no option to skip verification.",

@@ -12,7 +12,7 @@ const log = createLogger("update")
 const DAY = 24 * 60 * 60 * 1000
 
 /** Base URL of the release host; overridable so tests and mirrors can stand in for GitHub. */
-const releaseBase = () => (process.env.VEDECAPS_RELEASE_URL || `https://github.com/${REPO}/releases`).replace(/\/+$/, "")
+const releaseBase = () => (process.env.DEBEROPA_RELEASE_URL || `https://github.com/${REPO}/releases`).replace(/\/+$/, "")
 
 export class UpdateError extends Error {}
 
@@ -34,12 +34,12 @@ export function targetName(platform = process.platform, arch = process.arch, lib
 }
 
 export function assetName(target = targetName()): string {
-  return `vedecaps-${target}.${target.startsWith("windows") ? "zip" : "tar.gz"}`
+  return `deberopa-${target}.${target.startsWith("windows") ? "zip" : "tar.gz"}`
 }
 
 /** True when this process is the installed executable rather than a source checkout run through bun. */
 export function isCompiled(): boolean {
-  return /^vedecaps(\.exe)?$/i.test(path.basename(process.execPath))
+  return /^deberopa(\.exe)?$/i.test(path.basename(process.execPath))
 }
 
 export function compareVersions(a: string, b: string): number {
@@ -51,7 +51,7 @@ export function compareVersions(a: string, b: string): number {
 
 /** Newest released version, read from the redirect of /releases/latest (no API token or rate limit involved). */
 export async function latestVersion(timeoutMs = 10_000): Promise<string> {
-  const res = await fetch(`${releaseBase()}/latest`, { redirect: "manual", signal: AbortSignal.timeout(timeoutMs), headers: { "User-Agent": `vedecaps/${VERSION}` } })
+  const res = await fetch(`${releaseBase()}/latest`, { redirect: "manual", signal: AbortSignal.timeout(timeoutMs), headers: { "User-Agent": `deberopa/${VERSION}` } })
   const location = res.headers.get("location") ?? ""
   const match = /\/tag\/v?([^/?#]+)/.exec(location)
   if (!match) throw new UpdateError(res.status === 404 || !location ? "No release has been published yet." : `Could not determine the latest version (HTTP ${res.status}).`)
@@ -59,7 +59,7 @@ export async function latestVersion(timeoutMs = 10_000): Promise<string> {
 }
 
 async function download(url: string, file: string) {
-  const res = await fetch(url, { signal: AbortSignal.timeout(5 * 60_000), headers: { "User-Agent": `vedecaps/${VERSION}` } })
+  const res = await fetch(url, { signal: AbortSignal.timeout(5 * 60_000), headers: { "User-Agent": `deberopa/${VERSION}` } })
   if (!res.ok) throw new UpdateError(`Download failed (HTTP ${res.status}): ${url}`)
   await fs.writeFile(file, Buffer.from(await res.arrayBuffer()))
 }
@@ -88,7 +88,7 @@ export async function upgrade(opts: { version?: string; force?: boolean; onProgr
 
   const asset = assetName()
   const base = `${releaseBase()}/download/v${version}`
-  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "vedecaps-upgrade-"))
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "deberopa-upgrade-"))
   try {
     progress(`Downloading ${asset} (v${version})`)
     const archive = path.join(tmp, asset)
@@ -105,7 +105,7 @@ export async function upgrade(opts: { version?: string; force?: boolean; onProgr
     // bsdtar (shipped with Windows 10+) reads zip as well as tar.gz
     const unpack = await run("tar", ["-xf", archive, "-C", tmp], { timeout: 120_000 })
     if (unpack.code !== 0) throw new UpdateError(`Could not unpack ${asset}: ${unpack.stderr.trim() || "tar failed"}`)
-    const exe = process.platform === "win32" ? "vedecaps.exe" : "vedecaps"
+    const exe = process.platform === "win32" ? "deberopa.exe" : "deberopa"
     const fresh = path.join(tmp, exe)
     await fs.chmod(fresh, 0o755).catch(() => {})
 
@@ -152,11 +152,11 @@ export async function cleanupOldBinary() {
 
 /**
  * At most once a day, look for a newer release. Returns the newer version, if any.
- * Only ever notifies: installing is always an explicit `vedecaps upgrade`.
+ * Only ever notifies: installing is always an explicit `deberopa upgrade`.
  */
 export async function checkForUpdate(): Promise<string | undefined> {
   try {
-    if (process.env.VEDECAPS_DISABLE_UPDATE_CHECK || !isCompiled()) return undefined
+    if (process.env.DEBEROPA_DISABLE_UPDATE_CHECK || !isCompiled()) return undefined
     const config = await getConfig()
     if (config.autoupdate === false) return undefined
     const state = await readState()

@@ -13,7 +13,7 @@ import { endProject, mockConfig, reply, startMockLLM, tmpDir, useProject, type M
 
 let mock: MockLLM
 let dir: string
-const savedTrust = process.env.VEDECAPS_TRUST_PROJECT
+const savedTrust = process.env.DEBEROPA_TRUST_PROJECT
 
 beforeAll(() => {
   mock = startMockLLM()
@@ -21,20 +21,20 @@ beforeAll(() => {
 afterAll(() => {
   mock.stop()
   endProject()
-  if (savedTrust !== undefined) process.env.VEDECAPS_TRUST_PROJECT = savedTrust
+  if (savedTrust !== undefined) process.env.DEBEROPA_TRUST_PROJECT = savedTrust
 })
 beforeEach(() => {
   dir = tmpDir()
   mock.reset()
   fs.mkdirSync(path.join(dir, ".git"))
-  fs.mkdirSync(path.join(dir, ".vedecaps", "plugin"), { recursive: true })
-  process.env.VEDECAPS_TRUST_PROJECT = "1"
+  fs.mkdirSync(path.join(dir, ".deberopa", "plugin"), { recursive: true })
+  process.env.DEBEROPA_TRUST_PROJECT = "1"
 })
 afterEach(() => {
   fs.rmSync(path.join(Paths.config, "plugin"), { recursive: true, force: true })
 })
 
-const plugin = (name: string, source: string, where = path.join(dir, ".vedecaps", "plugin")) => {
+const plugin = (name: string, source: string, where = path.join(dir, ".deberopa", "plugin")) => {
   fs.mkdirSync(where, { recursive: true })
   const file = path.join(where, name)
   fs.writeFileSync(file, source)
@@ -169,7 +169,7 @@ test("plugins in the user config directory and in the plugin setting load too", 
 
 test("an untrusted project's plugins are not run", async () => {
   plugin("evil.js", `export default () => { globalThis.__vdcEvil = true; return {} }`)
-  delete process.env.VEDECAPS_TRUST_PROJECT
+  delete process.env.DEBEROPA_TRUST_PROJECT
   ;(globalThis as any).__vdcEvil = false
   start()
   expect(await loadPlugins()).toEqual([])

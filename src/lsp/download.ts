@@ -38,7 +38,7 @@ export async function downloadServer(id: DownloadServer, dir: string, say: (mess
     release = `tags/${minor}.0`
   }
   const requestSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(5 * 60_000)]) : AbortSignal.timeout(5 * 60_000)
-  const metadata = await fetch(`https://api.github.com/repos/${repo}/releases/${release}`, { signal: requestSignal, headers: { "User-Agent": "vedecaps", Accept: "application/vnd.github+json" } })
+  const metadata = await fetch(`https://api.github.com/repos/${repo}/releases/${release}`, { signal: requestSignal, headers: { "User-Agent": "deberopa", Accept: "application/vnd.github+json" } })
   if (!metadata.ok) throw new Error(`Could not read the official ${id} release (HTTP ${metadata.status})`)
   const data: any = await metadata.json()
   const pattern = assetPattern(id)

@@ -6,7 +6,7 @@ import { shareHTML, startShareViewer } from "../../session/share"
 import { parse, type CommandSpec, UsageError } from "../args"
 
 export const spec: CommandSpec = {
-  usage: "vedecaps share [session-id] [options]",
+  usage: "deberopa share [session-id] [options]",
   description: "export a read-only HTML conversation or serve it temporarily",
   options: {
     out: { type: "string", short: "o", arg: "file", description: "HTML file to review and share (default session.html)" },

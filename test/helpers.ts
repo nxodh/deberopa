@@ -29,13 +29,13 @@ export function resetAll() {
 export function useProject(dir: string, config: Record<string, unknown> = {}) {
   initProject(dir)
   setCatalog({})
-  process.env.VEDECAPS_CONFIG_CONTENT = JSON.stringify(config)
+  process.env.DEBEROPA_CONFIG_CONTENT = JSON.stringify(config)
   resetAll()
 }
 
 /** Undo `useProject`: the next test file must not inherit this one's config. */
 export function endProject() {
-  delete process.env.VEDECAPS_CONFIG_CONTENT
+  delete process.env.DEBEROPA_CONFIG_CONTENT
   resetAll()
 }
 

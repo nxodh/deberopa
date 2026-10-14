@@ -10,7 +10,7 @@ const TOOL = "web_search_exa"
 let cached: { url: string; client: Promise<McpClient> } | undefined
 
 async function endpoint(): Promise<string> {
-  const base = process.env.VEDECAPS_EXA_URL || DEFAULT_URL
+  const base = process.env.DEBEROPA_EXA_URL || DEFAULT_URL
   const config = await getConfig()
   const key = config.websearch?.apiKey || process.env.EXA_API_KEY
   if (!key) return base
@@ -81,7 +81,7 @@ Use it for information that is recent or outside the codebase: library documenta
     // The free tier reports its limit as ordinary content, not as an error.
     if (/rate limit/i.test(text) && text.length < 800) {
       throw new Error(
-        "Exa's free search limit has been reached. Create a key at https://dashboard.exa.ai/api-keys and set EXA_API_KEY (or websearch.apiKey in vedecaps.json) to continue.",
+        "Exa's free search limit has been reached. Create a key at https://dashboard.exa.ai/api-keys and set EXA_API_KEY (or websearch.apiKey in deberopa.json) to continue.",
       )
     }
     if (text === "") return { title: query, output: "No results found.", metadata: { query, results: 0 } }

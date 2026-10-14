@@ -34,14 +34,14 @@ let cached: ShellInfo | undefined
  */
 export function detectShell(): ShellInfo {
   if (cached) return cached
-  const override = process.env.VEDECAPS_SHELL
+  const override = process.env.DEBEROPA_SHELL
   if (override) {
     const name = path.basename(override).replace(/\.exe$/i, "").toLowerCase()
     return (cached = { path: override, name, args: shellArgs(name) })
   }
   if (process.platform === "win32") {
     const gitBash = [
-      process.env.VEDECAPS_GIT_BASH_PATH,
+      process.env.DEBEROPA_GIT_BASH_PATH,
       path.join(process.env.ProgramFiles || "C:\\Program Files", "Git", "bin", "bash.exe"),
       path.join(process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)", "Git", "bin", "bash.exe"),
       path.join(process.env.LOCALAPPDATA || "", "Programs", "Git", "bin", "bash.exe"),

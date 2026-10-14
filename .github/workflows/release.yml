@@ -45,20 +45,20 @@ jobs:
       - name: Smoke test the Linux binary (Ubuntu and a clean debian:13 container)
         run: |
           npx bun build --compile --target=bun-linux-x64 script/smoke.ts --outfile dist/smoke-linux-x64
-          dist/smoke-linux-x64 dist/linux-x64/vedecaps
-          docker run --rm -v "$PWD/dist:/s:ro" debian:13 /s/smoke-linux-x64 /s/linux-x64/vedecaps
+          dist/smoke-linux-x64 dist/linux-x64/deberopa
+          docker run --rm -v "$PWD/dist:/s:ro" debian:13 /s/smoke-linux-x64 /s/linux-x64/deberopa
       - name: Smoke test the Alpine musl binary
         run: |
           npx bun build --compile --target=bun-linux-x64-musl script/smoke.ts --outfile dist/smoke-linux-x64-musl
-          docker run --rm -v "$PWD/dist:/s:ro" alpine:3.22 sh -c 'apk add --no-cache libstdc++ libgcc >/dev/null && /s/smoke-linux-x64-musl /s/linux-x64-musl/vedecaps'
+          docker run --rm -v "$PWD/dist:/s:ro" alpine:3.22 sh -c 'apk add --no-cache libstdc++ libgcc >/dev/null && /s/smoke-linux-x64-musl /s/linux-x64-musl/deberopa'
       - name: Build the VS Code extension
         working-directory: ide/vscode
         run: |
           npm ci
           npm run typecheck
           npm run package
-          test -s vedecaps.vsix
-          cp vedecaps.vsix "../../dist/vedecaps-vscode-$VERSION.vsix"
+          test -s deberopa.vsix
+          cp deberopa.vsix "../../dist/deberopa-vscode-$VERSION.vsix"
       - name: Release notes from the changelog
         run: |
           awk -v v="$VERSION" '
@@ -66,18 +66,18 @@ jobs:
             found && /^## / { exit }
             found { print }
           ' CHANGELOG.md > notes.md
-          test -s notes.md || echo "Vedecaps $VERSION" > notes.md
+          test -s notes.md || echo "Deberopa $VERSION" > notes.md
           cat >> notes.md <<'NOTES'
 
           ## Install
 
           Linux / macOS:
           ```sh
-          curl -fsSL https://raw.githubusercontent.com/nxodh/vedecaps/main/install.sh | sh
+          curl -fsSL https://raw.githubusercontent.com/nxodh/deberopa/main/install.sh | sh
           ```
           Windows (PowerShell):
           ```powershell
-          irm https://raw.githubusercontent.com/nxodh/vedecaps/main/install.ps1 | iex
+          irm https://raw.githubusercontent.com/nxodh/deberopa/main/install.ps1 | iex
           ```
           Verify downloads against `checksums.txt` (SHA-256).
           NOTES
@@ -86,8 +86,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --title "Vedecaps $VERSION" --notes-file notes.md \
-            dist/vedecaps-linux-x64.tar.gz dist/vedecaps-linux-arm64.tar.gz \
-            dist/vedecaps-linux-x64-musl.tar.gz dist/vedecaps-linux-arm64-musl.tar.gz \
-            dist/vedecaps-darwin-arm64.tar.gz dist/vedecaps-darwin-x64.tar.gz \
-            dist/vedecaps-windows-x64.zip dist/checksums.txt "dist/vedecaps-vscode-$VERSION.vsix"
+          gh release create "$GITHUB_REF_NAME" --title "Deberopa $VERSION" --notes-file notes.md \
+            dist/deberopa-linux-x64.tar.gz dist/deberopa-linux-arm64.tar.gz \
+            dist/deberopa-linux-x64-musl.tar.gz dist/deberopa-linux-arm64-musl.tar.gz \
+            dist/deberopa-darwin-arm64.tar.gz dist/deberopa-darwin-x64.tar.gz \
+            dist/deberopa-windows-x64.zip dist/checksums.txt "dist/deberopa-vscode-$VERSION.vsix"

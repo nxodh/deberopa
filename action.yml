@@ -1,5 +1,5 @@
-name: Vedecaps
-description: Run the Vedecaps AI coding agent in a workflow
+name: Deberopa
+description: Run the Deberopa AI coding agent in a workflow
 author: nxodh
 branding:
   icon: terminal
@@ -18,7 +18,7 @@ inputs:
     required: false
     default: build
   version:
-    description: Vedecaps version to install (for example 0.1.5). Default is the latest release.
+    description: Deberopa version to install (for example 0.2.0). Default is the latest release.
     required: false
     default: ""
   working-directory:
@@ -26,7 +26,7 @@ inputs:
     required: false
     default: "."
   config:
-    description: Configuration as JSON (merged over vedecaps.json). Use it to set permissions or providers.
+    description: Configuration as JSON (merged over deberopa.json). Use it to set permissions or providers.
     required: false
     default: ""
   allow-all:
@@ -43,13 +43,13 @@ inputs:
     required: false
     default: "false"
   branch:
-    description: Branch name for the commit. Default is vedecaps/<run id>-<attempt>.
+    description: Branch name for the commit. Default is deberopa/<run id>-<attempt>.
     required: false
     default: ""
   commit-message:
     description: Commit message.
     required: false
-    default: "Changes by Vedecaps"
+    default: "Changes by Deberopa"
   pull-request:
     description: >
       Open a pull request from that branch (implies commit). Needs the pull-requests write permission.
@@ -88,25 +88,25 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Install Vedecaps (Linux and macOS)
+    - name: Install Deberopa (Linux and macOS)
       if: runner.os != 'Windows'
       shell: bash
       env:
-        VEDECAPS_VERSION: ${{ inputs.version }}
-        VEDECAPS_NO_MODIFY_PATH: "1"
+        DEBEROPA_VERSION: ${{ inputs.version }}
+        DEBEROPA_NO_MODIFY_PATH: "1"
       run: |
         sh "${{ github.action_path }}/install.sh"
-        echo "$HOME/.vedecaps/bin" >> "$GITHUB_PATH"
+        echo "$HOME/.deberopa/bin" >> "$GITHUB_PATH"
 
-    - name: Install Vedecaps (Windows)
+    - name: Install Deberopa (Windows)
       if: runner.os == 'Windows'
       shell: pwsh
       env:
-        VEDECAPS_VERSION: ${{ inputs.version }}
-        VEDECAPS_NO_MODIFY_PATH: "1"
+        DEBEROPA_VERSION: ${{ inputs.version }}
+        DEBEROPA_NO_MODIFY_PATH: "1"
       run: |
         & "${{ github.action_path }}/install.ps1"
-        Add-Content -Path $env:GITHUB_PATH -Value (Join-Path $env:LOCALAPPDATA 'vedecaps\bin')
+        Add-Content -Path $env:GITHUB_PATH -Value (Join-Path $env:LOCALAPPDATA 'deberopa\bin')
 
     - name: Run
       id: run
@@ -121,20 +121,20 @@ runs:
         INPUT_ALLOW_ALL: ${{ inputs.allow-all }}
       run: |
         set -euo pipefail
-        export PATH="$HOME/.vedecaps/bin:${LOCALAPPDATA:+$(cygpath -u "$LOCALAPPDATA" 2>/dev/null)/vedecaps/bin:}$PATH"
+        export PATH="$HOME/.deberopa/bin:${LOCALAPPDATA:+$(cygpath -u "$LOCALAPPDATA" 2>/dev/null)/deberopa/bin:}$PATH"
         args=(run --agent "$INPUT_AGENT" --dir "$INPUT_DIR")
         if [ -n "$INPUT_MODEL" ]; then args+=(-m "$INPUT_MODEL"); fi
         if [ "$INPUT_ALLOW_ALL" = "true" ]; then args+=(--dangerously-skip-permissions); fi
-        if [ -n "$INPUT_CONFIG" ]; then export VEDECAPS_CONFIG_CONTENT="$INPUT_CONFIG"; fi
-        out="$RUNNER_TEMP/vedecaps-response.md"
+        if [ -n "$INPUT_CONFIG" ]; then export DEBEROPA_CONFIG_CONTENT="$INPUT_CONFIG"; fi
+        out="$RUNNER_TEMP/deberopa-response.md"
         status=0
-        vedecaps "${args[@]}" -- "$INPUT_PROMPT" > "$out" || status=$?
+        deberopa "${args[@]}" -- "$INPUT_PROMPT" > "$out" || status=$?
         {
-          echo "### Vedecaps"
+          echo "### Deberopa"
           echo
           cat "$out"
         } >> "$GITHUB_STEP_SUMMARY"
-        delimiter="VEDECAPS_$(date +%s%N)_EOF"
+        delimiter="DEBEROPA_$(date +%s%N)_EOF"
         {
           echo "response<<$delimiter"
           cat "$out"
@@ -159,7 +159,7 @@ runs:
         RUN_ATTEMPT: ${{ github.run_attempt }}
         DEFAULT_BASE: ${{ github.ref_name }}
         REPOSITORY: ${{ github.repository }}
-        OUTPUT_FILE: ${{ runner.temp }}/vedecaps-response.md
+        OUTPUT_FILE: ${{ runner.temp }}/deberopa-response.md
       run: |
         set -euo pipefail
         cd "$INPUT_DIR"
@@ -176,7 +176,7 @@ runs:
           exit 0
         fi
 
-        branch="${INPUT_BRANCH:-vedecaps/${RUN_ID}-${RUN_ATTEMPT}}"
+        branch="${INPUT_BRANCH:-deberopa/${RUN_ID}-${RUN_ATTEMPT}}"
         git config user.name "github-actions[bot]"
         git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
         git checkout -b "$branch"
@@ -192,7 +192,7 @@ runs:
         if [ "$INPUT_PR" = "true" ]; then
           base="${INPUT_BASE:-$DEFAULT_BASE}"
           title="${INPUT_TITLE:-$INPUT_MESSAGE}"
-          body="$(printf 'Opened by Vedecaps.\n\n%s\n' "$(cat "$OUTPUT_FILE" 2>/dev/null | head -c 6000)")"
+          body="$(printf 'Opened by Deberopa.\n\n%s\n' "$(cat "$OUTPUT_FILE" 2>/dev/null | head -c 6000)")"
           url="$(gh pr create --repo "$REPOSITORY" --base "$base" --head "$branch" --title "$title" --body "$body")"
           echo "pull-request-url=$url" >> "$GITHUB_OUTPUT"
         fi

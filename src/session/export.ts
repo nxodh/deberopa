@@ -7,7 +7,7 @@ import { visibleMessages } from "./revert"
 import type { AssistantMessage, Message, Part, SessionInfo, ToolPart } from "./message"
 
 export interface SessionExport {
-  format: "vedecaps-session"
+  format: "deberopa-session"
   version: 1
   exportedBy: string
   info: SessionInfo
@@ -17,7 +17,7 @@ export interface SessionExport {
 export async function exportJSON(sessionID: string): Promise<SessionExport> {
   const info = await requireSession(sessionID)
   const messages = await visibleMessages(sessionID)
-  const data: SessionExport = { format: "vedecaps-session", version: 1, exportedBy: `vedecaps ${VERSION}`, info: { ...info, revert: undefined }, messages }
+  const data: SessionExport = { format: "deberopa-session", version: 1, exportedBy: `deberopa ${VERSION}`, info: { ...info, revert: undefined }, messages }
   // Tool output can contain whatever was on screen (an `env` dump, a .env file): scrub key shapes.
   return JSON.parse(redact(JSON.stringify(data))) as SessionExport
 }
@@ -97,8 +97,8 @@ export function parseExport(text: string): SessionExport {
   } catch {
     throw new ImportError("The file is not valid JSON.")
   }
-  if (data?.format !== "vedecaps-session" || !data.info || !Array.isArray(data.messages)) {
-    throw new ImportError("This is not a Vedecaps session export (expected the JSON written by `vedecaps export`).")
+  if (data?.format !== "deberopa-session" || !data.info || !Array.isArray(data.messages)) {
+    throw new ImportError("This is not a Deberopa session export (expected the JSON written by `deberopa export`).")
   }
   if (data.version !== 1) throw new ImportError("Unsupported session export version.")
   if (typeof data.info.title !== "string" || data.messages.some((m: any) =>

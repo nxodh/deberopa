@@ -2,14 +2,22 @@ import os from "node:os"
 import path from "node:path"
 import fs from "node:fs"
 import pkg from "../package.json"
+import { LEGACY_NAME, legacyEnvWarning, migrateEnv, migrateLegacyDirs } from "./legacy"
 
-export const NAME = "vedecaps"
+// The old environment variable prefix keeps working for one release (and says so once).
+const legacyEnv = migrateEnv()
+{
+  const warning = legacyEnvWarning(legacyEnv)
+  if (warning) process.stderr.write(warning + "\n")
+}
+
+export const NAME = "deberopa"
 export const VERSION: string = pkg.version
-export const REPO = "nxodh/vedecaps"
+export const REPO = "nxodh/deberopa"
 
-function resolvePaths() {
+function resolvePaths(name: string = NAME) {
   const home = os.homedir()
-  const override = process.env.VEDECAPS_HOME
+  const override = process.env.DEBEROPA_HOME
   if (override) {
     return {
       home,
@@ -24,22 +32,29 @@ function resolvePaths() {
     const roaming = process.env.APPDATA || path.join(home, "AppData", "Roaming")
     return {
       home,
-      data: path.join(local, NAME),
-      config: path.join(roaming, NAME),
-      cache: path.join(local, NAME, "cache"),
-      state: path.join(local, NAME, "state"),
+      data: path.join(local, name),
+      config: path.join(roaming, name),
+      cache: path.join(local, name, "cache"),
+      state: path.join(local, name, "state"),
     }
   }
   return {
     home,
-    data: path.join(process.env.XDG_DATA_HOME || path.join(home, ".local", "share"), NAME),
-    config: path.join(process.env.XDG_CONFIG_HOME || path.join(home, ".config"), NAME),
-    cache: path.join(process.env.XDG_CACHE_HOME || path.join(home, ".cache"), NAME),
-    state: path.join(process.env.XDG_STATE_HOME || path.join(home, ".local", "state"), NAME),
+    data: path.join(process.env.XDG_DATA_HOME || path.join(home, ".local", "share"), name),
+    config: path.join(process.env.XDG_CONFIG_HOME || path.join(home, ".config"), name),
+    cache: path.join(process.env.XDG_CACHE_HOME || path.join(home, ".cache"), name),
+    state: path.join(process.env.XDG_STATE_HOME || path.join(home, ".local", "state"), name),
   }
 }
 
 const base = resolvePaths()
+
+// First run after the rename: bring settings, logins and sessions over from the old folders.
+if (!process.env.DEBEROPA_HOME) {
+  const old = resolvePaths(LEGACY_NAME)
+  const copied = migrateLegacyDirs({ config: old.config, data: old.data, state: old.state }, { config: base.config, data: base.data, state: base.state })
+  if (copied.length) process.stderr.write(`deberopa: copied your ${copied.join(", ")} from the old folders (they were left in place and are not used any more)\n`)
+}
 
 /** Well-known directories. Created lazily by `ensureDirs()`. */
 export const Paths = {

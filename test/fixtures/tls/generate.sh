@@ -40,22 +40,22 @@ leaf() { # leaf <name> <issuer> <san> [not_before not_after]
 
 LOCAL_SAN="DNS:localhost,IP:127.0.0.1,IP:::1"
 
-ca ca "/CN=Vedecaps Test CA"
-ca other-ca "/CN=Vedecaps Other Test CA"
+ca ca "/CN=Deberopa Test CA"
+ca other-ca "/CN=Deberopa Other Test CA"
 # Name constraints. Measured with Bun 1.4 (BoringSSL): DNS constraints are enforced and work with IP
 # SANs on the leaf; any IP constraint makes a leaf that has an IP SAN fail with
 # UNSUPPORTED_CONSTRAINT_TYPE. So the "nc" CA constrains DNS names only, and "nc-ip" documents the form
 # that does not work.
-ca nc-ca "/CN=Vedecaps Name Constrained Test CA" \
+ca nc-ca "/CN=Deberopa Name Constrained Test CA" \
   "nameConstraints=critical,permitted;DNS:.local,permitted;DNS:localhost"
-ca nc-ip-ca "/CN=Vedecaps IP Constrained Test CA" \
+ca nc-ip-ca "/CN=Deberopa IP Constrained Test CA" \
   "nameConstraints=critical,permitted;DNS:localhost,permitted;IP:127.0.0.0/255.0.0.0,permitted;IP:::1/FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF"
 
 leaf server ca "$LOCAL_SAN"
 leaf other-server other-ca "$LOCAL_SAN"
 leaf wrongname ca "DNS:wrong.test"
 leaf expired ca "$LOCAL_SAN" 20200101000000Z 20200102000000Z
-leaf nc-server nc-ca "DNS:localhost,DNS:diparnux.local,IP:127.0.0.1,IP:::1"
+leaf nc-server nc-ca "DNS:localhost,DNS:opereta.local,IP:127.0.0.1,IP:::1"
 leaf nc-bad-server nc-ca "DNS:localhost,DNS:evil.example.com,IP:127.0.0.1"
 leaf nc-ip-server nc-ip-ca "DNS:localhost,IP:127.0.0.1,IP:::1"
 

@@ -13,7 +13,7 @@ auth.json
 *.key
 *.p12
 *.pfx
-/.vedecaps/
+/.deberopa/
 /data/
 /logs/
 state.json

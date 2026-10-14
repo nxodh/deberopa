@@ -16,13 +16,13 @@ import { parse, type CommandSpec } from "../args"
 import { bootstrap } from "../bootstrap"
 
 export const spec: CommandSpec = {
-  usage: "vedecaps debug [config|local] [options]",
+  usage: "deberopa debug [config|local] [options]",
   description: "show paths, loaded config, providers and tooling (useful for bug reports)",
   options: {
     "check-tools": { type: "boolean", description: "with `local`: send one request per server to test tool calling (generates tokens)" },
     help: { type: "boolean", short: "h", description: "show this help" },
   },
-  examples: ["vedecaps debug", "vedecaps debug local", "vedecaps debug local --check-tools"],
+  examples: ["deberopa debug", "deberopa debug local", "deberopa debug local --check-tools"],
 }
 
 export async function main(argv: string[]): Promise<number> {
@@ -40,7 +40,7 @@ export async function main(argv: string[]): Promise<number> {
     return runLocalDebug({ checkTools: values["check-tools"] === true, providers: Object.values(await allProviders()), out })
   }
   const p = project()
-  out(`vedecaps ${VERSION}`)
+  out(`deberopa ${VERSION}`)
   out(`${process.platform} ${process.arch} · ${os.release()} · runtime ${typeof Bun !== "undefined" ? `bun ${Bun.version}` : `node ${process.version}`}`)
   out(`shell      ${detectShell().path} (${detectShell().name})`)
   out(`git        ${which("git") ?? "not found"}`)
@@ -61,7 +61,7 @@ export async function main(argv: string[]): Promise<number> {
   const providers = Object.values(await allProviders()).filter((x) => x.source !== "none")
   if (providers.length === 0) out("  none")
   for (const x of providers) {
-    const limit = x.maxConcurrency ? `  max ${x.maxConcurrency} at once${x.maxConcurrencySource === "diparnux" ? " (from the gateway's slots)" : ""}` : ""
+    const limit = x.maxConcurrency ? `  max ${x.maxConcurrency} at once${x.maxConcurrencySource === "opereta" ? " (from the gateway's slots)" : ""}` : ""
     out(`  ${x.id.padEnd(14)} ${x.protocol.padEnd(9)} via ${x.source.padEnd(7)} ${Object.keys(x.models).length} models${limit}`)
     if (x.maxConcurrencyIgnored) out(`    ! ${x.maxConcurrencyIgnored}`)
     for (const source of x.tlsSources ?? []) out(`    trusts only ${source.label}${source.fingerprints[0] ? ` (SHA-256 ${source.fingerprints[0]})` : ""}`)

@@ -134,13 +134,13 @@ export async function* streamOpenAI(input: StreamInput): AsyncGenerator<StreamEv
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "text/event-stream",
-    "User-Agent": `vedecaps/${VERSION}`,
+    "User-Agent": `deberopa/${VERSION}`,
     ...provider.headers,
   }
   if (provider.apiKey) headers.Authorization = `Bearer ${provider.apiKey}`
   if (provider.id === "openrouter") {
-    headers["HTTP-Referer"] ??= "https://github.com/nxodh/vedecaps"
-    headers["X-Title"] ??= "Vedecaps"
+    headers["HTTP-Referer"] ??= "https://github.com/nxodh/deberopa"
+    headers["X-Title"] ??= "Deberopa"
   }
 
   let response: Response

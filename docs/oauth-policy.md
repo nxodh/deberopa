@@ -10,7 +10,7 @@ remain available. Bedrock, Vertex and Azure were explicitly excluded.
 
 [Anthropic's credential-use rules](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use)
 restrict offering Claude.ai login inside a third-party app and collecting or
-intermediating subscription/session credentials. Vedecaps must not extract tokens
+intermediating subscription/session credentials. Deberopa must not extract tokens
 from Claude Code, Keychain or another application, impersonate that client, or
 route subscription credentials to its own model adapter. API keys remain the
 supported integration here. Operating the unmodified official CLI is a separate
@@ -25,7 +25,7 @@ describes per-account dynamic registration, user consent, PKCE, state, nonce and
 identity/permission validation.
 [Models and inference](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference)
 requires authorized Responses API usage and explicitly excludes private
-backend-api endpoints. Vedecaps currently uses Chat Completions and has no
+backend-api endpoints. Deberopa currently uses Chat Completions and has no
 validated account/workspace-bound OAuth or Responses implementation. Under the
 requested conservative standard, this integration is deferred until eligibility,
 permissions, secure token lifecycle and a complete conforming implementation can

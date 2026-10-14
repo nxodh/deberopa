@@ -10,7 +10,7 @@ import { downloadServer } from "./download"
 const log = createLogger("lsp-install")
 
 /**
- * Language servers Vedecaps can fetch itself, always into its own data directory (never a
+ * Language servers Deberopa can fetch itself, always into its own data directory (never a
  * global install), and only after the user said yes. Official platform availability and the required toolchain are checked before installation.
  */
 export interface Installer {
@@ -69,7 +69,7 @@ async function npmInstall(dir: string, packages: string[], signal?: AbortSignal)
   if (!npm) throw new Error("npm was not found on PATH")
   await fs.mkdir(dir, { recursive: true })
   // a package.json of its own keeps npm from walking up into the user's project
-  await fs.writeFile(path.join(dir, "package.json"), JSON.stringify({ name: "vedecaps-lsp", private: true }))
+  await fs.writeFile(path.join(dir, "package.json"), JSON.stringify({ name: "deberopa-lsp", private: true }))
   const result = await exec([npm, "install", "--prefix", dir, "--no-save", "--ignore-scripts", ...packages], { timeoutMs: 5 * 60_000, signal })
   if (result.code !== 0) throw new Error(`npm install failed:\n${result.output.trim()}`)
 }
@@ -93,7 +93,7 @@ export const INSTALLERS: Installer[] = [
   })),
   {
     id: "ruby-lsp", label: "Ruby LSP", requires: "gem", size: "about 30 MB plus native build dependencies",
-    how: "gem install ruby-lsp into Vedecaps' directory (dependencies may compile native code)",
+    how: "gem install ruby-lsp into Deberopa' directory (dependencies may compile native code)",
     command: (dir) => [which("ruby") ?? "ruby", path.join(dir, "ruby-lsp.rb")],
     marker: (dir) => path.join(dir, "ruby-lsp.rb"),
     async install(dir, _say, signal) {
@@ -150,7 +150,7 @@ export const INSTALLERS: Installer[] = [
       const asset = rustAnalyzerAsset()
       const res = await fetch(`https://github.com/rust-lang/rust-analyzer/releases/latest/download/${asset.name}`, {
         signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(5 * 60_000)]) : AbortSignal.timeout(5 * 60_000),
-        headers: { "User-Agent": `vedecaps/${VERSION}` },
+        headers: { "User-Agent": `deberopa/${VERSION}` },
       })
       if (!res.ok) throw new Error(`download failed (HTTP ${res.status})`)
       const data = Buffer.from(await res.arrayBuffer())

@@ -9,7 +9,7 @@ import { App } from "../../tui/app"
 import { app } from "../../tui/state"
 
 export const spec: CommandSpec = {
-  usage: "vedecaps [project] [options]",
+  usage: "deberopa [project] [options]",
   description: "start the terminal UI",
   options: {
     continue: { type: "boolean", short: "c", description: "continue the last session" },
@@ -24,7 +24,7 @@ export const spec: CommandSpec = {
 export async function main(argv: string[]): Promise<number> {
   const { values, positionals } = parse(argv, spec.options!)
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
-    throw new UsageError('The terminal UI needs an interactive terminal. For scripts and pipes use: vedecaps run "your request"')
+    throw new UsageError('The terminal UI needs an interactive terminal. For scripts and pipes use: deberopa run "your request"')
   }
   await bootstrap({ directory: positionals[0] ? path.resolve(positionals[0]) : undefined, printLogs: values["print-logs"], mcp: "background" })
 
@@ -49,6 +49,6 @@ export async function main(argv: string[]): Promise<number> {
   } finally {
     instance.unmount()
   }
-  if (app.session) process.stdout.write(`\nResume this session with: vedecaps -s ${app.session.id}\n`)
+  if (app.session) process.stdout.write(`\nResume this session with: deberopa -s ${app.session.id}\n`)
   return 0
 }

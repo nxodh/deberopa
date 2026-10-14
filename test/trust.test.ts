@@ -7,24 +7,24 @@ import { initProject } from "../src/project"
 import { tmpDir } from "./helpers"
 
 let dir: string
-const saved = process.env.VEDECAPS_TRUST_PROJECT
+const saved = process.env.DEBEROPA_TRUST_PROJECT
 
 beforeAll(() => {
-  delete process.env.VEDECAPS_TRUST_PROJECT
+  delete process.env.DEBEROPA_TRUST_PROJECT
 })
 afterAll(() => {
-  if (saved !== undefined) process.env.VEDECAPS_TRUST_PROJECT = saved
-  delete process.env.VEDECAPS_CONFIG_CONTENT
+  if (saved !== undefined) process.env.DEBEROPA_TRUST_PROJECT = saved
+  delete process.env.DEBEROPA_CONFIG_CONTENT
 })
 beforeEach(() => {
   dir = tmpDir()
-  delete process.env.VEDECAPS_CONFIG_CONTENT
+  delete process.env.DEBEROPA_CONFIG_CONTENT
   fs.mkdirSync(path.join(dir, ".git"))
   initProject(dir)
   resetConfig()
 })
 
-const write = (config: unknown, name = "vedecaps.json") => fs.writeFileSync(path.join(dir, name), JSON.stringify(config))
+const write = (config: unknown, name = "deberopa.json") => fs.writeFileSync(path.join(dir, name), JSON.stringify(config))
 
 const hostile = {
   model: "mock/m",
@@ -79,29 +79,29 @@ test("a trusted project keeps everything", async () => {
   expect(await untrustProject(dir)).toBe(false)
 })
 
-test("the same rules apply to .vedecaps/ config inside the project", async () => {
-  fs.mkdirSync(path.join(dir, ".vedecaps"))
-  fs.writeFileSync(path.join(dir, ".vedecaps", "vedecaps.json"), JSON.stringify({ mcp: { x: { type: "local", command: ["x"] } } }))
+test("the same rules apply to .deberopa/ config inside the project", async () => {
+  fs.mkdirSync(path.join(dir, ".deberopa"))
+  fs.writeFileSync(path.join(dir, ".deberopa", "deberopa.json"), JSON.stringify({ mcp: { x: { type: "local", command: ["x"] } } }))
   const loaded = await loadConfig()
   expect(loaded.config.mcp).toBeUndefined()
   expect(loaded.blocked[0]).toContain("mcp.x")
 })
 
 test("the user's own config (environment) is never filtered", async () => {
-  process.env.VEDECAPS_CONFIG_CONTENT = JSON.stringify({ mcp: { mine: { type: "local", command: ["ok"] } }, permission: { bash: "allow" } })
+  process.env.DEBEROPA_CONFIG_CONTENT = JSON.stringify({ mcp: { mine: { type: "local", command: ["ok"] } }, permission: { bash: "allow" } })
   const loaded = await loadConfig()
   expect(loaded.config.mcp?.mine).toBeDefined()
   expect(loaded.config.permission).toEqual({ bash: "allow" })
 })
 
-test("VEDECAPS_TRUST_PROJECT=1 vouches for a checkout in CI", async () => {
+test("DEBEROPA_TRUST_PROJECT=1 vouches for a checkout in CI", async () => {
   write(hostile)
-  process.env.VEDECAPS_TRUST_PROJECT = "1"
+  process.env.DEBEROPA_TRUST_PROJECT = "1"
   try {
     resetConfig()
     expect((await loadConfig()).config.mcp?.shell).toBeDefined()
   } finally {
-    delete process.env.VEDECAPS_TRUST_PROJECT
+    delete process.env.DEBEROPA_TRUST_PROJECT
   }
 })
 

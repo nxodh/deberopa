@@ -52,29 +52,29 @@ jobs:
       - name: Alpine musl smoke test
         run: |
           npx bun build --compile --target=bun-linux-x64-musl script/smoke.ts --outfile dist/smoke-linux-x64-musl
-          docker run --rm -v "$PWD/dist:/s:ro" alpine:3.22 sh -c 'apk add --no-cache libstdc++ libgcc >/dev/null && /s/smoke-linux-x64-musl /s/linux-x64-musl/vedecaps'
+          docker run --rm -v "$PWD/dist:/s:ro" alpine:3.22 sh -c 'apk add --no-cache libstdc++ libgcc >/dev/null && /s/smoke-linux-x64-musl /s/linux-x64-musl/deberopa'
       - name: Smoke test (Ubuntu)
-        run: dist/smoke-linux-x64 dist/linux-x64/vedecaps
+        run: dist/smoke-linux-x64 dist/linux-x64/deberopa
       - name: Smoke test (clean debian:13 container, only the binaries inside)
-        run: docker run --rm -v "$PWD/dist:/s:ro" debian:13 /s/smoke-linux-x64 /s/linux-x64/vedecaps
+        run: docker run --rm -v "$PWD/dist:/s:ro" debian:13 /s/smoke-linux-x64 /s/linux-x64/deberopa
       - name: Terminal UI in a pseudo-terminal (compiled binary, mock model)
         run: |
           python3 -m venv "$RUNNER_TEMP/tui-venv"
           "$RUNNER_TEMP/tui-venv/bin/python" -m pip install -r script/requirements-tui.txt
-          "$RUNNER_TEMP/tui-venv/bin/python" script/tui-pty.py "$PWD/dist/linux-x64/vedecaps"
+          "$RUNNER_TEMP/tui-venv/bin/python" script/tui-pty.py "$PWD/dist/linux-x64/deberopa"
       - name: install.sh in a clean debian:13 container (local release host)
         run: |
           npx bun run script/release-server.ts dist 48731 &
           sleep 2
           docker run --rm --network host -v "$PWD/install.sh:/install.sh:ro" \
-            -e VEDECAPS_RELEASE_URL=http://127.0.0.1:48731 \
+            -e DEBEROPA_RELEASE_URL=http://127.0.0.1:48731 \
             -e EXPECTED="$(node -p "require('./package.json').version")" debian:13 sh -c '
               set -e
               apt-get update -qq >/dev/null && apt-get install -y -qq curl ca-certificates >/dev/null
               sh /install.sh
-              test "$($HOME/.vedecaps/bin/vedecaps --version)" = "$EXPECTED"
+              test "$($HOME/.deberopa/bin/deberopa --version)" = "$EXPECTED"
               sh /install.sh >/dev/null
-              test "$(grep -c "# vedecaps" $HOME/.profile)" = 1
+              test "$(grep -c "# deberopa" $HOME/.profile)" = 1
             '
       - name: Start a local release host and a mock model for the action test
         run: |
@@ -85,9 +85,9 @@ jobs:
         id: action
         uses: ./
         env:
-          VEDECAPS_RELEASE_URL: http://127.0.0.1:48732
-          VEDECAPS_DISABLE_LOCAL_DETECT: "1"
-          VEDECAPS_DISABLE_MODELS_FETCH: "1"
+          DEBEROPA_RELEASE_URL: http://127.0.0.1:48732
+          DEBEROPA_DISABLE_LOCAL_DETECT: "1"
+          DEBEROPA_DISABLE_MODELS_FETCH: "1"
         with:
           prompt: Summarise this repository
           config: >-
@@ -100,7 +100,7 @@ jobs:
           echo "$RESPONSE" | head -3
           echo "$RESPONSE" | grep -q "완료"
           expected="$(node -p "require('./package.json').version")"
-          test "$("$HOME/.vedecaps/bin/vedecaps" --version)" = "$expected"
+          test "$("$HOME/.deberopa/bin/deberopa" --version)" = "$expected"
       - name: Prepare a throwaway repository with a local bare remote (never the real origin)
         run: |
           set -e
@@ -119,15 +119,15 @@ jobs:
         id: commit
         uses: ./
         env:
-          VEDECAPS_RELEASE_URL: http://127.0.0.1:48732
-          VEDECAPS_DISABLE_LOCAL_DETECT: "1"
-          VEDECAPS_DISABLE_MODELS_FETCH: "1"
+          DEBEROPA_RELEASE_URL: http://127.0.0.1:48732
+          DEBEROPA_DISABLE_LOCAL_DETECT: "1"
+          DEBEROPA_DISABLE_MODELS_FETCH: "1"
         with:
           prompt: edit the notes
           working-directory: ${{ runner.temp }}/action-commit/work
           commit: "true"
-          branch: vedecaps/ci-test
-          commit-message: Add notes via Vedecaps
+          branch: deberopa/ci-test
+          commit-message: Add notes via Deberopa
           config: >-
             {"model":"mock/m","snapshot":false,"provider":{"mock":{"name":"Mock","api":"http://127.0.0.1:48733/v1",
             "models":{"m":{"name":"M","tool_call":true,"limit":{"context":100000,"output":4000}}}}}}
@@ -141,16 +141,16 @@ jobs:
           set -e
           remote="$RUNNER_TEMP/action-commit/remote.git"
           test "$CHANGED" = "true"
-          test "$BRANCH" = "vedecaps/ci-test"
+          test "$BRANCH" = "deberopa/ci-test"
           test -z "$PR_URL"
-          test "$(git -C "$remote" rev-parse vedecaps/ci-test)" = "$COMMIT"
-          test "$(git -C "$remote" log -1 --format=%s vedecaps/ci-test)" = "Add notes via Vedecaps"
-          git -C "$remote" show vedecaps/ci-test:notes.txt | grep -q "line one"
+          test "$(git -C "$remote" rev-parse deberopa/ci-test)" = "$COMMIT"
+          test "$(git -C "$remote" log -1 --format=%s deberopa/ci-test)" = "Add notes via Deberopa"
+          git -C "$remote" show deberopa/ci-test:notes.txt | grep -q "line one"
           # main on the remote is untouched
           test "$(git -C "$remote" log -1 --format=%s main)" = "init"
       - name: Binaries must not embed build-machine paths
         run: |
-          if strings -a dist/linux-x64/vedecaps | grep -E "/home/runner/|/Users/"; then
+          if strings -a dist/linux-x64/deberopa | grep -E "/home/runner/|/Users/"; then
             echo "build-machine path found in the binary"; exit 1
           fi
       - name: Check release assets
@@ -160,7 +160,7 @@ jobs:
           test "$(wc -l < dist/checksums.txt)" -eq 7
       - uses: actions/upload-artifact@v4
         with:
-          name: vedecaps-binaries
+          name: deberopa-binaries
           path: |
             dist/*.tar.gz
             dist/*.zip
@@ -178,21 +178,21 @@ jobs:
       - name: Build and package the Windows executable
         run: npx bun run script/build.ts --target windows-x64 --package
       - name: Smoke test
-        run: npx bun run script/smoke.ts dist/windows-x64/vedecaps.exe
+        run: npx bun run script/smoke.ts dist/windows-x64/deberopa.exe
       - name: install.ps1 on Windows PowerShell 5.1 and PowerShell 7 (local release host)
         shell: pwsh
         run: |
           $server = Start-Process -FilePath (Resolve-Path 'node_modules/bun/bin/bun.exe') -ArgumentList 'run','script/release-server.ts','dist','48731' -PassThru -NoNewWindow
           Start-Sleep -Seconds 3
           $expected = (Get-Content package.json | ConvertFrom-Json).version
-          $env:VEDECAPS_RELEASE_URL = 'http://127.0.0.1:48731'
+          $env:DEBEROPA_RELEASE_URL = 'http://127.0.0.1:48731'
           try {
             foreach ($shell in 'powershell', 'pwsh') {
               $dir = Join-Path $env:RUNNER_TEMP "vdc-$shell"
-              $env:VEDECAPS_INSTALL_DIR = $dir
+              $env:DEBEROPA_INSTALL_DIR = $dir
               & $shell -NoProfile -ExecutionPolicy Bypass -Command "Get-Content -Raw install.ps1 | Invoke-Expression"
               if ($LASTEXITCODE -ne 0) { throw "install.ps1 failed under $shell" }
-              $got = & (Join-Path $dir 'vedecaps.exe') --version
+              $got = & (Join-Path $dir 'deberopa.exe') --version
               if ($got -ne $expected) { throw "expected $expected, got $got under $shell" }
               # installing again over an existing copy must work too
               & $shell -NoProfile -ExecutionPolicy Bypass -Command "Get-Content -Raw install.ps1 | Invoke-Expression"
@@ -219,7 +219,7 @@ jobs:
           npm ci
           npm run typecheck
           npm run package
-          test -s vedecaps.vsix
+          test -s deberopa.vsix
       - name: SDK build
         working-directory: sdk/js
         run: |
@@ -228,8 +228,8 @@ jobs:
           test -s dist/index.js
       - uses: actions/upload-artifact@v4
         with:
-          name: vedecaps-vscode
-          path: ide/vscode/vedecaps.vsix
+          name: deberopa-vscode
+          path: ide/vscode/deberopa.vsix
 
   go-sdk:
     name: Go SDK

@@ -75,34 +75,34 @@ SDK는 레지스트리에 게시하지 않았고 Go SDK의 별도 모듈 태그�
 확장의 전체 CI가 통과했습니다. 릴리스는 버전을 0.1.3으로 맞춘 main 커밋의 CI가
 성공한 뒤 생성하도록 검사합니다. 0.1.2 이전 구현 범위는 위 기록을 참고하세요.
 
-## 0.1.4: Diparnux 호환과 동시 요청 상한
+## 0.1.4: Opereta 호환과 동시 요청 상한
 
-설계서 `vedecaps-repo-changes-design.md`의 VE1·VE4(PR A)와 VE3(PR B)를 구현합니다.
-VE2(`options.ca`)는 Diparnux의 TLS가 나올 때까지 미뤘고 0.1.5에서 구현했습니다.
+Opereta 저장소의 저장소 변경 설계서의 VE1·VE4(PR A)와 VE3(PR B)를 구현합니다.
+VE2(`options.ca`)는 Opereta의 TLS가 나올 때까지 미뤘고 0.1.5에서 구현했습니다.
 
-**PR A (VE1 + VE4)**: 키가 필요한 서버 감지(`DIPARNUX_API_KEY`, `LLAMA_API_KEY`), 401/403 보고,
-Diparnux 표식과 `/diparnux/info` 인식(값 검증, 제어 문자 제거), 구성된 로컬 제공자의 컨텍스트
+**PR A (VE1 + VE4)**: 키가 필요한 서버 감지(`OPERETA_API_KEY`, `LLAMA_API_KEY`), 401/403 보고,
+Opereta 표식과 `/opereta/info` 인식(값 검증, 제어 문자 제거), 구성된 로컬 제공자의 컨텍스트
 보강, `debug local`의 슬롯 정보와 `--check-tools`. 호스팅 주소에는 요청하지 않고 리다이렉트는
 오류로 처리합니다. 모의 서버로 시험 23개를 추가했습니다(T1.1~T1.11, T4.1~T4.7).
 
-**PR B (VE3)**: `provider.<id>.options.max_concurrency`와 Diparnux 슬롯 수 자동값. 우선순위가 있는
+**PR B (VE3)**: `provider.<id>.options.max_concurrency`와 Opereta 슬롯 수 자동값. 우선순위가 있는
 세마포어(`src/provider/limiter.ts`)를 `streamModel` 앞에 두며 취소, 오류, 소비자의 조기 종료에서
 자리를 반납합니다. 시험 22개(T3.1~T3.10, 수용 기준 4.7과 상한이 없을 때 429가 나는 대조군)를
 추가했습니다. `max_concurrency: 1`에서 서브에이전트 2개를 부르는 세션이 끝까지 가는 것을 확인했습니다.
 
-선택 사항이던 대기 중 상태 표시(TUI)는 넣지 않았습니다. `vedecaps debug`의 제공자 줄에 상한과
+선택 사항이던 대기 중 상태 표시(TUI)는 넣지 않았습니다. `deberopa debug`의 제공자 줄에 상한과
 그 출처가 표시됩니다.
 
 릴리스는 PR #1을 병합한 main 커밋의 전체 CI(Windows·Ubuntu·Debian·Alpine 실행파일, SDK, 확장)가
 성공한 뒤 만들도록 검사합니다. 실제 llama.cpp 서버(`--jinja`, `--api-key`)로 감지, 401 안내,
-도구 호출 시험, 키 기반 실행을 확인했으나 실제 Diparnux 서버는 확인하지 못했습니다(Diparnux 쪽
+도구 호출 시험, 키 기반 실행을 확인했으나 실제 Opereta 서버는 확인하지 못했습니다(Opereta 쪽
 CI의 범위).
 
 ## 0.1.5: 사설 CA(`options.ca`)
 
-설계서의 VE2와 `vedecaps-agent-handoff-0.5.4.md` §3을 구현합니다. 제공자의 `options.ca`(PEM 경로,
+Opereta 저장소의 0.5.4 인계 문서 §3의 VE2를 구현합니다. 제공자의 `options.ca`(PEM 경로,
 경로 목록, PEM 본문)를 제공자를 만들 때 읽어 `ProviderInfo.tls`로 두고, 채팅 요청(OpenAI·Ollama·
-Anthropic 경로), 모델 목록, `/diparnux/info`, 도구 호출 시험의 모든 `fetch`에 전달합니다.
+Anthropic 경로), 모델 목록, `/opereta/info`, 도구 호출 시험의 모든 `fetch`에 전달합니다.
 파일 문제는 제공자를 사용 불가로 만들며 시스템 저장소로 돌아가지 않습니다. 인증서 검증을 끄는
 옵션은 없고, 신뢰하지 않는 프로젝트의 `ca`는 `stripUntrusted`가 제거합니다.
 
@@ -113,5 +113,23 @@ Bun 1.4.3(macOS arm64)에서 측정한 사실: `tls.ca`는 시스템 저장소�
 제한만 있는 CA는 IP SAN이 있는 리프도 검증합니다. 시험은 `test/tls.test.ts`(TC1~TC13, 일회용
 인증서는 `test/fixtures/tls/`)입니다.
 
-**범위**: 실제 Diparnux 서버의 HTTPS 시험은 Diparnux 쪽 CI의 몫입니다. 여기서는 Bun.serve의 `tls`로
-같은 계약(별도 포트의 HTTPS, 리다이렉트 없음, 같은 `/diparnux/info`와 키 규칙)을 모의해 확인했습니다.
+**범위**: 실제 Opereta 서버의 HTTPS 시험은 Opereta 쪽 CI의 몫입니다. 여기서는 Bun.serve의 `tls`로
+같은 계약(별도 포트의 HTTPS, 리다이렉트 없음, 같은 `/opereta/info`와 키 규칙)을 모의해 확인했습니다.
+
+## 0.2.0: Deberopa 이름 변경과 Opereta 인식
+
+Opereta 저장소의 `deberopa-agent-handoff-0.6.1.md`를 따릅니다. 제품 이름을 Vedecaps에서 Deberopa로
+바꾸고(실행 파일, 설정, 환경 변수, 릴리스 자산, SDK·Action·확장, 로고), 모델 서버 OS를 새 이름의
+정보 주소(`/opereta/info`)와 응답 헤더(`X-Opereta`), 키 변수(`OPERETA_API_KEY`), 안내 명령으로 알아봅니다.
+이전 OS 이름을 알아보는 코드는 남기지 않았습니다.
+
+결정(사용자가 정하지 않은 것은 문서의 기본안으로 진행): D1 버전 0.2.0, D2 저장소 이름은 릴리스 전에
+사용자가 바꿀 것(코드는 새 이름 `nxodh/deberopa`를 가리킴), D3 중간 릴리스 없음, D4 설정 폴더 이전(복사),
+D5 `VEDECAPS_*`를 이번 릴리스까지 읽음. 이전은 설정 외에 로그인, 세션, 상태도 한 번 복사합니다(문서의 D4보다
+넓은 범위이며, 옛 폴더는 건드리지 않습니다).
+
+예외로 옛 이름이 남은 곳: `CHANGELOG.md`의 이전 버전 항목, 이전 코드(`src/legacy.ts`)와 그 시험
+(`test/rename.test.ts`).
+
+**범위**: 실제 Opereta 서버와 GPU 서버로는 확인하지 못했습니다(Opereta의 호환 시험 몫).
+

@@ -84,49 +84,49 @@ beforeEach(() => {
 })
 
 test("registers its three commands", () => {
-  expect([...commands.keys()].sort()).toEqual(["vedecaps.addFile", "vedecaps.addSelection", "vedecaps.open"])
+  expect([...commands.keys()].sort()).toEqual(["deberopa.addFile", "deberopa.addSelection", "deberopa.open"])
 })
 
-test("open starts vedecaps in a terminal beside the editor, once", async () => {
-  config = { command: "/opt/vedecaps/bin/vedecaps", arguments: ["-m", "anthropic/claude-sonnet-5-5"] }
-  await commands.get("vedecaps.open")!()
-  await commands.get("vedecaps.open")!()
+test("open starts deberopa in a terminal beside the editor, once", async () => {
+  config = { command: "/opt/deberopa/bin/deberopa", arguments: ["-m", "anthropic/claude-sonnet-5-5"] }
+  await commands.get("deberopa.open")!()
+  await commands.get("deberopa.open")!()
   expect(created).toHaveLength(1)
-  expect(created[0]).toMatchObject({ name: "Vedecaps", cwd: "/work/app", env: { VEDECAPS_CALLER: "vscode" } })
-  expect(terminals[0]!.sent).toEqual([{ text: "/opt/vedecaps/bin/vedecaps -m anthropic/claude-sonnet-5-5", newline: true }])
+  expect(created[0]).toMatchObject({ name: "Deberopa", cwd: "/work/app", env: { DEBEROPA_CALLER: "vscode" } })
+  expect(terminals[0]!.sent).toEqual([{ text: "/opt/deberopa/bin/deberopa -m anthropic/claude-sonnet-5-5", newline: true }])
   expect(terminals[0]!.shown).toBe(2)
 })
 
 test("the selection is typed into the prompt but not sent", async () => {
   activeEditor = editor("/work/app/src/a.ts", [9, 0], [19, 4])
-  await commands.get("vedecaps.addSelection")!()
+  await commands.get("deberopa.addSelection")!()
   const sent = terminals[0]!.sent
-  expect(sent[0]).toEqual({ text: "vedecaps", newline: true }) // started first
+  expect(sent[0]).toEqual({ text: "deberopa", newline: true }) // started first
   expect(sent[1]).toEqual({ text: "@src/a.ts#L10-20 ", newline: false })
   // a second reference reuses the running terminal
   activeEditor = editor("/work/app/src/b.ts", [0, 0], [0, 0])
-  await commands.get("vedecaps.addSelection")!()
+  await commands.get("deberopa.addSelection")!()
   expect(terminals).toHaveLength(1)
   expect(terminals[0]!.sent[2]).toEqual({ text: "@src/b.ts ", newline: false })
 })
 
 test("a closed terminal is started again; unsupported documents are explained", async () => {
-  await commands.get("vedecaps.open")!()
+  await commands.get("deberopa.open")!()
   terminals[0]!.exitStatus = { code: 0 }
   closeListener!(terminals[0]!)
-  await commands.get("vedecaps.open")!()
+  await commands.get("deberopa.open")!()
   expect(terminals).toHaveLength(2)
 
   activeEditor = { document: { uri: { scheme: "untitled", fsPath: "Untitled-1" } }, selection: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 }, isEmpty: true } }
-  await commands.get("vedecaps.addSelection")!()
+  await commands.get("deberopa.addSelection")!()
   expect(messages.at(-1)).toContain("Open a file")
 
   activeEditor = editor("/work/app/my docs/a.ts", [0, 0], [0, 0])
-  await commands.get("vedecaps.addSelection")!()
+  await commands.get("deberopa.addSelection")!()
   expect(messages.at(-1)).toContain("cannot be written as an @mention")
 })
 
 test("add file works from the explorer with an explicit uri", async () => {
-  await commands.get("vedecaps.addFile")!({ scheme: "file", fsPath: "/work/app/README.md" })
+  await commands.get("deberopa.addFile")!({ scheme: "file", fsPath: "/work/app/README.md" })
   expect(terminals[0]!.sent.at(-1)).toEqual({ text: "@README.md ", newline: false })
 })

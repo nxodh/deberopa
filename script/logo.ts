@@ -1,7 +1,7 @@
 /**
  * Rasterise assets/logo.png into half-block art for the terminal and print it.
  *   bun run script/logo.ts [columns]
- * The result is pasted into src/tui/logo.ts; the mark is the dark "V" on the off-white disc.
+ * The result is pasted into src/tui/logo.ts; the mark is the dark "D" on the off-white disc.
  */
 import fs from "node:fs"
 import path from "node:path"
@@ -56,14 +56,14 @@ function decodePng(buf: Buffer) {
 }
 
 const png = decodePng(fs.readFileSync(path.join(import.meta.dir, "..", "assets", "logo.png")))
-// "ink" = opaque and dark: the V itself
+// "ink" = opaque and dark: the D itself
 const ink = (x: number, y: number) => {
   const i = (y * png.width + x) * png.channels
   const alpha = png.channels === 4 ? png.data[i + 3]! : 255
   return alpha > 128 && png.data[i]! < 90
 }
 
-// bounding box of the V
+// bounding box of the D
 let x0 = png.width, x1 = 0, y0 = png.height, y1 = 0
 for (let y = 0; y < png.height; y++) for (let x = 0; x < png.width; x++) if (ink(x, y)) {
   if (x < x0) x0 = x

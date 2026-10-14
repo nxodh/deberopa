@@ -1,8 +1,8 @@
 /**
- * Types for writing a Vedecaps plugin.
+ * Types for writing a Deberopa plugin.
  *
- *   // ~/.config/vedecaps/plugin/hello.js
- *   /** @type {import("@vedecaps/sdk").Plugin} *\/
+ *   // ~/.config/deberopa/plugin/hello.js
+ *   /** @type {import("@deberopa/sdk").Plugin} *\/
  *   export default async ({ directory }) => ({
  *     tool: {
  *       shout: {
@@ -16,9 +16,9 @@
  *     },
  *   })
  *
- * Plugins are loaded from ~/.config/vedecaps/plugin (Windows: %APPDATA%\\vedecaps\\plugin), from the
- * "plugin" setting (file paths), and from .vedecaps/plugin in a project you have trusted
- * (`vedecaps trust`). They run with your full rights.
+ * Plugins are loaded from ~/.config/deberopa/plugin (Windows: %APPDATA%\\deberopa\\plugin), from the
+ * "plugin" setting (file paths), and from .deberopa/plugin in a project you have trusted
+ * (`deberopa trust`). They run with your full rights.
  */
 
 export interface PluginContext {

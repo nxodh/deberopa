@@ -30,7 +30,7 @@ export interface CatalogProvider {
 
 export type Catalog = Record<string, CatalogProvider>
 
-const URL = process.env.VEDECAPS_MODELS_URL || "https://models.dev/api.json"
+const URL = process.env.DEBEROPA_MODELS_URL || "https://models.dev/api.json"
 const TTL = 24 * 60 * 60 * 1000
 const cacheFile = () => path.join(Paths.cache, "models.json")
 
@@ -96,10 +96,10 @@ async function readCache(): Promise<{ catalog: Catalog; mtime: number } | undefi
 }
 
 export async function refreshCatalog(timeoutMs = 10_000): Promise<boolean> {
-  if (process.env.VEDECAPS_DISABLE_MODELS_FETCH) return false
+  if (process.env.DEBEROPA_DISABLE_MODELS_FETCH) return false
   try {
     const res = await fetch(URL, {
-      headers: { "User-Agent": `vedecaps/${VERSION}` },
+      headers: { "User-Agent": `deberopa/${VERSION}` },
       signal: AbortSignal.timeout(timeoutMs),
     })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)

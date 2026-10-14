@@ -115,7 +115,7 @@ test("export to JSON and markdown, import as a new session, fork", async () => {
   await deleteSession(fork.id)
   expect(await getSession(fork.id)).toBeUndefined()
 
-  expect(() => parseExport("{}")).toThrow(/not a Vedecaps/)
+  expect(() => parseExport("{}")).toThrow(/not a Deberopa/)
   expect(() => parseExport("nope")).toThrow(/valid JSON/)
 })
 

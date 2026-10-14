@@ -6,7 +6,7 @@ import { describeTlsError, hostOf, tlsInit, type ProviderTls } from "./tls"
 /**
  * Does this server turn a "use the tool" request into a tool call? One non-streaming request, sent
  * straight to the server (not through the recovery layer, so that layer cannot hide the answer).
- * The body matches Diparnux's own `serve toolcheck`, so the two tools' results explain each other.
+ * The body matches Opereta's own `serve toolcheck`, so the two tools' results explain each other.
  */
 export type ToolCheckStatus = "ok" | "recovered" | "failed" | "unauthorized" | "error"
 
@@ -52,7 +52,7 @@ export async function checkToolCalling(opts: {
 }): Promise<ToolCheckResult> {
   const started = Date.now()
   const done = (status: ToolCheckStatus, detail?: string): ToolCheckResult => ({ status, ms: Date.now() - started, detail })
-  const headers: Record<string, string> = { "Content-Type": "application/json", "User-Agent": `vedecaps/${VERSION}`, ...opts.headers }
+  const headers: Record<string, string> = { "Content-Type": "application/json", "User-Agent": `deberopa/${VERSION}`, ...opts.headers }
   if (opts.apiKey) headers.Authorization = `Bearer ${opts.apiKey}`
 
   let response: Response

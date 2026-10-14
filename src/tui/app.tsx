@@ -80,14 +80,14 @@ const HELP = `## Keys
 
 - \`@path\` attaches a file or directory (fuzzy completion)
 - \`!command\` runs a shell command and shares its output with the agent
-- \`/command\` runs a command; custom ones live in \`.vedecaps/command/*.md\`
+- \`/command\` runs a command; custom ones live in \`.deberopa/command/*.md\`
 
 ## Commands
 
 ${BUILTIN_COMMANDS.map((c) => `- \`${c.label}\` ${c.description}`).join("\n")}
 - \`/init\` create or update AGENTS.md · \`/review\` review changes
 
-Docs: https://github.com/nxodh/vedecaps`
+Docs: https://github.com/nxodh/deberopa`
 
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M"
@@ -160,7 +160,7 @@ export function App(props: { options: AppOptions }) {
           app.showToast(`This project's config wants to run commands (${loaded.blocked.length}); ignored until trusted. Review it, then /trust`, "info", 12000)
         }
       })
-      void checkForUpdate().then((latest) => latest && app.showToast(`Vedecaps ${latest} is available. Run \`vedecaps upgrade\` to update.`, "info", 8000))
+      void checkForUpdate().then((latest) => latest && app.showToast(`Deberopa ${latest} is available. Run \`deberopa upgrade\` to update.`, "info", 8000))
       if (props.options.initialPrompt) submit(props.options.initialPrompt)
     })()
     return () => app.stop()
@@ -294,7 +294,7 @@ export function App(props: { options: AppOptions }) {
     const mcp = mcpStatus()
     const lsp = await lspStatus().catch(() => [])
     const lines = ["## MCP servers", ""]
-    if (mcp.length === 0) lines.push("None configured. Add servers under `mcp` in vedecaps.json or with `vedecaps mcp add`.")
+    if (mcp.length === 0) lines.push("None configured. Add servers under `mcp` in deberopa.json or with `deberopa mcp add`.")
     for (const server of mcp) lines.push(`- **${server.name}** ${server.status}${server.status === "connected" ? ` · ${server.tools} tools` : ""}${server.error ? ` · ${server.error}` : ""}`)
     lines.push("", "## Language servers", "")
     if (lsp.length === 0) lines.push("None running yet. They start when a matching file is edited.")
@@ -304,7 +304,7 @@ export function App(props: { options: AppOptions }) {
 
   const editInEditor = async () => {
     const editor = process.env.VISUAL || process.env.EDITOR || (process.platform === "win32" ? "notepad" : "vi")
-    const file = path.join(os.tmpdir(), `vedecaps-prompt-${Date.now()}.md`)
+    const file = path.join(os.tmpdir(), `deberopa-prompt-${Date.now()}.md`)
     await fs.writeFile(file, promptControl.current?.get() ?? "")
     try {
       await suspendTerminal(
@@ -346,7 +346,7 @@ export function App(props: { options: AppOptions }) {
         setItems(Object.values(THEMES).map((t) => ({ value: t.name, label: t.name, hint: t.description })))
         return setDialog({ type: "themes" })
       case "help":
-        return setDialog({ type: "text", title: `Vedecaps ${VERSION}`, markdown: HELP.replace(/## Keys[\s\S]*?## Prompt/, `## Keys\n\n${Object.entries(DEFAULT_KEYBINDS).map(([action, binding]) => `- **${keybinds?.[action] ?? binding}** ${action}`).join("\n")}\n\n## Prompt`) })
+        return setDialog({ type: "text", title: `Deberopa ${VERSION}`, markdown: HELP.replace(/## Keys[\s\S]*?## Prompt/, `## Keys\n\n${Object.entries(DEFAULT_KEYBINDS).map(([action, binding]) => `- **${keybinds?.[action] ?? binding}** ${action}`).join("\n")}\n\n## Prompt`) })
       case "mcp":
       case "status":
         return status()
@@ -392,7 +392,7 @@ export function App(props: { options: AppOptions }) {
     const sessionID = app.session?.id
     switch (name) {
       case "share": {
-        const target = path.resolve(project().directory, args.trim() || `vedecaps-${sessionID!.slice(-8)}.html`)
+        const target = path.resolve(project().directory, args.trim() || `deberopa-${sessionID!.slice(-8)}.html`)
         await fs.writeFile(target, await shareHTML(sessionID!), { mode: 0o600 })
         return app.showToast(`Saved ${target}. Review private content before sharing.`, "info", 9000)
       }
@@ -418,7 +418,7 @@ export function App(props: { options: AppOptions }) {
         await compactSession(sessionID!)
         return
       case "export": {
-        const target = path.resolve(project().directory, args.trim() || `vedecaps-${sessionID!.slice(-8)}.md`)
+        const target = path.resolve(project().directory, args.trim() || `deberopa-${sessionID!.slice(-8)}.md`)
         await fs.writeFile(target, await exportMarkdown(sessionID!, { tools: true }))
         return app.showToast(`Exported to ${target}`)
       }
@@ -665,7 +665,7 @@ export function App(props: { options: AppOptions }) {
   return (
     <Box width={width} height={height} flexDirection="column" overflow="hidden">
       <Box height={1} flexShrink={0} paddingX={1} justifyContent="space-between">
-        <Box flexShrink={0} marginRight={2}><Plain theme={theme} bold>{`VEDECAPS · v${VERSION}`}</Plain></Box>
+        <Box flexShrink={0} marginRight={2}><Plain theme={theme} bold>{`DEBEROPA · v${VERSION}`}</Plain></Box>
         <Box flexGrow={1} flexShrink={1} minWidth={0} justifyContent="flex-end"><Muted theme={theme} wrap="truncate-end">{project().directory}</Muted></Box>
       </Box>
       <Conversation key={app.epoch} width={width} theme={theme} active={!bottom} keybinds={keybinds} followID={app.messages.findLast((m) => m.role === "user")?.id}>

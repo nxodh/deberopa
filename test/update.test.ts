@@ -12,10 +12,10 @@ beforeAll(() => {
       return new Response("not found", { status: 404 })
     },
   })
-  process.env.VEDECAPS_RELEASE_URL = `http://127.0.0.1:${server.port}`
+  process.env.DEBEROPA_RELEASE_URL = `http://127.0.0.1:${server.port}`
 })
 afterAll(() => {
-  delete process.env.VEDECAPS_RELEASE_URL
+  delete process.env.DEBEROPA_RELEASE_URL
   server.stop(true)
 })
 
@@ -28,11 +28,11 @@ test("version comparison", () => {
 
 test("release asset names per platform", () => {
   expect(targetName("linux", "x64", "musl")).toBe("linux-x64-musl")
-  expect(assetName("linux-arm64-musl")).toBe("vedecaps-linux-arm64-musl.tar.gz")
-  expect(assetName(targetName("linux", "x64"))).toBe("vedecaps-linux-x64.tar.gz")
-  expect(assetName(targetName("linux", "arm64"))).toBe("vedecaps-linux-arm64.tar.gz")
-  expect(assetName(targetName("win32", "x64"))).toBe("vedecaps-windows-x64.zip")
-  expect(assetName(targetName("darwin", "arm64"))).toBe("vedecaps-darwin-arm64.tar.gz")
+  expect(assetName("linux-arm64-musl")).toBe("deberopa-linux-arm64-musl.tar.gz")
+  expect(assetName(targetName("linux", "x64"))).toBe("deberopa-linux-x64.tar.gz")
+  expect(assetName(targetName("linux", "arm64"))).toBe("deberopa-linux-arm64.tar.gz")
+  expect(assetName(targetName("win32", "x64"))).toBe("deberopa-windows-x64.zip")
+  expect(assetName(targetName("darwin", "arm64"))).toBe("deberopa-darwin-arm64.tar.gz")
   expect(() => targetName("freebsd" as NodeJS.Platform, "x64")).toThrow(UpdateError)
   expect(() => targetName("win32", "arm64")).toThrow(UpdateError)
 })

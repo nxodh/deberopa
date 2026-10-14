@@ -8,7 +8,7 @@ import { parse as parseJsonc } from "jsonc-parser"
 import { redact } from "../../util/redact"
 
 export const spec: CommandSpec = {
-  usage: "vedecaps mcp <list|add|remove> [name] [-- command args..]",
+  usage: "deberopa mcp <list|add|remove> [name] [-- command args..]",
   description: "manage MCP (Model Context Protocol) servers",
   options: {
     url: { type: "string", arg: "url", description: "add a remote server at this URL" },
@@ -17,10 +17,10 @@ export const spec: CommandSpec = {
     help: { type: "boolean", short: "h", description: "show this help" },
   },
   examples: [
-    "vedecaps mcp list",
-    "vedecaps mcp add files -- npx -y @modelcontextprotocol/server-filesystem .",
-    "vedecaps mcp add docs --url https://example.com/mcp --header 'Authorization: Bearer TOKEN'",
-    "vedecaps mcp remove files",
+    "deberopa mcp list",
+    "deberopa mcp add files -- npx -y @modelcontextprotocol/server-filesystem .",
+    "deberopa mcp add docs --url https://example.com/mcp --header 'Authorization: Bearer TOKEN'",
+    "deberopa mcp remove files",
   ],
 }
 
@@ -32,7 +32,7 @@ export async function main(argv: string[]): Promise<number> {
     const config = await getConfig()
     const names = Object.keys(config.mcp ?? {})
     if (names.length === 0) {
-      process.stdout.write("No MCP servers configured. Add one with `vedecaps mcp add`.\n")
+      process.stdout.write("No MCP servers configured. Add one with `deberopa mcp add`.\n")
       return 0
     }
     await startMcp()
@@ -46,7 +46,7 @@ export async function main(argv: string[]): Promise<number> {
     return 0
   }
   if (action === "add") {
-    if (!name || !/^[\w-]+$/.test(name)) throw new UsageError("Usage: vedecaps mcp add <name> (--url <url> | -- <command> [args..])")
+    if (!name || !/^[\w-]+$/.test(name)) throw new UsageError("Usage: deberopa mcp add <name> (--url <url> | -- <command> [args..])")
     let server: McpServerConfig
     if (values.url) {
       const headers: Record<string, string> = {}
@@ -71,7 +71,7 @@ export async function main(argv: string[]): Promise<number> {
     return 0
   }
   if (action === "remove" || action === "rm") {
-    if (!name) throw new UsageError("Usage: vedecaps mcp remove <name>")
+    if (!name) throw new UsageError("Usage: deberopa mcp remove <name>")
     const file = globalConfigFile()
     const text = await fs.readFile(file, "utf8").catch(() => "")
     const data = text ? (parseJsonc(text) as Record<string, any>) : {}

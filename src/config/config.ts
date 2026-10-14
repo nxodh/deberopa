@@ -3,6 +3,7 @@ import fs from "node:fs/promises"
 import os from "node:os"
 import { parse as parseJsonc, printParseErrorCode, type ParseError } from "jsonc-parser"
 import { Paths, NAME } from "../global"
+import { LEGACY_NAME } from "../legacy"
 import { project } from "../project"
 import { exists, findUp } from "../util/fs"
 import { createLogger } from "../util/log"
@@ -103,7 +104,7 @@ export interface Config {
   username?: string
   autoupdate?: boolean | "notify"
   snapshot?: boolean
-  /** false stops Vedecaps from offering to install missing language servers. */
+  /** false stops Deberopa from offering to install missing language servers. */
   lsp_install?: boolean
   /** Local files, or explicitly installed npm:name@version plugins. */
   plugin?: string[]
@@ -130,7 +131,7 @@ export interface Config {
 
 export interface LoadedConfig {
   config: Config
-  /** Config directories, lowest precedence first (global, then project `.vedecaps` dirs root → cwd). */
+  /** Config directories, lowest precedence first (global, then project `.deberopa` dirs root → cwd). */
   directories: string[]
   /** Files that were actually read, lowest precedence first. */
   files: string[]
@@ -143,6 +144,8 @@ export interface LoadedConfig {
 }
 
 const FILE_NAMES = [`${NAME}.jsonc`, `${NAME}.json`]
+// Projects written before the rename keep working: their files are read first, so a new-named file wins.
+const PROJECT_FILE_NAMES = [...FILE_NAMES, `${LEGACY_NAME}.jsonc`, `${LEGACY_NAME}.json`]
 
 let cached: Promise<LoadedConfig> | undefined
 
@@ -194,14 +197,14 @@ async function load(): Promise<LoadedConfig> {
   }
 
   for (const name of FILE_NAMES) await merge(path.join(Paths.config, name))
-  if (process.env.VEDECAPS_CONFIG) await merge(path.resolve(process.env.VEDECAPS_CONFIG))
+  if (process.env.DEBEROPA_CONFIG) await merge(path.resolve(process.env.DEBEROPA_CONFIG))
 
   // Project files apply root → cwd so the nearest file wins.
-  const projectFiles = (await findUp(FILE_NAMES, directory, worktree)).reverse()
+  const projectFiles = (await findUp(PROJECT_FILE_NAMES, directory, worktree)).reverse()
   for (const file of projectFiles) await merge(file, true)
 
-  const dotDirs = (await findUp([`.${NAME}`], directory, worktree)).reverse()
-  for (const dir of dotDirs) for (const name of FILE_NAMES) await merge(path.join(dir, name), true)
+  const dotDirs = (await findUp([`.${NAME}`, `.${LEGACY_NAME}`], directory, worktree)).reverse()
+  for (const dir of dotDirs) for (const name of PROJECT_FILE_NAMES.slice().reverse()) await merge(path.join(dir, name), true)
 
   // A project's plugin folder is code that would run in this process.
   if (!trusted) {
@@ -216,13 +219,13 @@ async function load(): Promise<LoadedConfig> {
     }
   }
 
-  if (process.env.VEDECAPS_CONFIG_CONTENT) {
+  if (process.env.DEBEROPA_CONFIG_CONTENT) {
     try {
       // no file to be relative to: relative CA paths mean the current directory
-      const inline = resolveConfigCaPaths(parseText(process.env.VEDECAPS_CONFIG_CONTENT, "VEDECAPS_CONFIG_CONTENT"), directory)
+      const inline = resolveConfigCaPaths(parseText(process.env.DEBEROPA_CONFIG_CONTENT, "DEBEROPA_CONFIG_CONTENT"), directory)
       config = mergeConfig(config, inline)
     } catch (err) {
-      errors.push(`VEDECAPS_CONFIG_CONTENT: ${err instanceof Error ? err.message : String(err)}`)
+      errors.push(`DEBEROPA_CONFIG_CONTENT: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -298,7 +301,7 @@ export async function updateGlobalConfig(patch: Config) {
     }
   }
   const next = mergeConfig(current, patch)
-  if (!next.$schema) next.$schema = `https://raw.githubusercontent.com/nxodh/vedecaps/main/config.schema.json`
+  if (!next.$schema) next.$schema = `https://raw.githubusercontent.com/nxodh/deberopa/main/config.schema.json`
   await fs.mkdir(path.dirname(file), { recursive: true })
   await fs.writeFile(file, JSON.stringify(next, null, 2) + "\n")
   resetConfig()

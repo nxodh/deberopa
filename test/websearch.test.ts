@@ -25,12 +25,12 @@ beforeAll(() => {
       return new Response(null, { status: 202 })
     },
   })
-  process.env.VEDECAPS_EXA_URL = `http://127.0.0.1:${server.port}/mcp`
+  process.env.DEBEROPA_EXA_URL = `http://127.0.0.1:${server.port}/mcp`
 })
 afterAll(() => {
   resetWebSearch()
   server.stop(true)
-  delete process.env.VEDECAPS_EXA_URL
+  delete process.env.DEBEROPA_EXA_URL
   delete process.env.EXA_API_KEY
   endProject()
 })

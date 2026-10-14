@@ -21,9 +21,9 @@ beforeEach(() => {
 async function cli(args: string[], opts: { stdin?: string; config?: Record<string, unknown> | false; env?: Record<string, string> } = {}) {
   const env: Record<string, string> = {
     ...(process.env as Record<string, string>),
-    VEDECAPS_HOME: home,
-    VEDECAPS_DISABLE_MODELS_FETCH: "1",
-    VEDECAPS_CONFIG_CONTENT: JSON.stringify(opts.config === false ? {} : (opts.config ?? mockConfig(mock))),
+    DEBEROPA_HOME: home,
+    DEBEROPA_DISABLE_MODELS_FETCH: "1",
+    DEBEROPA_CONFIG_CONTENT: JSON.stringify(opts.config === false ? {} : (opts.config ?? mockConfig(mock))),
     ...opts.env,
   }
   const proc = Bun.spawn([process.execPath, entry, ...args], {
@@ -41,7 +41,7 @@ test("--version and --help", async () => {
   expect((await cli(["--version"])).stdout.trim()).toBe(require("../package.json").version)
   const help = await cli(["--help"])
   expect(help.code).toBe(0)
-  expect(help.stdout).toContain("vedecaps run")
+  expect(help.stdout).toContain("deberopa run")
   const runHelp = await cli(["run", "--help"])
   expect(runHelp.stdout).toContain("--dangerously-skip-permissions")
   const unknown = await cli(["frobnicate"])
@@ -140,7 +140,7 @@ test("models, agent list/create, session list, export/import, stats, debug", asy
   expect(agents.stdout).toContain("explore")
   const created = await cli(["agent", "create", "--name", "docs", "--mode", "subagent", "--description", "Writes docs"])
   expect(created.code).toBe(0)
-  expect(fs.readFileSync(path.join(dir, ".vedecaps", "agent", "docs.md"), "utf8")).toContain("mode: subagent")
+  expect(fs.readFileSync(path.join(dir, ".deberopa", "agent", "docs.md"), "utf8")).toContain("mode: subagent")
 
   mock.queue(reply.text("hello there"))
   await cli(["run", "greet"])
@@ -172,7 +172,7 @@ test("models, agent list/create, session list, export/import, stats, debug", asy
 test("mcp add / list / remove", async () => {
   const add = await cli(["mcp", "add", "echo", "--", "node", "server.js"], { config: false })
   expect(add.code).toBe(0)
-  const cfg = JSON.parse(fs.readFileSync(path.join(home, "config", "vedecaps.json"), "utf8"))
+  const cfg = JSON.parse(fs.readFileSync(path.join(home, "config", "deberopa.json"), "utf8"))
   expect(cfg.mcp.echo).toEqual({ type: "local", command: ["node", "server.js"] })
   expect(cfg.$schema).toContain("config.schema.json")
   const rm = await cli(["mcp", "remove", "echo"], { config: false })

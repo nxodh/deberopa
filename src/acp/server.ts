@@ -313,7 +313,7 @@ export function serveAcp(options: AcpOptions): Promise<void> {
             mcpCapabilities: { http: true, sse: true },
           },
           authMethods: [],
-          agentInfo: { name: "vedecaps", title: "Vedecaps", version: VERSION },
+          agentInfo: { name: "deberopa", title: "Deberopa", version: VERSION },
         }
       }
       case "authenticate":
@@ -323,7 +323,7 @@ export function serveAcp(options: AcpOptions): Promise<void> {
         const cwd = typeof params?.cwd === "string" && path.isAbsolute(params.cwd) ? params.cwd : (options.directory ?? process.cwd())
         const here = project()
         if (sessions.size > 0 && path.resolve(cwd) !== path.resolve(here.directory)) {
-          throw invalid(`This agent instance works in ${here.directory}. Start another \`vedecaps acp\` for ${cwd}.`)
+          throw invalid(`This agent instance works in ${here.directory}. Start another \`deberopa acp\` for ${cwd}.`)
         }
         if (sessions.size === 0) initProject(cwd)
         await connectMcpServers(params?.mcpServers)

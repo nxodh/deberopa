@@ -65,7 +65,7 @@ export class BusyError extends Error {
 
 export class NoModelError extends Error {
   constructor() {
-    super("No model is configured. Run `vedecaps auth login` to add a provider, or set an API key such as ANTHROPIC_API_KEY.")
+    super("No model is configured. Run `deberopa auth login` to add a provider, or set an API key such as ANTHROPIC_API_KEY.")
     this.name = "NoModelError"
   }
 }

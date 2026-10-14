@@ -1,40 +1,40 @@
 {
-  "name": "vedecaps",
-  "displayName": "Vedecaps",
-  "description": "Open the Vedecaps AI coding agent beside your editor and send it the file or selection you are looking at.",
-  "version": "0.1.5",
+  "name": "deberopa",
+  "displayName": "Deberopa",
+  "description": "Open the Deberopa AI coding agent beside your editor and send it the file or selection you are looking at.",
+  "version": "0.2.0",
   "publisher": "nxodh",
   "license": "MIT",
   "icon": "icon.png",
-  "repository": { "type": "git", "url": "https://github.com/nxodh/vedecaps.git", "directory": "ide/vscode" },
+  "repository": { "type": "git", "url": "https://github.com/nxodh/deberopa.git", "directory": "ide/vscode" },
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Other", "AI"],
-  "keywords": ["ai", "agent", "coding", "terminal", "vedecaps"],
+  "keywords": ["ai", "agent", "coding", "terminal", "deberopa"],
   "main": "./out/extension.js",
   "activationEvents": [],
   "contributes": {
     "commands": [
-      { "command": "vedecaps.open", "title": "Vedecaps: Open" },
-      { "command": "vedecaps.addSelection", "title": "Vedecaps: Add Selection to Prompt" },
-      { "command": "vedecaps.addFile", "title": "Vedecaps: Add File to Prompt" }
+      { "command": "deberopa.open", "title": "Deberopa: Open" },
+      { "command": "deberopa.addSelection", "title": "Deberopa: Add Selection to Prompt" },
+      { "command": "deberopa.addFile", "title": "Deberopa: Add File to Prompt" }
     ],
     "keybindings": [
-      { "command": "vedecaps.open", "key": "ctrl+alt+v", "mac": "cmd+alt+v" },
-      { "command": "vedecaps.addSelection", "key": "ctrl+alt+k", "mac": "cmd+alt+k", "when": "editorTextFocus" }
+      { "command": "deberopa.open", "key": "ctrl+alt+v", "mac": "cmd+alt+v" },
+      { "command": "deberopa.addSelection", "key": "ctrl+alt+k", "mac": "cmd+alt+k", "when": "editorTextFocus" }
     ],
     "menus": {
-      "editor/context": [{ "command": "vedecaps.addSelection", "group": "navigation@99", "when": "editorHasSelection" }],
-      "explorer/context": [{ "command": "vedecaps.addFile", "group": "navigation@99", "when": "!explorerResourceIsFolder" }]
+      "editor/context": [{ "command": "deberopa.addSelection", "group": "navigation@99", "when": "editorHasSelection" }],
+      "explorer/context": [{ "command": "deberopa.addFile", "group": "navigation@99", "when": "!explorerResourceIsFolder" }]
     },
     "configuration": {
-      "title": "Vedecaps",
+      "title": "Deberopa",
       "properties": {
-        "vedecaps.command": {
+        "deberopa.command": {
           "type": "string",
-          "default": "vedecaps",
-          "description": "The command that starts Vedecaps. Use a full path if it is not on your PATH."
+          "default": "deberopa",
+          "description": "The command that starts Deberopa. Use a full path if it is not on your PATH."
         },
-        "vedecaps.arguments": {
+        "deberopa.arguments": {
           "type": "array",
           "items": { "type": "string" },
           "default": [],
@@ -46,7 +46,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --minify --outfile=out/extension.js",
-    "package": "npm run build && vsce package --no-dependencies --out vedecaps.vsix"
+    "package": "npm run build && vsce package --no-dependencies --out deberopa.vsix"
   },
   "devDependencies": {
     "@types/vscode": "1.85.0",

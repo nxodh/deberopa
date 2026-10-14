@@ -1,8 +1,8 @@
 /**
- * Serve dist/ the way GitHub Releases serves a release, so the installers and `vedecaps upgrade`
+ * Serve dist/ the way GitHub Releases serves a release, so the installers and `deberopa upgrade`
  * can be exercised before anything is published:
  *   bun run script/release-server.ts [dist] [port]
- *   VEDECAPS_RELEASE_URL=http://127.0.0.1:<port> sh install.sh
+ *   DEBEROPA_RELEASE_URL=http://127.0.0.1:<port> sh install.sh
  */
 import path from "node:path"
 import pkg from "../package.json"

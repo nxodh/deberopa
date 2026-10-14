@@ -4,15 +4,15 @@ import { bootstrap } from "../bootstrap"
 import { serveAcp } from "../../acp/server"
 
 export const spec: CommandSpec = {
-  usage: "vedecaps acp [options]",
+  usage: "deberopa acp [options]",
   description: "run as an Agent Client Protocol server on stdin/stdout (for Zed and other editors)",
   options: {
     cwd: { type: "string", arg: "path", description: "project directory (default: the current directory)" },
     "print-logs": { type: "boolean", description: "print the log to stderr" },
   },
   examples: [
-    "vedecaps acp",
-    '# Zed settings.json: "agent_servers": { "Vedecaps": { "command": "vedecaps", "args": ["acp"] } }',
+    "deberopa acp",
+    '# Zed settings.json: "agent_servers": { "Deberopa": { "command": "deberopa", "args": ["acp"] } }',
   ],
 }
 

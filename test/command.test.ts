@@ -45,12 +45,12 @@ test("shell output injection runs in the project directory", async () => {
 })
 
 test("commands load from config, command/*.md (nested) and built-ins", async () => {
-  fs.mkdirSync(path.join(dir, ".vedecaps", "command", "git"), { recursive: true })
+  fs.mkdirSync(path.join(dir, ".deberopa", "command", "git"), { recursive: true })
   fs.writeFileSync(
-    path.join(dir, ".vedecaps", "command", "test.md"),
+    path.join(dir, ".deberopa", "command", "test.md"),
     "---\ndescription: run tests\nagent: plan\nmodel: mock/mock-1\nsubtask: true\n---\nRun the tests for $ARGUMENTS\n",
   )
-  fs.writeFileSync(path.join(dir, ".vedecaps", "command", "git", "summary.md"), "Summarise recent commits\n")
+  fs.writeFileSync(path.join(dir, ".deberopa", "command", "git", "summary.md"), "Summarise recent commits\n")
   useProject(dir, mockConfig(mock, { command: { hello: { template: "Say hello to $1", description: "greet" } } }))
   const all = await listCommands()
   expect(Object.keys(all).sort()).toEqual(["git/summary", "hello", "init", "review", "test"])

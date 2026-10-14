@@ -302,7 +302,7 @@ export async function formatFile(file: string): Promise<string | undefined> {
   }
 }
 
-/** For `vedecaps debug`/status output: every formatter with whether it is active here. */
+/** For `deberopa debug`/status output: every formatter with whether it is active here. */
 export async function formatterStatus(): Promise<Array<{ name: string; extensions: string[]; enabled: boolean }>> {
   const config = await getConfig()
   const cfg: Record<string, FormatterConfig> = config.formatter || {}

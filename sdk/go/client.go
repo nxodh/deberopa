@@ -1,5 +1,5 @@
-// Package vedecaps provides a standard-library client for the Vedecaps HTTP API.
-package vedecaps
+// Package deberopa provides a standard-library client for the Deberopa HTTP API.
+package deberopa
 
 import (
 	"bufio"
@@ -30,7 +30,7 @@ type Error struct {
 	Message string
 }
 
-func (e *Error) Error() string { return fmt.Sprintf("Vedecaps HTTP %d: %s", e.Status, e.Message) }
+func (e *Error) Error() string { return fmt.Sprintf("Deberopa HTTP %d: %s", e.Status, e.Message) }
 
 func New(options Options) (*Client, error) {
 	base := strings.TrimRight(options.BaseURL, "/")
@@ -74,7 +74,7 @@ func (c *Client) request(ctx context.Context, method, path string, body any) (*h
 		req.Header.Set("Content-Type", "application/json")
 	}
 	if c.password != "" {
-		req.SetBasicAuth("vedecaps", c.password)
+		req.SetBasicAuth("deberopa", c.password)
 	}
 	res, err := c.http.Do(req)
 	if err != nil {

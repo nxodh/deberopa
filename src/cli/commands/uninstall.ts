@@ -6,8 +6,8 @@ import { ask } from "../input"
 import { isCompiled } from "../../update/update"
 
 export const spec: CommandSpec = {
-  usage: "vedecaps uninstall [options]",
-  description: "remove vedecaps and (optionally) its data from this machine",
+  usage: "deberopa uninstall [options]",
+  description: "remove deberopa and (optionally) its data from this machine",
   options: {
     "keep-config": { type: "boolean", description: "keep configuration files" },
     "keep-data": { type: "boolean", description: "keep sessions, credentials and snapshots" },

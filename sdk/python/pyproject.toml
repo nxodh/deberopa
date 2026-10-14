@@ -3,11 +3,11 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "vedecaps-sdk"
-version = "0.1.5"
-description = "Dependency-free Python client for the Vedecaps HTTP API"
+name = "deberopa-sdk"
+version = "0.2.0"
+description = "Dependency-free Python client for the Deberopa HTTP API"
 requires-python = ">=3.10"
 license = "MIT"
 
 [tool.setuptools]
-packages = ["vedecaps"]
+packages = ["deberopa"]

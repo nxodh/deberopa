@@ -251,30 +251,30 @@ test("titles and summaries yield to real work through generateText", async () =>
 // ---- settings and automatic values -------------------------------------------------------------
 
 let gateway: ReturnType<typeof Bun.serve>
-let gatewayInfo: unknown = { diparnux: "0.5.3", server: "running", slots: 3, ctx_per_slot: 8192 }
+let gatewayInfo: unknown = { opereta: "0.5.3", server: "running", slots: 3, ctx_per_slot: 8192 }
 
 beforeAll(() => {
   gateway = Bun.serve({
     port: 0,
     hostname: "127.0.0.1",
-    fetch: (req) => (new URL(req.url).pathname === "/diparnux/info" ? Response.json(gatewayInfo) : new Response("nope", { status: 404 })),
+    fetch: (req) => (new URL(req.url).pathname === "/opereta/info" ? Response.json(gatewayInfo) : new Response("nope", { status: 404 })),
   })
 })
 afterAll(() => gateway.stop(true))
 
 async function providersFor(options: Record<string, unknown> | undefined, api = `http://127.0.0.1:${gateway.port}/v1`) {
-  delete process.env.VEDECAPS_DISABLE_LOCAL_DETECT
+  delete process.env.DEBEROPA_DISABLE_LOCAL_DETECT
   try {
     useProject(tmpDir(), { provider: { gw: { name: "GW", api, ...(options ? { options } : {}), models: { m: { name: "M" } } } } })
     return (await allProviders()).gw!
   } finally {
-    process.env.VEDECAPS_DISABLE_LOCAL_DETECT = "1"
+    process.env.DEBEROPA_DISABLE_LOCAL_DETECT = "1"
   }
 }
 
 test("T3.6 unusable values are ignored with a recorded reason", async () => {
   for (const bad of [0, -1, 1.5, "2", "abc", 65, true, [2], { n: 2 }]) {
-    gatewayInfo = { diparnux: "0.5.3", server: "running", slots: 3 }
+    gatewayInfo = { opereta: "0.5.3", server: "running", slots: 3 }
     const p = await providersFor({ max_concurrency: bad })
     expect(p.maxConcurrency, String(bad)).toBeUndefined()
     expect(p.maxConcurrencyIgnored, String(bad)).toContain("whole number from 1 to 64")
@@ -282,14 +282,14 @@ test("T3.6 unusable values are ignored with a recorded reason", async () => {
 })
 
 test("an explicit null means \"not set\" and leaves the automatic value alone", async () => {
-  gatewayInfo = { diparnux: "0.5.3", server: "running", slots: 3 }
+  gatewayInfo = { opereta: "0.5.3", server: "running", slots: 3 }
   const p = await providersFor({ max_concurrency: null })
   expect(p.maxConcurrency).toBe(3)
   expect(p.maxConcurrencyIgnored).toBeUndefined()
 })
 
 test("a usable value is taken as written", async () => {
-  gatewayInfo = { diparnux: "0.5.3", server: "running", slots_auto: true }
+  gatewayInfo = { opereta: "0.5.3", server: "running", slots_auto: true }
   const p = await providersFor({ max_concurrency: 4 })
   expect(p.maxConcurrency).toBe(4)
   expect(p.maxConcurrencySource).toBe("config")
@@ -297,25 +297,25 @@ test("a usable value is taken as written", async () => {
 })
 
 test("T3.7 a gateway's fixed slot count becomes the limit", async () => {
-  gatewayInfo = { diparnux: "0.5.3", server: "running", slots: 3, ctx_per_slot: 8192 }
+  gatewayInfo = { opereta: "0.5.3", server: "running", slots: 3, ctx_per_slot: 8192 }
   const p = await providersFor(undefined)
   expect(p.maxConcurrency).toBe(3)
-  expect(p.maxConcurrencySource).toBe("diparnux")
+  expect(p.maxConcurrencySource).toBe("opereta")
 })
 
 test("T3.8 what the user wrote beats the gateway, smaller or larger", async () => {
-  gatewayInfo = { diparnux: "0.5.3", server: "running", slots: 3 }
+  gatewayInfo = { opereta: "0.5.3", server: "running", slots: 3 }
   expect((await providersFor({ max_concurrency: 1 })).maxConcurrency).toBe(1)
   expect((await providersFor({ max_concurrency: 6 })).maxConcurrency).toBe(6)
 })
 
 test("T3.9 slots chosen by the server give no automatic limit", async () => {
-  gatewayInfo = { diparnux: "0.5.3", server: "running", slots_auto: true }
+  gatewayInfo = { opereta: "0.5.3", server: "running", slots_auto: true }
   expect((await providersFor(undefined)).maxConcurrency).toBeUndefined()
 })
 
 test("an unusable value does not fall back to the gateway's slots", async () => {
-  gatewayInfo = { diparnux: "0.5.3", server: "running", slots: 3 }
+  gatewayInfo = { opereta: "0.5.3", server: "running", slots: 3 }
   const p = await providersFor({ max_concurrency: 0 })
   expect(p.maxConcurrency).toBeUndefined() // the user tried to say something; do not guess for them
 })
@@ -382,7 +382,7 @@ test("a 429 followed by success completes through the normal retry, with the lim
 
 // ---- acceptance: four subagents against a server with two slots --------------------------------
 
-/** An OpenAI-style server with a fixed number of slots: a request beyond them gets 429, like Diparnux's gateway. */
+/** An OpenAI-style server with a fixed number of slots: a request beyond them gets 429, like Opereta's gateway. */
 function slotServer(slots: number) {
   let active = 0
   const stats = { rejected: 0, accepted: 0, peak: 0 }
