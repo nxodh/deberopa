@@ -70,13 +70,22 @@ jobs:
           WORK="$RUNNER_TEMP/e2e-work"; mkdir -p "$WORK"
           export DEBEROPA_HOME="$RUNNER_TEMP/e2e-home" DEBEROPA_DISABLE_LOCAL_DETECT=1 DEBEROPA_DISABLE_MODELS_FETCH=1
           export DEBEROPA_E2E_LOG="$RUNNER_TEMP/e2e.log"
+          # The Electron binary itself. bin/deberopa-desktop is a launcher that starts the app in the background
+          # and returns at once, which made this step "pass" without the test ever running.
+          BIN="$APP/deberopa-desktop"
+          test -x "$BIN"
           status=0
-          timeout 420 xvfb-run -a "$APP/bin/deberopa-desktop" --no-sandbox --disable-gpu --disable-workspace-trust \
-            --user-data-dir "$RUNNER_TEMP/e2e-ud" --extensions-dir "$RUNNER_TEMP/e2e-ex" \
+          timeout 300 xvfb-run -a "$BIN" --no-sandbox --disable-gpu --disable-workspace-trust --verbose --enable-logging=stderr --v=0 \
+            --logsPath "$RUNNER_TEMP/e2e-logs" --user-data-dir "$RUNNER_TEMP/e2e-ud" --extensions-dir "$RUNNER_TEMP/e2e-ex" \
             --extensionDevelopmentPath="$APP/resources/app/extensions/deberopa-agent" \
-            --extensionTestsPath="$GITHUB_WORKSPACE/desktop/test/e2e/index.js" "$WORK" || status=$?
-          cat "$DEBEROPA_E2E_LOG" 2>/dev/null || echo "(the test wrote no log)"
+            --extensionTestsPath="$GITHUB_WORKSPACE/desktop/test/e2e/index.js" "$WORK" > "$RUNNER_TEMP/e2e.out" 2> "$RUNNER_TEMP/e2e.err" || status=$?
+          echo "exit status: $status"
+          echo "---- test log"; cat "$DEBEROPA_E2E_LOG" 2>/dev/null || echo "(the test wrote no log)"
+          echo "---- app stderr (tail)"; tail -30 "$RUNNER_TEMP/e2e.err" | cut -c1-240
+          find "$RUNNER_TEMP/e2e-logs" -type f 2>/dev/null | sed "s#$RUNNER_TEMP/##" | sort | head -30
           pkill -f "deberopa serve" || true
+          # passing means the test said so, not merely that the process ended
+          grep -q "\[e2e\].* OK" "$DEBEROPA_E2E_LOG" || { echo "the in-app test did not report OK"; exit 1; }
           exit $status
       - name: Start the packaged app (Windows) and run the in-app test
         if: matrix.target == 'win32-x64'
