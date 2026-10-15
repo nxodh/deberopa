@@ -1,10 +1,10 @@
 # Runs the app smoke test on Windows and prints what it logged. Electron is a GUI program: wait on
 # the process itself, with a time limit, and kill what is left (the agent it started).
-param([int]$TimeoutSeconds = 240, [string]$Exe = "", [string]$Mode = "1")
+param([int]$TimeoutSeconds = 240, [string]$PackagedExe = "", [string]$Mode = "1")
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 # a packaged Deberopa.exe when given, otherwise the development Electron
-$exe = $Exe
+$exe = $PackagedExe
 if (-not $exe) { $exe = (node -p "require('electron')" 2>$null | Select-Object -Last 1) }
 if (-not $exe -or -not (Test-Path $exe)) { Write-Host "Electron binary not found (run: node node_modules/electron/install.js)"; exit 1 }
 Write-Host "electron: $exe"
@@ -16,7 +16,7 @@ $env:DEBEROPA_APP_TEST = $Mode
 $env:DEBEROPA_APP_TEST_LOG = $log
 $env:DEBEROPA_APP_SHOTS = Join-Path $env:RUNNER_TEMP "app-shots"
 
-$argList = if ($Exe) { @("--no-sandbox", "--disable-gpu") } else { @(".", "--no-sandbox", "--disable-gpu") }
+$argList = if ($PackagedExe) { @("--no-sandbox", "--disable-gpu") } else { @(".", "--no-sandbox", "--disable-gpu") }
 $p = Start-Process -FilePath $exe -ArgumentList $argList -WorkingDirectory $root -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
 if (-not $p.WaitForExit($TimeoutSeconds * 1000)) {
   Write-Host "timed out after $TimeoutSeconds s; killing"

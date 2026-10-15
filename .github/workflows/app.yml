@@ -118,7 +118,7 @@ jobs:
         if: runner.os == 'Windows'
         working-directory: app
         shell: pwsh
-        run: ./test/run-windows.ps1 -Exe "${{ github.workspace }}\out\Deberopa-win32-x64\Deberopa.exe"
+        run: ./test/run-windows.ps1 -PackagedExe "${{ github.workspace }}\out\Deberopa-win32-x64\Deberopa.exe"
       - name: Archive (Debian 13)
         if: runner.os == 'Linux'
         run: |
