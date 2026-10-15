@@ -18,8 +18,9 @@ let win = null
 function backend() {
   if (process.env.DEBEROPA_BIN) return { cmd: process.env.DEBEROPA_BIN, args: [] }
   if (app.isPackaged) {
+    // the packager puts the CLI next to app.asar (resources/deberopa[.exe])
     const exe = process.platform === "win32" ? "deberopa.exe" : "deberopa"
-    return { cmd: path.join(process.resourcesPath, "bin", exe), args: [] }
+    return { cmd: path.join(process.resourcesPath, exe), args: [] }
   }
   // development: run the CLI from source with the repository's own Bun
   const root = path.resolve(__dirname, "..")
