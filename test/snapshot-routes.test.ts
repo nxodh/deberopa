@@ -71,3 +71,15 @@ test("diff and revert refuse bad snapshot ids and paths outside the project", as
   expect((await call("POST", "/snapshot/revert", { hash: "a".repeat(40), files: [] })).status).toBe(400)
   expect((await call("GET", "/snapshot/status")).data.available).toBe(true)
 })
+
+test("status gathers what a settings page needs without secrets", async () => {
+  const res = await call("GET", "/status")
+  expect(res.status).toBe(200)
+  expect(res.data.version).toMatch(/^\d+\.\d+\.\d+/)
+  expect(res.data.directory).toBe(dir)
+  expect(Array.isArray(res.data.mcp)).toBe(true)
+  expect(Array.isArray(res.data.lsp)).toBe(true)
+  expect(Array.isArray(res.data.plugins)).toBe(true)
+  expect(res.data.snapshot.available).toBe(true)
+  expect(JSON.stringify(res.data)).not.toMatch(/sk-/)
+})

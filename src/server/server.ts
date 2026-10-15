@@ -5,7 +5,7 @@ import { project } from "../project"
 import { subscribe } from "../util/bus"
 import { redactDeep, registerSecret } from "../util/redact"
 import { listFiles } from "../util/walk"
-import { getConfig } from "../config/config"
+import { getConfig, globalConfigFile } from "../config/config"
 import { listAgents } from "../agent/agent"
 import { allProviders, defaultModel } from "../provider/provider"
 import { listCommands, runCommand } from "../command/command"
@@ -13,6 +13,9 @@ import { pendingPermissions, replyPermission, type PermissionReply } from "../pe
 import { createSession, deleteSession, getSession, listSessions, updateSession } from "../session/store"
 import { busySessions, BusyError, cancel, compactSession, isBusy, prompt, shell } from "../session/prompt"
 import { revert, unrevert, visibleMessages } from "../session/revert"
+import { mcpStatus } from "../mcp"
+import { lspStatus } from "../lsp"
+import { loadPlugins, pluginProblems } from "../plugin"
 import { closeTerminal, listTerminals, openTerminal, resizeTerminal, writeTerminal } from "../pty/pty"
 import { changedFiles, diffSince, revertFiles, snapshotStatus } from "../snapshot/snapshot"
 import { exportMarkdown, forkSession } from "../session/export"
@@ -265,6 +268,21 @@ async function route(req: Request): Promise<Response> {
   if (is("DELETE", "remote", "*")) {
     if (!(await removeRemoteHost(parts[1]!))) throw new HttpError(404, `No saved host named ${parts[1]}`)
     return json(true)
+  }
+  // One page of facts for a settings screen: what is connected, loaded and where the config lives.
+  if (is("GET", "status")) {
+    const plugins = await loadPlugins().catch(() => [])
+    return json({
+      version: VERSION,
+      directory: project().directory,
+      worktree: project().worktree,
+      configFile: globalConfigFile(),
+      mcp: mcpStatus(),
+      lsp: await lspStatus().catch(() => []),
+      plugins: plugins.map((p) => ({ name: p.name, source: p.source })),
+      pluginProblems: pluginProblems().map((p: any) => redactDeep(p)),
+      snapshot: await snapshotStatus(),
+    })
   }
   // Interactive terminals: output arrives as `pty.data` events, the end as `pty.exit`.
   if (is("GET", "pty")) return json(listTerminals())

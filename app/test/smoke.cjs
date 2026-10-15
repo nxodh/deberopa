@@ -233,6 +233,22 @@ function run({ app, win }) {
     // switching tabs must not lose an unsaved edit or kill the shell
     await click('[data-testid="file-hello.txt"]')
     await waitFor("the editor again", `!!document.querySelector(".cm-content")`, 10000)
+    // settings: keys, trust, tools, usage; and the command palette
+    await click("[data-testid=open-settings]")
+    await waitFor("settings", `(() => { const t = (document.querySelector('[data-testid=settings]') || {}).textContent || ""; return t.includes("API keys") && t.includes("Connected tools") && t.includes("Usage") })()`, 15000)
+    await waitFor("the usage of the mock model", `document.querySelector('[data-testid=settings]').textContent.includes("mock/mock-1")`, 15000)
+    log("settings show keys, trust, tools and usage")
+    const wc2 = win().webContents
+    const mod2 = process.platform === "darwin" ? "meta" : "control"
+    wc2.sendInputEvent({ type: "keyDown", keyCode: "k", modifiers: [mod2] })
+    wc2.sendInputEvent({ type: "keyUp", keyCode: "k", modifiers: [mod2] })
+    await waitFor("the command palette", `!!document.querySelector('[data-testid=palette]')`, 5000)
+    await type('input[aria-label="Command"]', "terminal")
+    await sleep(200)
+    await exec(`(document.querySelector(".palette-item") || { click() {} }).click(); true`)
+    await waitFor("a second terminal from the palette", `document.querySelectorAll(".tab").length >= 1 && [...document.querySelectorAll(".tab-main .title")].some((n) => n.textContent === "Terminal 2")`, 10000)
+    log("the command palette opened a terminal")
+
     await click("[data-testid=open-models]")
     await waitFor("models tab", `!!document.querySelector('[data-testid=models]')`, 10000)
     await waitFor("local info", `document.querySelector('[data-testid=models]').textContent.includes("This computer")`, 10000)

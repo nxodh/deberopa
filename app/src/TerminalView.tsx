@@ -60,6 +60,20 @@ export function TerminalView({ tab, active }: { tab: Extract<Tab, { kind: "termi
       }
     })()
 
+    // Input goes out in order, one request at a time, with whatever was typed meanwhile in one
+    // piece: separate concurrent requests can arrive in any order and scramble what was typed.
+    let pending = ""
+    let sending = false
+    const flush = async () => {
+      if (sending) return
+      sending = true
+      while (pending && id && !disposed) {
+        const chunk = pending
+        pending = ""
+        await request(tab.dir, "POST", `/pty/${id}/input`, { data: chunk }).catch(() => {})
+      }
+      sending = false
+    }
     t.onData((data) => {
       if (!id) return
       if (!pty) {
@@ -71,7 +85,8 @@ export function TerminalView({ tab, active }: { tab: Extract<Tab, { kind: "termi
         }
         data = data.replace(/\r/g, "\r\n")
       }
-      void request(tab.dir, "POST", `/pty/${id}/input`, { data }).catch(() => {})
+      pending += data
+      void flush()
     })
     const resize = () => {
       try {

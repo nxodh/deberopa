@@ -33,6 +33,7 @@ export interface ProjectState {
 export type Tab = { id: string; kind: "session"; dir: string; sessionID: string } | { id: string; kind: "models"; dir: string } | { id: string; kind: "file"; dir: string; path: string }
   | { id: string; kind: "diff"; dir: string; hash: string; file?: string }
   | { id: string; kind: "terminal"; dir: string; n: number }
+  | { id: string; kind: "settings"; dir: string }
 export interface AppState {
   ready: boolean
   version: string
@@ -281,6 +282,11 @@ export function openFile(dir: string, path: string) {
 export function openDiff(dir: string, hash: string, file?: string) {
   const id = `diff:${convKey(dir, `${hash}:${file ?? ""}`)}`
   set((s) => ({ tabs: s.tabs.some((t) => t.id === id) ? s.tabs : [...s.tabs, { id, kind: "diff", dir, hash, file }], active: id }))
+}
+
+export function openSettings(dir: string) {
+  const id = `settings:${dir}`
+  set((s) => ({ tabs: s.tabs.some((t) => t.id === id) ? s.tabs : [...s.tabs, { id, kind: "settings", dir }], active: id }))
 }
 
 let terminalCount = 0

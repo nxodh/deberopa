@@ -1,12 +1,14 @@
+import { CommandPalette } from "./CommandPalette"
 import { DiffView } from "./DiffView"
 import { Editor } from "./Editor"
 import { FileTree } from "./FileTree"
 import { ModelsView } from "./ModelsView"
+import { SettingsView } from "./SettingsView"
 import { TerminalView } from "./TerminalView"
 import { SessionView } from "./SessionView"
 import { ago } from "./text"
-import { closeProject, closeTab, deleteSession, grantTrust, newSession, notify, openModels, openProject, openSession, openTerminalTab, sessionTabID, setActive, useStore } from "./store"
-import { useState } from "react"
+import { closeProject, closeTab, deleteSession, grantTrust, newSession, notify, openModels, openProject, openSession, openSettings, openTerminalTab, sessionTabID, setActive, useStore } from "./store"
+import { useEffect, useState } from "react"
 
 function Files({ dir }: { dir: string }) {
   const [open, setOpen] = useState(true)
@@ -61,6 +63,9 @@ function Sidebar() {
                 <button className="icon" title="Models and servers" onClick={() => openModels(dir)} data-testid="open-models">
                   ⚙
                 </button>
+                <button className="icon" title="Settings (keys, trust, tools)" onClick={() => openSettings(dir)} data-testid="open-settings">
+                  ≡
+                </button>
                 <button className="icon" title="Close project" onClick={() => void closeProject(dir)}>
                   ×
                 </button>
@@ -108,7 +113,9 @@ function TabBar() {
                 ? `Changes${t.file ? `: ${t.file.split(/[\\/]/).pop()}` : ""}`
                 : t.kind === "terminal"
                   ? `Terminal ${t.n}`
-                  : "Models and servers"
+                  : t.kind === "settings"
+                    ? "Settings"
+                    : "Models and servers"
         return (
           <div key={t.id} role="tab" aria-selected={active === t.id} className={`tab${active === t.id ? " active" : ""}`}>
             <button className="tab-main" onClick={() => setActive(t.id)} title={label}>
@@ -149,6 +156,17 @@ function StatusBar() {
 }
 
 export function App() {
+  const [palette, setPalette] = useState(false)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault()
+        setPalette((v) => !v)
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [])
   const tabs = useStore((s) => s.tabs)
   const activeID = useStore((s) => s.active)
   const tab = useStore((s) => s.tabs.find((t) => t.id === s.active))
@@ -175,6 +193,7 @@ export function App() {
               {t.kind === "file" ? <Editor tab={t} /> : null}
               {t.kind === "diff" ? <DiffView tab={t} /> : null}
               {t.kind === "terminal" ? <TerminalView tab={t} active={t.id === activeID} /> : null}
+              {t.kind === "settings" ? <SettingsView dir={t.dir} /> : null}
             </div>
           ))}
           {!tab ? (
@@ -189,6 +208,7 @@ export function App() {
         </div>
       </main>
       <StatusBar />
+      {palette ? <CommandPalette onClose={() => setPalette(false)} /> : null}
     </div>
   )
 }
