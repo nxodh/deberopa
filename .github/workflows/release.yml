@@ -15,6 +15,9 @@ jobs:
     name: Deberopa Desktop (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 120
+    # dependency install scripts run in this job: it gets a read-only token, never the publishing one
+    permissions:
+      contents: read
     strategy:
       fail-fast: true
       matrix:
@@ -48,6 +51,8 @@ jobs:
       - name: Build the CLI that ships inside the app
         run: npm ci && npx bun run script/build.ts --target ${{ matrix.cli }}
       - name: Fetch, patch, install, package
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           node desktop/script/build.mjs --work ${{ runner.temp }}/deberopa-desktop --target ${{ matrix.target }} --stage fetch
           node desktop/script/build.mjs --work ${{ runner.temp }}/deberopa-desktop --target ${{ matrix.target }} --stage patch
@@ -64,10 +69,15 @@ jobs:
           test "$("$APP/resources/deberopa/deberopa" --version)" = "$VERSION"
           WORK="$RUNNER_TEMP/e2e-work"; mkdir -p "$WORK"
           export DEBEROPA_HOME="$RUNNER_TEMP/e2e-home" DEBEROPA_DISABLE_LOCAL_DETECT=1 DEBEROPA_DISABLE_MODELS_FETCH=1
-          xvfb-run -a "$APP/bin/deberopa-desktop" --no-sandbox --disable-gpu --disable-workspace-trust \
+          export DEBEROPA_E2E_LOG="$RUNNER_TEMP/e2e.log"
+          status=0
+          timeout 420 xvfb-run -a "$APP/bin/deberopa-desktop" --no-sandbox --disable-gpu --disable-workspace-trust \
             --user-data-dir "$RUNNER_TEMP/e2e-ud" --extensions-dir "$RUNNER_TEMP/e2e-ex" \
             --extensionDevelopmentPath="$APP/resources/app/extensions/deberopa-agent" \
-            --extensionTestsPath="$GITHUB_WORKSPACE/desktop/test/e2e/index.js" "$WORK"
+            --extensionTestsPath="$GITHUB_WORKSPACE/desktop/test/e2e/index.js" "$WORK" || status=$?
+          cat "$DEBEROPA_E2E_LOG" 2>/dev/null || echo "(the test wrote no log)"
+          pkill -f "deberopa serve" || true
+          exit $status
       - name: Start the packaged app (Windows) and run the in-app test
         if: matrix.target == 'win32-x64'
         shell: pwsh
@@ -83,7 +93,16 @@ jobs:
           $args = @("--disable-gpu", "--disable-workspace-trust", "--user-data-dir", "$env:RUNNER_TEMP\e2e-ud", "--extensions-dir", "$env:RUNNER_TEMP\e2e-ex",
                     "--extensionDevelopmentPath=$app\resources\app\extensions\deberopa-agent",
                     "--extensionTestsPath=$env:GITHUB_WORKSPACE\desktop\test\e2e\index.js", $work)
-          $p = Start-Process -FilePath $exe.FullName -ArgumentList $args -Wait -PassThru -NoNewWindow
+          $env:DEBEROPA_E2E_LOG = Join-Path $env:RUNNER_TEMP "e2e.log"
+          $p = Start-Process -FilePath $exe.FullName -ArgumentList $args -PassThru
+          $null = $p.Handle
+          # not -Wait: that also waits for children, and a server that outlives the app would hang the job
+          $timedOut = -not $p.WaitForExit(420000)
+          if ($timedOut) { Write-Host "the app did not exit in 7 minutes; stopping it"; taskkill /T /F /PID $p.Id | Out-Null }
+          Get-Process -Name deberopa -ErrorAction SilentlyContinue | Stop-Process -Force
+          if (Test-Path $env:DEBEROPA_E2E_LOG) { Get-Content $env:DEBEROPA_E2E_LOG } else { Write-Host "(the test wrote no log: the extension host never started it)" }
+          if ($timedOut) { throw "in-app test timed out" }
+          Write-Host "exit code $($p.ExitCode)"
           if ($p.ExitCode -ne 0) { throw "in-app test failed (exit $($p.ExitCode))" }
       - name: Archive (Linux)
         if: matrix.target == 'linux-x64'

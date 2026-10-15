@@ -487,6 +487,8 @@ function activate(context) {
   // A small read-only surface for the in-app end-to-end test (desktop/test/e2e).
   return {
     ensureSession: () => controller.ensureSession().then(() => undefined),
+    // stop the child server now: on Windows a child that outlives the app keeps a waiting parent waiting
+    stop: () => controller.dispose(),
     status: () => ({
       running: !!controller.client,
       sessionID: controller.state.sessionID,

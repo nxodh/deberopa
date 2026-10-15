@@ -87,7 +87,22 @@ if (want("patch")) {
   }
 }
 
-if (want("install")) run(npm, ["ci"])
+if (want("install")) {
+  // Dependencies download binaries from GitHub (ripgrep, Electron); a rate limit or a flaky connection
+  // fails the whole install, so try a few times before giving up.
+  let attempt = 0
+  for (;;) {
+    attempt++
+    const r = spawnSync(npm, ["ci"], { cwd: src, stdio: "inherit", env: { ...process.env, GIT_LFS_SKIP_SMUDGE: "1" }, shell: process.platform === "win32" })
+    if (r.status === 0) break
+    if (attempt >= 3) {
+      console.error(`npm ci failed ${attempt} times`)
+      process.exit(r.status ?? 1)
+    }
+    console.warn(`npm ci failed (exit ${r.status}); retrying in ${attempt * 20}s`)
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, attempt * 20_000)
+  }
+}
 if (want("compile")) run(npm, ["run", "compile-client"])
 const packaged = join(work, `VSCode-${target}`)
 if (want("package")) {
