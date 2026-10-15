@@ -2,7 +2,7 @@
 
 An AI coding agent for the terminal, written in TypeScript and compiled to single-file executables with Bun. It must keep working on Windows 11 and Debian 13.
 
-**Goal**: for the CLI and for Deberopa Desktop (`desktop/`), make local LLMs as comfortable as possible as a coding agent. Hosted models are supported, but local-model features and convenience come first: when two designs compete, favour the one that serves a model on the user's own machine (detection, tool-call checks, small-context behaviour, speed and slot visibility, downloads). Local-model changes are verified against a real local server, not only mocks.
+**Goal**: for the CLI and for Deberopa Desktop (`app/`), make local LLMs as comfortable as possible as a coding agent. Hosted models are supported, but local-model features and convenience come first: when two designs compete, favour the one that serves a model on the user's own machine (detection, tool-call checks, small-context behaviour, speed and slot visibility, downloads). Local-model changes are verified against a real local server, not only mocks.
 
 ## Commands
 
@@ -24,7 +24,7 @@ An AI coding agent for the terminal, written in TypeScript and compiled to singl
 - `src/plugin/` plugin loader and hooks; `src/acp/` Agent Client Protocol server; `src/config/trust.ts` project trust
 - `sdk/js/`, `sdk/python/`, `sdk/go/` HTTP API clients; `ide/vscode/` VS Code extension (own package.json); `action.yml` GitHub Action
 - `src/tui/keybinds.ts` terminal key mappings; `src/plugin/package.ts` explicitly installed npm packages; `src/session/share.ts` reviewed, read-only session sharing
-- `src/provider/localmode.ts` (mode, speed, slots, Ollama tool check and pull, start hints) and `localreport.ts` serve the terminal UI, `deberopa local` and the HTTP API alike; `src/provider/remote.ts` (model servers on other computers: address parsing, check, LAN scan, saved hosts) serves `deberopa remote` and `/remote`. `desktop/` is the Code - OSS based Desktop beta, superseded by the agent-first app in `docs/desktop-v2.md`. CLI and Desktop change and release together
+- `src/provider/localmode.ts` (mode, speed, slots, Ollama tool check and pull, start hints) and `localreport.ts` serve the terminal UI, `deberopa local` and the HTTP API alike; `src/provider/remote.ts` (model servers on other computers: address parsing, check, LAN scan, saved hosts) serves `deberopa remote` and `/remote`. `app/` is Deberopa Desktop (Electron + React; see `docs/desktop-v2.md`): its main process runs one `deberopa serve` per project and the page reaches it only through that process; `npm run build` in `app/` bundles the renderer and `node script/package.mjs` packages it with the CLI. CLI and Desktop change and release together
 - `test/helpers.ts` has the mock OpenAI-compatible server every loop test uses; call `endProject()` in `afterAll` after `useProject()` so config does not leak into the next test file
 
 ## Rules

@@ -41,18 +41,22 @@ Run `/init` once per project to generate an `AGENTS.md` that is given to the age
 
 ## Deberopa Desktop
 
-A desktop app for people who prefer a window to a terminal: a Code - OSS based editor with a conversation panel (permission prompts, tool cards, sessions, a local-models card). It bundles the `deberopa` command of the same version, so there is nothing else to install, and it is released together with the CLI under the same number. **0.3.0-beta.1 is a beta (a GitHub pre-release)**: the install scripts and `deberopa upgrade` keep installing the last full release (0.2.0); download the beta from the release page.
+An agent-first desktop app (the shape of Orca, OpenCode Desktop or the Codex app). Projects and sessions on the left; tabs in the middle for sessions, a file editor, diffs of what the agent changed, terminals, and models and servers. It bundles the `deberopa` command of the same version, so there is nothing else to install, and it is released together with the CLI under the same number.
+
+- **Code editor**: syntax highlighting, search, save (`Cmd/Ctrl+S`). It picks up changes the agent makes to the open file and tells you when you have unsaved edits.
+- **See and undo what the agent changed**: the diff of a step, with a revert per file.
+- **Local models and models on another computer**: Ollama, LM Studio, llama.cpp, vLLM and Opereta on this computer are found automatically; a server on another computer on the network is saved, or found with "Look on this network". Files, tools and sessions stay on this computer; only inference is remote. `deberopa remote` does the same from the CLI.
+- A command palette (`Cmd/Ctrl+K`) and settings (API keys, project trust, MCP / language server / plugin status, usage).
 
 | Target | File | Run |
 |---|---|---|
 | Debian 13 / Opereta (x86-64) | `deberopa-desktop-linux-x64.tar.gz` | unpack, then `deberopa-desktop-<version>-linux-x64/deberopa-desktop` |
-| Windows 11 (x86-64) | `deberopa-desktop-windows-x64.zip` | unpack, then `Deberopa Desktop.exe` |
+| Windows 11 (x86-64) | `deberopa-desktop-windows-x64.zip` | unpack, then `Deberopa.exe` |
 
 - There is no installer and no auto-update yet; unpack a newer release to update.
 - **It is not signed.** Windows may show SmartScreen or Smart App Control may block it. Check `checksums.txt` (SHA-256) and the GitHub build attestation (`gh attestation verify <file> --repo nxodh/deberopa`).
 - If it exits at once on Debian 13 because of Electron's sandbox, start it with `--no-sandbox`, or make `chrome-sandbox` owned by root with mode 4755.
-- No Microsoft marketplace or telemetry, and the Copilot extension is removed. Extensions: built-in ones and installing a VSIX directly.
-- Source and build: `desktop/`; design: [docs/desktop-design.md](docs/desktop-design.md).
+- Source: `app/`; design: [docs/desktop-v2.md](docs/desktop-v2.md). The Code - OSS based Desktop in 0.3.0-beta.1 is replaced by this app.
 
 ## What is in 0.1
 

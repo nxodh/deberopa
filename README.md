@@ -49,18 +49,22 @@ irm https://raw.githubusercontent.com/nxodh/deberopa/main/install.ps1 | iex
 
 ## Deberopa Desktop
 
-터미널 대신 창으로 쓰는 데스크톱 앱입니다. Code - OSS 기반 에디터 안에 대화 패널(권한 요청, 도구 카드, 세션, 로컬 모델 카드)이 들어 있고, 같은 버전의 `deberopa`를 함께 담고 있어 따로 설치할 것이 없습니다. CLI와 같은 번호로 함께 릴리스됩니다. **0.3.0-beta.1은 베타(GitHub 사전 릴리스)** 이며, 설치 스크립트와 `deberopa upgrade`는 계속 마지막 정식 릴리스(0.2.0)를 설치합니다. 베타는 릴리스 페이지에서 직접 내려받으세요.
+에이전트가 중심인 데스크톱 앱입니다(Orca, OpenCode Desktop, Codex 앱과 같은 형태). 왼쪽에 프로젝트와 세션, 가운데에 탭(세션, 파일 편집기, 에이전트가 바꾼 내용의 diff, 터미널, 모델과 서버)이 있습니다. 같은 버전의 `deberopa`를 함께 담고 있어 따로 설치할 것이 없고, CLI와 같은 번호로 함께 릴리스됩니다.
+
+- **코드 편집기**: 문법 강조, 검색, 저장(`Cmd/Ctrl+S`). 에이전트가 같은 파일을 바꾸면 반영하고, 내가 수정 중이면 알려 줍니다.
+- **변경 확인과 되돌리기**: 한 단계에서 에이전트가 바꾼 파일을 diff로 보고 파일별로 되돌립니다.
+- **로컬 모델과 다른 컴퓨터의 모델**: 이 컴퓨터의 Ollama, LM Studio, llama.cpp, vLLM, Opereta를 자동으로 찾고, 같은 네트워크의 다른 컴퓨터에서 도는 서버는 저장하거나 "네트워크에서 찾기"를 눌러 찾습니다. 파일, 도구 실행, 세션은 이 컴퓨터에 두고 추론만 원격에서 합니다. CLI에서는 `deberopa remote`로 같은 일을 합니다.
+- 명령 팔레트(`Cmd/Ctrl+K`), 설정(API 키, 프로젝트 신뢰, MCP·언어 서버·플러그인 상태, 사용량).
 
 | 대상 | 파일 | 실행 |
 |---|---|---|
 | Debian 13 · Opereta (x86-64) | `deberopa-desktop-linux-x64.tar.gz` | 풀어서 `deberopa-desktop-<버전>-linux-x64/deberopa-desktop` |
-| Windows 11 (x86-64) | `deberopa-desktop-windows-x64.zip` | 풀어서 `Deberopa Desktop.exe` |
+| Windows 11 (x86-64) | `deberopa-desktop-windows-x64.zip` | 풀어서 `Deberopa.exe` |
 
 - 설치 프로그램과 자동 업데이트는 아직 없습니다. 새 버전은 새로 내려받아 풉니다.
 - **서명되지 않았습니다.** Windows에서 SmartScreen이 경고하거나 Smart App Control이 막을 수 있습니다. `checksums.txt`(SHA-256)와 GitHub 빌드 증명(`gh attestation verify <파일> --repo nxodh/deberopa`)으로 확인하세요.
 - Debian 13에서 Electron 샌드박스 때문에 바로 종료되면 `--no-sandbox`로 실행하거나, `chrome-sandbox`의 소유자를 root로 하고 `chmod 4755` 하세요.
-- Microsoft 마켓플레이스와 원격 측정을 쓰지 않으며 Copilot 확장을 뺐습니다. 확장은 내장 확장과 VSIX 직접 설치만 지원합니다.
-- 소스와 빌드 방법: `desktop/`, 설계: [docs/desktop-design.md](docs/desktop-design.md).
+- 소스: `app/`, 설계: [docs/desktop-v2.md](docs/desktop-v2.md). 0.3.0-beta.1에 들어 있던 Code - OSS 기반 Desktop은 이 앱으로 대체됩니다.
 
 ## 시작하기
 

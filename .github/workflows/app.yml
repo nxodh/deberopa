@@ -4,6 +4,8 @@ name: Desktop app
 # model, and checks that a prompt gets an answer and a model server on another computer can be saved.
 on:
   workflow_dispatch:
+  # the release workflow builds, tests and archives the Desktop with exactly these steps
+  workflow_call:
   push:
     branches: [main]
     paths: ["app/**", "src/**", "script/build.ts", ".github/workflows/app.yml"]
@@ -112,11 +114,23 @@ jobs:
         run: ./test/run-windows.ps1 -Exe "${{ github.workspace }}\out\Deberopa-win32-x64\Deberopa.exe"
       - name: Archive (Debian 13)
         if: runner.os == 'Linux'
-        run: tar -C out -czf deberopa-desktop-linux-x64.tar.gz Deberopa-linux-x64 && ls -la deberopa-desktop-linux-x64.tar.gz
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          top="deberopa-desktop-$version-linux-x64"
+          rm -rf stage && mkdir stage && cp -a out/Deberopa-linux-x64 "stage/$top"
+          tar -C stage -czf deberopa-desktop-linux-x64.tar.gz "$top"
+          ls -la deberopa-desktop-linux-x64.tar.gz
       - name: Archive (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: Compress-Archive -Path out\Deberopa-win32-x64 -DestinationPath deberopa-desktop-windows-x64.zip; Get-Item deberopa-desktop-windows-x64.zip
+        run: |
+          $version = node -p "require('./package.json').version"
+          $top = "deberopa-desktop-$version-windows-x64"
+          Remove-Item -Recurse -Force stage -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory stage | Out-Null
+          Copy-Item -Recurse out\Deberopa-win32-x64 "stage\$top"
+          Compress-Archive -Path "stage\$top" -DestinationPath deberopa-desktop-windows-x64.zip
+          Get-Item deberopa-desktop-windows-x64.zip
       - name: Upload the app
         uses: actions/upload-artifact@v4
         with:
