@@ -67,7 +67,15 @@ if (want("patch")) {
   if (existsSync(applied)) {
     console.log("patches already applied")
   } else {
-    for (const p of patches) run("git", ["apply", "--whitespace=nowarn", join(dir, p)])
+    // DEBEROPA_SKIP_PATCHES=0003,0002 leaves those patches out (for finding out what a patch is for)
+    const skip = (process.env.DEBEROPA_SKIP_PATCHES ?? "").split(",").map((s) => s.trim()).filter(Boolean)
+    for (const p of patches) {
+      if (skip.some((s) => p.startsWith(s))) {
+        console.warn(`skipping patch ${p}`)
+        continue
+      }
+      run("git", ["apply", "--whitespace=nowarn", join(dir, p)])
+    }
     // Whole directories we do not ship (listed in desktop/remove.json) are deleted before anything installs.
     for (const rel of JSON.parse(readFileSync(join(desktop, "remove.json"), "utf8"))) rmSync(join(src, rel), { recursive: true, force: true })
     // Files that are removed or replaced wholesale live in desktop/overlay and are copied over the tree.

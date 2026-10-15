@@ -1,0 +1,50 @@
+name: Desktop probe (Linux, without patch 0003)
+
+# Temporary investigation: why did the Linux app start although the onboarding module throws at import time?
+# Builds Linux without the onboarding patch and shows what the app does. Delete after use.
+on:
+  pull_request:
+    paths: [".github/workflows/desktop-probe-linux.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.18.0"
+      - name: Build dependencies
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libx11-dev libxkbfile-dev libsecret-1-dev libkrb5-dev pkg-config xvfb libgbm1 libasound2t64 libgtk-3-0t64 libnss3 libxss1 libxkbfile1
+      - name: Build the CLI
+        run: npm ci && npx bun run script/build.ts --target linux-x64
+      - name: Build the app without patch 0003
+        env:
+          DEBEROPA_SKIP_PATCHES: "0003"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          W="${{ runner.temp }}/probe"
+          for s in fetch patch install package; do node desktop/script/build.mjs --work "$W" --target linux-x64 --stage $s; done
+          node desktop/script/build.mjs --work "$W" --target linux-x64 --stage bundle-cli --cli dist/linux-x64/deberopa
+      - name: Run it and look
+        run: |
+          APP="${{ runner.temp }}/probe/VSCode-linux-x64"
+          grep -c "Onboarding requires a default chat agent" -r "$APP/resources/app/out/vs/workbench/workbench.desktop.main.js" || true
+          WORK="$RUNNER_TEMP/p-work"; mkdir -p "$WORK"
+          export DEBEROPA_HOME="$RUNNER_TEMP/p-home" DEBEROPA_DISABLE_LOCAL_DETECT=1 DEBEROPA_DISABLE_MODELS_FETCH=1 DEBEROPA_E2E_LOG="$RUNNER_TEMP/p.log"
+          status=0
+          timeout 200 xvfb-run -a "$APP/bin/deberopa-desktop" --no-sandbox --disable-gpu --disable-workspace-trust --verbose --enable-logging=stderr --v=0 \
+            --logsPath "$RUNNER_TEMP/p-logs" --user-data-dir "$RUNNER_TEMP/p-ud" --extensions-dir "$RUNNER_TEMP/p-ex" \
+            --extensionDevelopmentPath="$APP/resources/app/extensions/deberopa-agent" \
+            --extensionTestsPath="$GITHUB_WORKSPACE/desktop/test/e2e/index.js" "$WORK" > "$RUNNER_TEMP/p.out" 2> "$RUNNER_TEMP/p.err" || status=$?
+          echo "exit status: $status"
+          echo "---- test log"; cat "$RUNNER_TEMP/p.log" 2>/dev/null || echo "(none)"
+          echo "---- stderr: lines mentioning errors"; grep -n -iE "onboarding|uncaught|error" "$RUNNER_TEMP/p.err" | head -30 | cut -c1-260 || true
+          echo "---- log files"; find "$RUNNER_TEMP/p-logs" -type f | sed "s#$RUNNER_TEMP/##" | sort | head -40
+          echo "---- renderer log (tail)"; f="$(find "$RUNNER_TEMP/p-logs" -name renderer.log | head -1)"; [ -n "$f" ] && tail -20 "$f" || echo "(no renderer.log)"
+          echo "---- main log: window lines"; grep -n -iE "window|crash|gone|render" "$RUNNER_TEMP/p-logs/main.log" | head -20 | cut -c1-220 || true
