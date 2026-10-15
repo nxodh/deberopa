@@ -32,8 +32,18 @@ else {
   const product = JSON.parse(readFileSync(productPath, "utf8"))
   console.log(`product.json: ${productPath}`)
   console.log(`  nameLong=${product.nameLong} applicationName=${product.applicationName} version=${product.version}`)
-  for (const key of ["extensionsGallery", "defaultChatAgent", "voiceWsUrl", "webviewContentExternalBaseUrlTemplate", "updateUrl", "extensionRecommendations"]) {
+  for (const key of ["extensionsGallery", "voiceWsUrl", "webviewContentExternalBaseUrlTemplate", "updateUrl", "extensionRecommendations"]) {
     if (key in product) fail(`product.json still has "${key}"`)
+  }
+  // defaultChatAgent must exist (the workbench reads it everywhere) but be inert: no addresses, no real ids
+  const agent = product.defaultChatAgent
+  if (!agent || typeof agent !== "object") fail("product.json has no defaultChatAgent block (the workbench would fail to start)")
+  else {
+    for (const [k, v] of Object.entries(agent)) {
+      if (typeof v === "string" && /url$/i.test(k) && v !== "") fail(`defaultChatAgent.${k} is not empty: ${v}`)
+      if (typeof v === "string" && /^https?:\/\//.test(v)) fail(`defaultChatAgent.${k} holds an address`)
+    }
+    if (!/^deberopa\./.test(String(agent.extensionId))) fail("defaultChatAgent.extensionId is a real extension id")
   }
   if (product.nameLong !== "Deberopa Desktop") fail(`nameLong is ${JSON.stringify(product.nameLong)}`)
   const text = JSON.stringify(product)

@@ -1,6 +1,5 @@
 {
   "$remove": [
-    "defaultChatAgent",
     "webviewContentExternalBaseUrlTemplate",
     "voiceWsUrl",
     "agentsTelemetryAppName",
@@ -47,5 +46,63 @@
     "workbench.enableExperiments": false
   },
   "trustedExtensionAuthAccess": {},
-  "builtInExtensionsEnabledWithAutoUpdates": []
+  "builtInExtensionsEnabledWithAutoUpdates": [],
+  "defaultChatAgent": {
+    "extensionId": "deberopa.no-chat-agent",
+    "chatExtensionId": "deberopa.no-chat-agent-chat",
+    "chatExtensionOutputId": "",
+    "chatExtensionOutputExtensionStateCommand": "",
+    "documentationUrl": "",
+    "skusDocumentationUrl": "",
+    "optimizeUsageDocumentationUrl": "",
+    "publicCodeMatchesUrl": "",
+    "managePlanUrl": "",
+    "upgradePlanUrl": "",
+    "signUpUrl": "",
+    "termsStatementUrl": "",
+    "privacyStatementUrl": "",
+    "provider": {
+      "default": {
+        "id": "deberopa-none",
+        "name": "None"
+      },
+      "enterprise": {
+        "id": "deberopa-none",
+        "name": "None"
+      },
+      "google": {
+        "id": "deberopa-none",
+        "name": "None"
+      },
+      "apple": {
+        "id": "deberopa-none",
+        "name": "None"
+      },
+      "microsoft": {
+        "id": "deberopa-none",
+        "name": "None"
+      }
+    },
+    "providerExtensionId": "",
+    "providerUriSetting": "",
+    "providerScopes": [
+      []
+    ],
+    "entitlementUrl": "",
+    "entitlementSignupLimitedUrl": "",
+    "tokenEntitlementUrl": "",
+    "mcpRegistryDataUrl": "",
+    "mcpConnectorsUrl": "",
+    "managedSettingsUrl": "",
+    "chatQuotaExceededContext": "deberopa.noChatQuota",
+    "completionsQuotaExceededContext": "deberopa.noCompletionsQuota",
+    "walkthroughCommand": "",
+    "completionsMenuCommand": "",
+    "chatRefreshTokenCommand": "",
+    "generateCommitMessageCommand": "",
+    "resolveMergeConflictsCommand": "",
+    "completionsAdvancedSetting": "deberopa.noCompletions.advanced",
+    "completionsEnablementSetting": "deberopa.noCompletions.enable",
+    "nextEditSuggestionsSetting": "deberopa.noCompletions.nextEdit"
+  }
 }

@@ -1,8 +1,8 @@
 diff --git a/src/vs/workbench/contrib/welcomeOnboarding/browser/welcomeOnboarding.contribution.ts b/src/vs/workbench/contrib/welcomeOnboarding/browser/welcomeOnboarding.contribution.ts
-index d725507e..a5623ff9 100644
+index d725507e..131b8982 100644
 --- a/src/vs/workbench/contrib/welcomeOnboarding/browser/welcomeOnboarding.contribution.ts
 +++ b/src/vs/workbench/contrib/welcomeOnboarding/browser/welcomeOnboarding.contribution.ts
-@@ -3,31 +3,24 @@
+@@ -3,31 +3,25 @@
   *  Licensed under the MIT License. See License.txt in the project root for license information.
   *--------------------------------------------------------------------------------------------*/
  
@@ -13,8 +13,9 @@ index d725507e..a5623ff9 100644
 -import { Categories } from '../../../../platform/action/common/actionCommonCategories.js';
 -import { Action2, registerAction2 } from '../../../../platform/actions/common/actions.js';
 +// Deberopa Desktop: the sign-in wizard (GitHub Copilot, Google, Apple, Microsoft) is not part of this
-+// product and needs `product.defaultChatAgent`, which is removed. The service stays registered, as a
-+// wizard that never appears, because the start-up page asks for it.
++// product. The service stays registered, as a wizard that never appears, because the start-up page asks
++// for it. (Its upstream module also asserts a real `product.defaultChatAgent` at import time, which this
++// product keeps only as an inert block.)
 +import { Emitter, Event } from '../../../../base/common/event.js';
  import { InstantiationType, registerSingleton } from '../../../../platform/instantiation/common/extensions.js';
 -import { ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
