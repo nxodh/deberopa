@@ -10,6 +10,7 @@ const path = require("node:path")
 const LOG = process.env.DEBEROPA_APP_TEST_LOG || ""
 const SHOTS = process.env.DEBEROPA_APP_SHOTS || ""
 const ANSWER = "pong from the mock model"
+const MARKDOWN = "# Plan\n\n- first **bold** step\n- run `npm test`\n"
 
 const log = (message) => {
   const line = `[app-test] ${new Date().toISOString()} ${message}`
@@ -52,6 +53,11 @@ function mockModel() {
       }
       if (last.role === "tool") {
         res.write(chunk({ role: "assistant", content: "I wrote generated.txt" }, null))
+        res.write(chunk({}, "stop", { usage }))
+        return res.end("data: [DONE]\n\n")
+      }
+      if (lastUser && userText(lastUser).includes("show markdown")) {
+        res.write(chunk({ role: "assistant", content: MARKDOWN }, null))
         res.write(chunk({}, "stop", { usage }))
         return res.end("data: [DONE]\n\n")
       }
@@ -168,6 +174,13 @@ function run({ app, win }) {
     log("the model's answer is on screen")
     await waitFor("status bar", `document.querySelector(".status").textContent.includes("deberopa-app-proj-")`, 5000)
     await shot("session")
+
+    // Markdown in an answer is shown as structure, and never as HTML
+    await type("[data-testid=composer]", "show markdown")
+    await sleep(150)
+    await click("[data-testid=send]")
+    await waitFor("the rendered list", `(() => { const m = [...document.querySelectorAll(".msg.assistant")].pop(); return !!m && m.querySelectorAll("li").length === 2 && !!m.querySelector("strong") && !!m.querySelector("code") && !!m.querySelector(".h") })()`, 30000)
+    log("an answer in Markdown is shown with its structure")
 
     // the agent changes a file: permission card, then the change with a diff and a revert
     await exec(`(window.confirm = () => true, true)`)

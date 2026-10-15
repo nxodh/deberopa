@@ -1,27 +1,74 @@
-import type { ReactNode } from "react"
+import { parseBlocks, type Inline } from "./markdown"
 
-/** Text is rendered as text nodes only: model output is never interpreted as HTML. */
+function InlineView({ parts }: { parts: Inline[] }) {
+  return (
+    <>
+      {parts.map((p, i) =>
+        p.t === "code" ? (
+          <code key={i}>{p.v}</code>
+        ) : p.t === "bold" ? (
+          <strong key={i}>{p.v}</strong>
+        ) : p.t === "link" ? (
+          <a
+            key={i}
+            href={p.href}
+            title={p.href}
+            onClick={(e) => {
+              e.preventDefault()
+              void window.deberopa.openExternal(p.href)
+            }}
+          >
+            {p.v}
+          </a>
+        ) : (
+          <span key={i}>{p.v}</span>
+        ),
+      )}
+    </>
+  )
+}
+
+/** The agent's answer: a small Markdown subset, always as text nodes (never HTML). */
 export function Text({ text }: { text: string }) {
-  const out: ReactNode[] = []
-  const re = /```([^\n`]*)\n([\s\S]*?)(```|$)/g
-  let last = 0
-  let key = 0
-  let m: RegExpExecArray | null
-  const paragraphs = (chunk: string) => {
-    for (const block of chunk.split(/\n{2,}/)) if (block.trim() !== "") out.push(<p key={key++}>{block.trim()}</p>)
-  }
-  while ((m = re.exec(text)) !== null) {
-    if (m.index > last) paragraphs(text.slice(last, m.index))
-    out.push(
-      <pre key={key++}>
-        <code>{m[2]!.replace(/\n$/, "")}</code>
-      </pre>,
-    )
-    last = re.lastIndex
-    if (m[3] === "") break
-  }
-  if (last < text.length) paragraphs(text.slice(last))
-  return <>{out}</>
+  const blocks = parseBlocks(text)
+  return (
+    <>
+      {blocks.map((b, i) => {
+        switch (b.t) {
+          case "code":
+            return (
+              <pre key={i}>
+                <code>{b.v}</code>
+              </pre>
+            )
+          case "heading":
+            return (
+              <p key={i} className={`h h${Math.min(b.level, 3)}`}>
+                <InlineView parts={b.inline} />
+              </p>
+            )
+          case "list": {
+            const Tag = b.ordered ? "ol" : "ul"
+            return (
+              <Tag key={i}>
+                {b.items.map((item, j) => (
+                  <li key={j}>
+                    <InlineView parts={item} />
+                  </li>
+                ))}
+              </Tag>
+            )
+          }
+          default:
+            return (
+              <p key={i}>
+                <InlineView parts={b.inline} />
+              </p>
+            )
+        }
+      })}
+    </>
+  )
 }
 
 export const short = (value: unknown, n = 80) => {
