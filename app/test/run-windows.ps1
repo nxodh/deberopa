@@ -3,7 +3,9 @@
 param([int]$TimeoutSeconds = 240)
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$exe = Join-Path $root "node_modules\electron\dist\electron.exe"
+$exe = (node -p "require('electron')" 2>$null | Select-Object -Last 1)
+if (-not $exe -or -not (Test-Path $exe)) { Write-Host "Electron binary not found (run: node node_modules/electron/install.js)"; exit 1 }
+Write-Host "electron: $exe"
 $log = Join-Path $env:RUNNER_TEMP "app-test.log"
 $out = Join-Path $env:RUNNER_TEMP "app-test.out"
 $err = Join-Path $env:RUNNER_TEMP "app-test.err"

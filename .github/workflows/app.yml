@@ -47,6 +47,10 @@ jobs:
         run: |
           npm ci
           cd app && npm ci
+      - name: Download the Electron binary
+        # npm does not run install scripts it has not been told to allow, so fetch it explicitly
+        working-directory: app
+        run: node node_modules/electron/install.js
       - name: Type check the app
         working-directory: app
         run: npx tsc --noEmit -p tsconfig.json
