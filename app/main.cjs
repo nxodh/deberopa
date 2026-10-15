@@ -112,6 +112,22 @@ function readRecents() {
     return []
   }
 }
+const openFile_ = () => path.join(app.getPath("userData"), "open.json")
+function readOpen() {
+  try {
+    const list = JSON.parse(fs.readFileSync(openFile_(), "utf8"))
+    return Array.isArray(list) ? list.filter((d) => typeof d === "string" && fs.existsSync(d)) : []
+  } catch {
+    return []
+  }
+}
+function writeOpen(list) {
+  try {
+    fs.mkdirSync(path.dirname(openFile_()), { recursive: true })
+    fs.writeFileSync(openFile_(), JSON.stringify(list))
+  } catch {}
+}
+
 function remember(dir) {
   const list = [dir, ...readRecents().filter((d) => d !== dir)].slice(0, 12)
   try {
@@ -121,7 +137,7 @@ function remember(dir) {
 }
 
 // ---- IPC ----------------------------------------------------------------------------------------
-ipcMain.handle("app:info", () => ({ version: app.getVersion(), platform: process.platform, recents: TEST ? [] : readRecents(), testProject }))
+ipcMain.handle("app:info", () => ({ version: app.getVersion(), platform: process.platform, recents: TEST ? [] : readRecents(), restore: !TEST || TEST === "restore" ? readOpen() : [], testProject }))
 
 ipcMain.handle("project:open", async (_e, requested) => {
   let dir = typeof requested === "string" ? requested : undefined
@@ -142,10 +158,14 @@ ipcMain.handle("project:open", async (_e, requested) => {
     return { ok: false, error: err.message }
   }
   remember(dir)
+  if (!TEST || TEST === "restore") writeOpen([...readOpen().filter((d) => d !== dir), dir])
   return { ok: true, dir, name: path.basename(dir) || dir }
 })
 
-ipcMain.handle("project:close", (_e, dir) => stop(dir))
+ipcMain.handle("project:close", (_e, dir) => {
+  stop(dir)
+  if (!TEST || TEST === "restore") writeOpen(readOpen().filter((d) => d !== dir))
+})
 
 ipcMain.handle("api", async (_e, req) => {
   const entry = projects.get(req && req.dir)

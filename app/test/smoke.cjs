@@ -97,6 +97,14 @@ async function prepare() {
     provider: { mock: { name: "Mock", api: `http://127.0.0.1:${port}/v1`, models: { "mock-1": { name: "Mock 1", tool_call: true, limit: { context: 100000, output: 4000 } } } } },
   })
   process.env.DEBEROPA_APP_OLLAMA_PORT = String(ollamaPort)
+  if (process.env.DEBEROPA_APP_TEST === "restore") {
+    // a previous run left this project open: the app must open it again by itself
+    const { app } = require("electron")
+    const data = fs.mkdtempSync(path.join(os.tmpdir(), "deberopa-app-data-"))
+    app.setPath("userData", data)
+    fs.writeFileSync(path.join(data, "open.json"), JSON.stringify([project]))
+    return ""
+  }
   return project
 }
 
@@ -131,6 +139,12 @@ function run({ app, win }) {
   win().webContents.on("console-message", (_e, level, message) => {
     if (level >= 2) log(`console: ${String(message).slice(0, 300)}`)
   })
+  const restore = async () => {
+    log(`start (restore) on ${process.platform}`)
+    await waitFor("the restored project and its session", `!!document.querySelector('[data-testid=composer]') && document.querySelector(".status").textContent.includes("deberopa-app-proj-")`, 60000)
+    log("the project that was open came back by itself")
+    log("OK")
+  }
   const main = async () => {
     log(`start on ${process.platform}, electron ${process.versions.electron}`)
     // the icon files the window, the taskbar and the installers use must exist and decode
@@ -262,7 +276,7 @@ function run({ app, win }) {
     log("OK")
   }
 
-  main().then(
+  ;(process.env.DEBEROPA_APP_TEST === "restore" ? restore() : main()).then(
     () => {
       for (const s of servers) s.close()
       app.exit(0)

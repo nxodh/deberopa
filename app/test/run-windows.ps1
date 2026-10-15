@@ -1,6 +1,6 @@
 # Runs the app smoke test on Windows and prints what it logged. Electron is a GUI program: wait on
 # the process itself, with a time limit, and kill what is left (the agent it started).
-param([int]$TimeoutSeconds = 240, [string]$Exe = "")
+param([int]$TimeoutSeconds = 240, [string]$Exe = "", [string]$Mode = "1")
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 # a packaged Deberopa.exe when given, otherwise the development Electron
@@ -12,7 +12,7 @@ $log = Join-Path $env:RUNNER_TEMP "app-test.log"
 $out = Join-Path $env:RUNNER_TEMP "app-test.out"
 $err = Join-Path $env:RUNNER_TEMP "app-test.err"
 Remove-Item $log, $out, $err -ErrorAction SilentlyContinue
-$env:DEBEROPA_APP_TEST = "1"
+$env:DEBEROPA_APP_TEST = $Mode
 $env:DEBEROPA_APP_TEST_LOG = $log
 $env:DEBEROPA_APP_SHOTS = Join-Path $env:RUNNER_TEMP "app-shots"
 

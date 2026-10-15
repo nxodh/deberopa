@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import type { Message, Part } from "./conv"
-import { abort, compactSession, convKey, openDiff, openFile, replyPermission, select, send, undoMessage, useStore, type ModelChoice, type Tab } from "./store"
+import { abort, compactSession, convKey, openDiff, openFile, openModels, openSettings, replyPermission, select, send, undoMessage, useStore, type ModelChoice, type Tab } from "./store"
 import { compactNumber, short, Text } from "./text"
 
 const MARK: Record<string, string> = { pending: "◌", running: "◐", completed: "●", error: "✕" }
@@ -189,6 +189,17 @@ export function SessionView({ tab }: { tab: Extract<Tab, { kind: "session" }> })
         <div ref={bottom} />
       </div>
 
+      {project.models.length === 0 ? (
+        <div className="banner" role="alert" data-testid="no-model">
+          <span>
+            <strong>No model is available yet.</strong> Start a model server on this computer, add another computer on the network, or add an API key for a hosted model.
+          </span>
+          <button className="primary" onClick={() => openModels(tab.dir)}>
+            Models and servers
+          </button>
+          <button onClick={() => openSettings(tab.dir)}>API keys</button>
+        </div>
+      ) : null}
       <div className="composer">
         <textarea
           data-testid="composer"

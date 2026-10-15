@@ -78,11 +78,18 @@ jobs:
           echo "---- stdout"; tail -30 "$RUNNER_TEMP/app-test.out" | cut -c1-240
           echo "---- stderr"; tail -30 "$RUNNER_TEMP/app-test.err" | cut -c1-240
           grep -q "\[app-test\].* OK$" "$RUNNER_TEMP/app-test.log" || { echo "the app test did not report OK"; exit 1; }
+          # the project that was open when the app was closed comes back at the next start
+          rm -f "$RUNNER_TEMP/app-test.log"
+          DEBEROPA_APP_TEST=restore xvfb-run -a ./node_modules/.bin/electron . --no-sandbox --disable-gpu --disable-dev-shm-usage > /dev/null 2>&1 || true
+          cat "$RUNNER_TEMP/app-test.log" 2>/dev/null || echo "(no log written)"
+          grep -q "\[app-test\].* OK$" "$RUNNER_TEMP/app-test.log" || { echo "the restore test did not report OK"; exit 1; }
       - name: Run the app (Windows)
         if: runner.os == 'Windows'
         working-directory: app
         shell: pwsh
-        run: ./test/run-windows.ps1
+        run: |
+          ./test/run-windows.ps1
+          ./test/run-windows.ps1 -Mode restore
       - name: Build the CLI that goes inside the app
         shell: bash
         run: npx bun run script/build.ts --target ${{ matrix.cli }}

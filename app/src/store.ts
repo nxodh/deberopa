@@ -151,6 +151,8 @@ export async function init() {
   set({ ready: true, version: info.version, platform: info.platform, recents: info.recents })
   // test mode: the smoke test names a folder to open without a dialog
   if (info.testProject) void openProject(info.testProject)
+  // the projects that were open when the app was last closed
+  else for (const dir of info.restore) await openProject(dir)
   window.deberopa.onEvent(({ dir, event }) => {
     if (event.type.startsWith("session.") && ["session.created", "session.updated", "session.deleted"].includes(event.type)) refreshSessionsSoon(dir)
     const prefix = `${dir}\u0000`

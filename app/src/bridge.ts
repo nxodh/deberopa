@@ -1,5 +1,5 @@
 export interface Bridge {
-  info(): Promise<{ version: string; platform: string; recents: string[]; testProject: string }>
+  info(): Promise<{ version: string; platform: string; recents: string[]; restore: string[]; testProject: string }>
   openProject(dir?: string): Promise<{ ok: boolean; canceled?: boolean; error?: string; dir?: string; name?: string }>
   closeProject(dir: string): Promise<void>
   api(dir: string, method: string, path: string, body?: unknown): Promise<{ ok: boolean; status?: number; data?: any; error?: string }>
