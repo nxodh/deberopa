@@ -9,7 +9,7 @@ contextBridge.exposeInMainWorld("deberopa", {
   listDir: (dir, rel) => ipcRenderer.invoke("fs:list", { dir, rel }),
   readFile: (dir, rel) => ipcRenderer.invoke("fs:read", { dir, rel }),
   statFile: (dir, rel) => ipcRenderer.invoke("fs:stat", { dir, rel }),
-  writeFile: (dir, rel, text, expectedMtimeMs, force) => ipcRenderer.invoke("fs:write", { dir, rel, text, expectedMtimeMs, force }),
+  writeFile: (dir, rel, text, expected, force) => ipcRenderer.invoke("fs:write", { dir, rel, text, expectedMtimeMs: expected && expected.mtimeMs, expectedSize: expected && expected.size, force }),
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
   onEvent: (callback) => {
     const handler = (_e, payload) => callback(payload)

@@ -222,7 +222,7 @@ ipcMain.handle("fs:read", (_e, req) => {
     if (stat.size > MAX_TEXT) return { ok: false, error: `Too large to edit here (${Math.round(stat.size / 1024)} KB; the limit is ${MAX_TEXT / 1024} KB).` }
     const buffer = fs.readFileSync(at.real)
     if (buffer.includes(0)) return { ok: false, error: "This looks like a binary file." }
-    return { ok: true, text: buffer.toString("utf8"), mtimeMs: stat.mtimeMs }
+    return { ok: true, text: buffer.toString("utf8"), mtimeMs: stat.mtimeMs, size: stat.size }
   } catch (err) {
     return { ok: false, error: err.message }
   }
@@ -233,7 +233,8 @@ ipcMain.handle("fs:stat", (_e, req) => {
   const at = inside(req.dir, req.rel)
   if (!at) return { ok: false }
   try {
-    return { ok: true, mtimeMs: fs.statSync(at.real).mtimeMs }
+    const stat = fs.statSync(at.real)
+    return { ok: true, mtimeMs: stat.mtimeMs, size: stat.size }
   } catch {
     return { ok: false, missing: true }
   }
@@ -247,11 +248,14 @@ ipcMain.handle("fs:write", (_e, req) => {
   try {
     // the agent may have changed the file since it was read: do not overwrite that without being told to
     if (!req.force && typeof req.expectedMtimeMs === "number" && fs.existsSync(at.real)) {
-      const current = fs.statSync(at.real).mtimeMs
-      if (Math.abs(current - req.expectedMtimeMs) > 1) return { ok: false, conflict: true, error: "The file changed on disk since you opened it." }
+      const current = fs.statSync(at.real)
+      // timestamps can be coarse (the same tick for two writes): the size is compared as well
+      const moved = Math.abs(current.mtimeMs - req.expectedMtimeMs) > 1 || (typeof req.expectedSize === "number" && current.size !== req.expectedSize)
+      if (moved) return { ok: false, conflict: true, error: "The file changed on disk since you opened it." }
     }
     fs.writeFileSync(at.real, req.text)
-    return { ok: true, mtimeMs: fs.statSync(at.real).mtimeMs }
+    const written = fs.statSync(at.real)
+    return { ok: true, mtimeMs: written.mtimeMs, size: written.size }
   } catch (err) {
     return { ok: false, error: err.message }
   }

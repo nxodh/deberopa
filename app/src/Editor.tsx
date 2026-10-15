@@ -72,7 +72,7 @@ function languageFor(name: string): LanguageSupport | undefined {
 export function Editor({ tab }: { tab: Extract<Tab, { kind: "file" }> }) {
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<EditorView | null>(null)
-  const loaded = useRef<{ mtimeMs: number; saved: string }>({ mtimeMs: 0, saved: "" })
+  const loaded = useRef<{ mtimeMs: number; size: number; saved: string }>({ mtimeMs: 0, size: 0, saved: "" })
   const dirty = useRef(false)
   const [error, setError] = useState("")
   const [notice, setNotice] = useState<"" | "changed" | "saved">("")
@@ -89,9 +89,9 @@ export function Editor({ tab }: { tab: Extract<Tab, { kind: "file" }> }) {
     const v = view.current
     if (!v) return
     const text = v.state.doc.toString()
-    const res = await window.deberopa.writeFile(tab.dir, tab.path, text, loaded.current.mtimeMs, force)
+    const res = await window.deberopa.writeFile(tab.dir, tab.path, text, { mtimeMs: loaded.current.mtimeMs, size: loaded.current.size }, force)
     if (res.ok) {
-      loaded.current = { mtimeMs: res.mtimeMs ?? loaded.current.mtimeMs, saved: text }
+      loaded.current = { mtimeMs: res.mtimeMs ?? loaded.current.mtimeMs, size: res.size ?? loaded.current.size, saved: text }
       setDirty(false)
       setNotice("saved")
       setError("")
@@ -110,7 +110,7 @@ export function Editor({ tab }: { tab: Extract<Tab, { kind: "file" }> }) {
   const reload = async () => {
     const res = await window.deberopa.readFile(tab.dir, tab.path)
     if (!res.ok) return setError(res.error ?? "Could not read the file.")
-    loaded.current = { mtimeMs: res.mtimeMs ?? 0, saved: res.text ?? "" }
+    loaded.current = { mtimeMs: res.mtimeMs ?? 0, size: res.size ?? 0, saved: res.text ?? "" }
     replaceText(res.text ?? "")
     setDirty(false)
     setNotice("")
@@ -122,7 +122,7 @@ export function Editor({ tab }: { tab: Extract<Tab, { kind: "file" }> }) {
     void window.deberopa.readFile(tab.dir, tab.path).then((res) => {
       if (cancelled) return
       if (!res.ok) return setError(res.error ?? "Could not read the file.")
-      loaded.current = { mtimeMs: res.mtimeMs ?? 0, saved: res.text ?? "" }
+      loaded.current = { mtimeMs: res.mtimeMs ?? 0, size: res.size ?? 0, saved: res.text ?? "" }
       const language = languageFor(name)
       const state = EditorState.create({
         doc: res.text ?? "",
@@ -165,7 +165,9 @@ export function Editor({ tab }: { tab: Extract<Tab, { kind: "file" }> }) {
     if (!ready) return
     const timer = setInterval(async () => {
       const stat = await window.deberopa.statFile(tab.dir, tab.path)
-      if (!stat.ok || stat.mtimeMs === undefined || Math.abs(stat.mtimeMs - loaded.current.mtimeMs) <= 1) return
+      if (!stat.ok || stat.mtimeMs === undefined) return
+      // a coarse clock can give two writes the same time: the size is compared as well
+      if (Math.abs(stat.mtimeMs - loaded.current.mtimeMs) <= 1 && stat.size === loaded.current.size) return
       if (!dirty.current) await reload()
       else setNotice("changed")
     }, 1200)

@@ -4,9 +4,9 @@ export interface Bridge {
   closeProject(dir: string): Promise<void>
   api(dir: string, method: string, path: string, body?: unknown): Promise<{ ok: boolean; status?: number; data?: any; error?: string }>
   listDir(dir: string, rel: string): Promise<{ ok: boolean; error?: string; entries?: { name: string; dir: boolean }[] }>
-  readFile(dir: string, rel: string): Promise<{ ok: boolean; error?: string; text?: string; mtimeMs?: number }>
-  statFile(dir: string, rel: string): Promise<{ ok: boolean; missing?: boolean; mtimeMs?: number }>
-  writeFile(dir: string, rel: string, text: string, expectedMtimeMs?: number, force?: boolean): Promise<{ ok: boolean; conflict?: boolean; error?: string; mtimeMs?: number }>
+  readFile(dir: string, rel: string): Promise<{ ok: boolean; error?: string; text?: string; mtimeMs?: number; size?: number }>
+  statFile(dir: string, rel: string): Promise<{ ok: boolean; missing?: boolean; mtimeMs?: number; size?: number }>
+  writeFile(dir: string, rel: string, text: string, expected?: { mtimeMs: number; size: number }, force?: boolean): Promise<{ ok: boolean; conflict?: boolean; error?: string; mtimeMs?: number; size?: number }>
   openExternal(url: string): Promise<void>
   onEvent(callback: (payload: { dir: string; event: { type: string; properties?: any } }) => void): () => void
   onProjectExit(callback: (payload: { dir: string; code: number | null }) => void): () => void
