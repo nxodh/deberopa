@@ -6,6 +6,10 @@ contextBridge.exposeInMainWorld("deberopa", {
   openProject: (dir) => ipcRenderer.invoke("project:open", dir),
   closeProject: (dir) => ipcRenderer.invoke("project:close", dir),
   api: (dir, method, path, body) => ipcRenderer.invoke("api", { dir, method, path, body }),
+  listDir: (dir, rel) => ipcRenderer.invoke("fs:list", { dir, rel }),
+  readFile: (dir, rel) => ipcRenderer.invoke("fs:read", { dir, rel }),
+  statFile: (dir, rel) => ipcRenderer.invoke("fs:stat", { dir, rel }),
+  writeFile: (dir, rel, text, expectedMtimeMs, force) => ipcRenderer.invoke("fs:write", { dir, rel, text, expectedMtimeMs, force }),
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
   onEvent: (callback) => {
     const handler = (_e, payload) => callback(payload)

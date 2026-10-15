@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import type { Message, Part } from "./conv"
-import { abort, compactSession, convKey, replyPermission, select, send, undoMessage, useStore, type ModelChoice, type Tab } from "./store"
+import { abort, compactSession, convKey, openFile, replyPermission, select, send, undoMessage, useStore, type ModelChoice, type Tab } from "./store"
 import { compactNumber, short, Text } from "./text"
 
 const MARK: Record<string, string> = { pending: "◌", running: "◐", completed: "●", error: "✕" }
@@ -23,7 +23,7 @@ function ToolCard({ part }: { part: Part }) {
   )
 }
 
-function PartView({ part }: { part: Part }) {
+function PartView({ part, dir }: { part: Part; dir: string }) {
   switch (part.type) {
     case "text":
       return part.synthetic ? null : (
@@ -52,7 +52,11 @@ function PartView({ part }: { part: Part }) {
           </summary>
           <div className="files">
             {(part.files ?? []).map((f: string) => (
-              <div key={f}>{f}</div>
+              <div key={f}>
+                <button className="link" onClick={() => openFile(dir, f)} title="Open in the editor">
+                  {f}
+                </button>
+              </div>
             ))}
           </div>
         </details>
@@ -64,14 +68,14 @@ function PartView({ part }: { part: Part }) {
   }
 }
 
-function MessageView({ message, busy, onUndo }: { message: Message; busy: boolean; onUndo: () => void }) {
+function MessageView({ message, busy, dir, onUndo }: { message: Message; busy: boolean; dir: string; onUndo: () => void }) {
   const nodes = (message.parts ?? []).filter((p) => !(p.type === "text" && p.synthetic))
   if (message.role === "user") {
     if (!nodes.length) return null
     return (
       <div className="msg user">
         {nodes.map((p) => (
-          <PartView key={p.id} part={p} />
+          <PartView key={p.id} part={p} dir={dir} />
         ))}
         {busy ? null : (
           <button className="undo" title="Undo this message and the file changes it caused" onClick={onUndo}>
@@ -85,7 +89,7 @@ function MessageView({ message, busy, onUndo }: { message: Message; busy: boolea
   return (
     <div className="msg assistant">
       {nodes.map((p) => (
-        <PartView key={p.id} part={p} />
+        <PartView key={p.id} part={p} dir={dir} />
       ))}
       {message.error ? <div className="error">{message.error.message}</div> : null}
     </div>
@@ -143,7 +147,7 @@ export function SessionView({ tab }: { tab: Extract<Tab, { kind: "session" }> })
           </div>
         ) : null}
         {conv.messages.map((m) => (
-          <MessageView key={m.id} message={m} busy={conv.busy} onUndo={() => void undoMessage(tab.dir, tab.sessionID, m.id)} />
+          <MessageView key={m.id} message={m} busy={conv.busy} dir={tab.dir} onUndo={() => void undoMessage(tab.dir, tab.sessionID, m.id)} />
         ))}
         {conv.todos.length ? (
           <div className="todos" aria-label="Plan">

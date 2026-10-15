@@ -475,3 +475,59 @@ textarea {
 .scan {
   margin-top: 8px;
 }
+
+.files-section {
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 4px;
+}
+.section-head {
+  border: 0;
+  background: transparent;
+  padding: 2px 12px;
+  color: var(--dim);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+}
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding-top: 1px;
+  padding-bottom: 1px;
+  border-radius: 0;
+}
+.tree-row .title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.editor-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+.editor-host {
+  flex: 1;
+  min-height: 0;
+}
+.editor-host .cm-editor {
+  height: 100%;
+}

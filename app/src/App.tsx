@@ -1,7 +1,22 @@
+import { Editor } from "./Editor"
+import { FileTree } from "./FileTree"
 import { ModelsView } from "./ModelsView"
 import { SessionView } from "./SessionView"
 import { ago } from "./text"
 import { closeProject, closeTab, deleteSession, grantTrust, newSession, notify, openModels, openProject, openSession, sessionTabID, setActive, useStore } from "./store"
+import { useState } from "react"
+
+function Files({ dir }: { dir: string }) {
+  const [open, setOpen] = useState(true)
+  return (
+    <div className="files-section">
+      <button className="section-head" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <span className="mark">{open ? "▾" : "▸"}</span>Files
+      </button>
+      {open ? <FileTree dir={dir} /> : null}
+    </div>
+  )
+}
 
 function Sidebar() {
   const order = useStore((s) => s.order)
@@ -60,6 +75,7 @@ function Sidebar() {
                   </div>
                 )
               })}
+              <Files dir={dir} />
             </div>
           )
         })}
@@ -73,15 +89,22 @@ function TabBar() {
   const active = useStore((s) => s.active)
   const convs = useStore((s) => s.convs)
   const projects = useStore((s) => s.projects)
+  const dirty = useStore((s) => s.dirty)
   return (
     <div className="tabs" role="tablist">
       {tabs.map((t) => {
         const conv = t.kind === "session" ? convs[`${t.dir}\u0000${t.sessionID}`] : undefined
-        const label = t.kind === "session" ? conv?.title || projects[t.dir]?.sessions.find((x) => x.id === t.sessionID)?.title || "New session" : "Models and servers"
+        const label =
+          t.kind === "session"
+            ? conv?.title || projects[t.dir]?.sessions.find((x) => x.id === t.sessionID)?.title || "New session"
+            : t.kind === "file"
+              ? (t.path.split("/").pop() ?? t.path)
+              : "Models and servers"
         return (
           <div key={t.id} role="tab" aria-selected={active === t.id} className={`tab${active === t.id ? " active" : ""}`}>
             <button className="tab-main" onClick={() => setActive(t.id)} title={label}>
               {conv?.busy ? <span className="mark">◐</span> : null}
+              {dirty[t.id] ? <span className="mark" title="Unsaved changes">•</span> : null}
               <span className="title">{label}</span>
               <span className="proj">{projects[t.dir]?.name}</span>
             </button>
@@ -135,6 +158,7 @@ export function App() {
         <div className="content">
           {tab?.kind === "session" ? <SessionView key={tab.id} tab={tab} /> : null}
           {tab?.kind === "models" ? <ModelsView key={tab.id} dir={tab.dir} /> : null}
+          {tab?.kind === "file" ? <Editor key={tab.id} tab={tab} /> : null}
           {!tab ? (
             <div className="empty big">
               <h1>Deberopa</h1>

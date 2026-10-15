@@ -11,6 +11,8 @@ const result = await Bun.build({
   entrypoints: [path.join(root, "src", "index.tsx")],
   outdir: dist,
   target: "browser",
+  // a classic <script> would turn top-level functions (CodeMirror has a getSelection) into window properties
+  format: "iife",
   minify: false,
   sourcemap: "none",
   define: { "process.env.NODE_ENV": JSON.stringify("production") },

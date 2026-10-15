@@ -157,6 +157,106 @@ ipcMain.handle("api", async (_e, req) => {
   }
 })
 
+// ---- files (the editor) -----------------------------------------------------------------------------
+const MAX_TEXT = 2 * 1024 * 1024
+
+/** `rel` inside the project folder, symlinks resolved; undefined when it would leave the folder. */
+function inside(dir, rel) {
+  if (typeof rel !== "string" || rel.includes("\0")) return undefined
+  let root
+  try {
+    root = fs.realpathSync(dir)
+  } catch {
+    return undefined
+  }
+  const target = path.resolve(root, rel)
+  let real
+  try {
+    real = fs.realpathSync(target)
+  } catch {
+    // a file that does not exist yet: its folder must be inside
+    try {
+      real = path.join(fs.realpathSync(path.dirname(target)), path.basename(target))
+    } catch {
+      return undefined
+    }
+  }
+  const rootWithSep = root.endsWith(path.sep) ? root : root + path.sep
+  return real === root || real.startsWith(rootWithSep) ? { root, real } : undefined
+}
+
+const known = (dir) => projects.has(dir)
+
+ipcMain.handle("fs:list", (_e, req) => {
+  if (!known(req && req.dir)) return { ok: false, error: "That project is not open." }
+  const at = inside(req.dir, req.rel || ".")
+  if (!at) return { ok: false, error: "Outside the project folder." }
+  try {
+    const entries = fs
+      .readdirSync(at.real, { withFileTypes: true })
+      .filter((d) => d.name !== ".git")
+      .slice(0, 5000)
+      .map((d) => ({ name: d.name, dir: d.isDirectory() || (d.isSymbolicLink() && safeIsDir(path.join(at.real, d.name))) }))
+      .sort((a, b) => Number(b.dir) - Number(a.dir) || a.name.localeCompare(b.name))
+    return { ok: true, entries }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
+
+function safeIsDir(p) {
+  try {
+    return fs.statSync(p).isDirectory()
+  } catch {
+    return false
+  }
+}
+
+ipcMain.handle("fs:read", (_e, req) => {
+  if (!known(req && req.dir)) return { ok: false, error: "That project is not open." }
+  const at = inside(req.dir, req.rel)
+  if (!at) return { ok: false, error: "Outside the project folder." }
+  try {
+    const stat = fs.statSync(at.real)
+    if (!stat.isFile()) return { ok: false, error: "Not a file." }
+    if (stat.size > MAX_TEXT) return { ok: false, error: `Too large to edit here (${Math.round(stat.size / 1024)} KB; the limit is ${MAX_TEXT / 1024} KB).` }
+    const buffer = fs.readFileSync(at.real)
+    if (buffer.includes(0)) return { ok: false, error: "This looks like a binary file." }
+    return { ok: true, text: buffer.toString("utf8"), mtimeMs: stat.mtimeMs }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
+
+ipcMain.handle("fs:stat", (_e, req) => {
+  if (!known(req && req.dir)) return { ok: false }
+  const at = inside(req.dir, req.rel)
+  if (!at) return { ok: false }
+  try {
+    return { ok: true, mtimeMs: fs.statSync(at.real).mtimeMs }
+  } catch {
+    return { ok: false, missing: true }
+  }
+})
+
+ipcMain.handle("fs:write", (_e, req) => {
+  if (!known(req && req.dir)) return { ok: false, error: "That project is not open." }
+  if (typeof req.text !== "string") return { ok: false, error: "Nothing to write." }
+  const at = inside(req.dir, req.rel)
+  if (!at) return { ok: false, error: "Outside the project folder." }
+  try {
+    // the agent may have changed the file since it was read: do not overwrite that without being told to
+    if (!req.force && typeof req.expectedMtimeMs === "number" && fs.existsSync(at.real)) {
+      const current = fs.statSync(at.real).mtimeMs
+      if (Math.abs(current - req.expectedMtimeMs) > 1) return { ok: false, conflict: true, error: "The file changed on disk since you opened it." }
+    }
+    fs.writeFileSync(at.real, req.text)
+    return { ok: true, mtimeMs: fs.statSync(at.real).mtimeMs }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
+
 ipcMain.handle("open-external", (_e, url) => {
   if (typeof url === "string" && /^https?:\/\//.test(url)) return shell.openExternal(url)
 })

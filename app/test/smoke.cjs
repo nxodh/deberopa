@@ -57,11 +57,13 @@ function fakeOllama() {
 }
 
 let servers = []
+let projectDir = ""
 
 async function prepare() {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "deberopa-app-home-"))
   const project = fs.mkdtempSync(path.join(os.tmpdir(), "deberopa-app-proj-"))
   fs.writeFileSync(path.join(project, "hello.txt"), "hello\n")
+  projectDir = project
   const model = mockModel()
   const port = await listen(model)
   const ollama = fakeOllama()
@@ -108,6 +110,9 @@ function run({ app, win }) {
       el.dispatchEvent(new Event("input", { bubbles: true })); return true })()`)
   const click = (selector) => exec(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return false; el.click(); return true })()`)
 
+  win().webContents.on("console-message", (_e, level, message) => {
+    if (level >= 2) log(`console: ${String(message).slice(0, 300)}`)
+  })
   const main = async () => {
     log(`start on ${process.platform}, electron ${process.versions.electron}`)
     // the icon files the window, the taskbar and the installers use must exist and decode
@@ -132,6 +137,40 @@ function run({ app, win }) {
     await waitFor("status bar", `document.querySelector(".status").textContent.includes("deberopa-app-proj-")`, 5000)
     await shot("session")
 
+    // the editor: open a file from the tree, change it, save it, and see it on disk
+    await waitFor("the file in the tree", `!!document.querySelector('[data-testid="file-hello.txt"]')`, 10000)
+    await click('[data-testid="file-hello.txt"]')
+    await waitFor("the file in the editor", `!!document.querySelector(".cm-content") && document.querySelector(".cm-content").textContent.includes("hello")`, 10000)
+    // real key presses, as a user types: focus the editor, select all, type
+    await click(".cm-content")
+    await exec(`document.querySelector(".cm-content").focus()`)
+    const wc = win().webContents
+    const mod = process.platform === "darwin" ? "meta" : "control"
+    wc.sendInputEvent({ type: "keyDown", keyCode: "a", modifiers: [mod] })
+    wc.sendInputEvent({ type: "keyUp", keyCode: "a", modifiers: [mod] })
+    for (const ch of "edited in the app") {
+      wc.sendInputEvent({ type: "keyDown", keyCode: ch })
+      wc.sendInputEvent({ type: "char", keyCode: ch })
+      wc.sendInputEvent({ type: "keyUp", keyCode: ch })
+    }
+    wc.sendInputEvent({ type: "keyDown", keyCode: "Enter" })
+    wc.sendInputEvent({ type: "keyUp", keyCode: "Enter" })
+    await waitFor("the unsaved mark", `!!document.querySelector('[title="Unsaved changes"]')`, 5000)
+    await click("[data-testid=save]")
+    await waitFor("the file on disk", `true`, 100)
+    const end = Date.now() + 5000
+    while (fs.readFileSync(path.join(projectDir, "hello.txt"), "utf8") !== "edited in the app\n") {
+      if (Date.now() > end) throw new Error(`hello.txt was not saved (it holds ${JSON.stringify(fs.readFileSync(path.join(projectDir, "hello.txt"), "utf8"))})`)
+      await sleep(100)
+    }
+    await waitFor("the unsaved mark to go", `!document.querySelector('[title="Unsaved changes"]')`, 5000)
+    log("a file was opened, edited and saved from the editor tab")
+    // a change made outside (the agent) is picked up while the file is open and not dirty
+    fs.writeFileSync(path.join(projectDir, "hello.txt"), "changed by the agent\n")
+    await waitFor("the outside change", `document.querySelector(".cm-content").textContent.includes("changed by the agent")`, 8000)
+    log("a change made outside shows up in the open editor")
+    await shot("editor")
+
     await click("[data-testid=open-models]")
     await waitFor("models tab", `!!document.querySelector('[data-testid=models]')`, 10000)
     await waitFor("local info", `document.querySelector('[data-testid=models]').textContent.includes("This computer")`, 10000)
@@ -155,6 +194,8 @@ function run({ app, win }) {
       try {
         const text = await exec("document.body.innerText")
         log(`page text: ${String(text).slice(0, 1500).replace(/\n/g, " | ")}`)
+        const tabs = await exec(`(document.querySelector(".tabs") || {}).innerHTML`)
+        log(`tabs: ${String(tabs).slice(0, 1200)}`)
         await shot("failure")
       } catch {}
       app.exit(1)

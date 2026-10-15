@@ -30,7 +30,7 @@ export interface ProjectState {
   commands: { name: string; description?: string }[]
   trust?: { trusted: boolean; blocked: string[] }
 }
-export type Tab = { id: string; kind: "session"; dir: string; sessionID: string } | { id: string; kind: "models"; dir: string }
+export type Tab = { id: string; kind: "session"; dir: string; sessionID: string } | { id: string; kind: "models"; dir: string } | { id: string; kind: "file"; dir: string; path: string }
 export interface AppState {
   ready: boolean
   version: string
@@ -42,10 +42,12 @@ export interface AppState {
   tabs: Tab[]
   active?: string
   selection: Record<string, { model?: string; agent?: string }>
+  /** File tabs with unsaved changes. */
+  dirty: Record<string, boolean>
   notice?: string
 }
 
-let state: AppState = { ready: false, version: "", platform: "", recents: [], projects: {}, order: [], convs: {}, tabs: [], selection: {} }
+let state: AppState = { ready: false, version: "", platform: "", recents: [], projects: {}, order: [], convs: {}, tabs: [], selection: {}, dirty: {} }
 const listeners = new Set<() => void>()
 const emit = () => listeners.forEach((l) => l())
 const set = (patch: Partial<AppState> | ((s: AppState) => Partial<AppState>)) => {
@@ -66,6 +68,7 @@ export function useStore<T>(select: (s: AppState) => T): T {
 export const convKey = (dir: string, id: string) => `${dir}\u0000${id}`
 export const sessionTabID = (dir: string, id: string) => `session:${convKey(dir, id)}`
 export const modelsTabID = (dir: string) => `models:${dir}`
+export const fileTabID = (dir: string, rel: string) => `file:${convKey(dir, rel)}`
 
 const errText = (err: unknown) => (err instanceof Error ? err.message : String(err))
 export const notify = (notice?: string) => set({ notice })
@@ -253,7 +256,32 @@ export function setActive(id: string) {
   set({ active: id })
 }
 
+/** `path` relative to the project folder, with forward slashes; undefined when it is outside. */
+export function relativeTo(dir: string, path: string): string | undefined {
+  const norm = (p: string) => p.replace(/\\/g, "/").replace(/\/+$/, "")
+  const root = norm(dir)
+  const p = norm(path)
+  if (!/^([a-zA-Z]:)?\//.test(p)) return p.startsWith("..") ? undefined : p.replace(/^\.\//, "")
+  const insensitive = /^[a-zA-Z]:/.test(root)
+  const a = insensitive ? p.toLowerCase() : p
+  const b = insensitive ? root.toLowerCase() : root
+  return a === b ? "" : a.startsWith(b + "/") ? p.slice(root.length + 1) : undefined
+}
+
+export function openFile(dir: string, path: string) {
+  const rel = relativeTo(dir, path)
+  if (!rel) return notify("That file is outside the project folder.")
+  const id = fileTabID(dir, rel)
+  set((s) => ({ tabs: s.tabs.some((t) => t.id === id) ? s.tabs : [...s.tabs, { id, kind: "file", dir, path: rel }], active: id }))
+}
+
+export function markDirty(id: string, value: boolean) {
+  if (!!state.dirty[id] === value) return
+  set((s) => ({ dirty: { ...s.dirty, [id]: value } }))
+}
+
 export function closeTab(id: string) {
+  if (state.dirty[id] && !window.confirm("This file has unsaved changes. Close it and discard them?")) return
   set((s) => {
     const index = s.tabs.findIndex((t) => t.id === id)
     if (index === -1) return {}
