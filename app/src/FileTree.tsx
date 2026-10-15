@@ -13,13 +13,21 @@ function Level({ dir, rel, depth }: { dir: string; rel: string; depth: number })
 
   useEffect(() => {
     let cancelled = false
-    void window.deberopa.listDir(dir, rel || ".").then((res) => {
-      if (cancelled) return
-      if (res.ok) setEntries(res.entries ?? [])
-      else setError(res.error ?? "Could not list this folder.")
-    })
+    const load = () =>
+      void window.deberopa.listDir(dir, rel || ".").then((res) => {
+        if (cancelled) return
+        if (res.ok) {
+          // keep the same array when nothing changed so the tree does not redraw
+          setEntries((prev) => (prev && JSON.stringify(prev) === JSON.stringify(res.entries ?? []) ? prev : (res.entries ?? [])))
+          setError("")
+        } else setError(res.error ?? "Could not list this folder.")
+      })
+    load()
+    // files appear and go away outside the app too (the agent, git, the terminal)
+    const timer = setInterval(load, 3000)
     return () => {
       cancelled = true
+      clearInterval(timer)
     }
   }, [dir, rel])
 

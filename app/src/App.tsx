@@ -2,9 +2,10 @@ import { DiffView } from "./DiffView"
 import { Editor } from "./Editor"
 import { FileTree } from "./FileTree"
 import { ModelsView } from "./ModelsView"
+import { TerminalView } from "./TerminalView"
 import { SessionView } from "./SessionView"
 import { ago } from "./text"
-import { closeProject, closeTab, deleteSession, grantTrust, newSession, notify, openModels, openProject, openSession, sessionTabID, setActive, useStore } from "./store"
+import { closeProject, closeTab, deleteSession, grantTrust, newSession, notify, openModels, openProject, openSession, openTerminalTab, sessionTabID, setActive, useStore } from "./store"
 import { useState } from "react"
 
 function Files({ dir }: { dir: string }) {
@@ -54,6 +55,9 @@ function Sidebar() {
                 <button className="icon" title="New session" onClick={() => void newSession(dir)}>
                   +
                 </button>
+                <button className="icon" title="New terminal" onClick={() => openTerminalTab(dir)} data-testid="open-terminal">
+                  ›_
+                </button>
                 <button className="icon" title="Models and servers" onClick={() => openModels(dir)} data-testid="open-models">
                   ⚙
                 </button>
@@ -102,7 +106,9 @@ function TabBar() {
               ? (t.path.split("/").pop() ?? t.path)
               : t.kind === "diff"
                 ? `Changes${t.file ? `: ${t.file.split(/[\\/]/).pop()}` : ""}`
-                : "Models and servers"
+                : t.kind === "terminal"
+                  ? `Terminal ${t.n}`
+                  : "Models and servers"
         return (
           <div key={t.id} role="tab" aria-selected={active === t.id} className={`tab${active === t.id ? " active" : ""}`}>
             <button className="tab-main" onClick={() => setActive(t.id)} title={label}>
@@ -143,6 +149,8 @@ function StatusBar() {
 }
 
 export function App() {
+  const tabs = useStore((s) => s.tabs)
+  const activeID = useStore((s) => s.active)
   const tab = useStore((s) => s.tabs.find((t) => t.id === s.active))
   const project = useStore((s) => (tab ? s.projects[tab.dir] : undefined))
   return (
@@ -159,10 +167,16 @@ export function App() {
           </div>
         ) : null}
         <div className="content">
-          {tab?.kind === "session" ? <SessionView key={tab.id} tab={tab} /> : null}
-          {tab?.kind === "models" ? <ModelsView key={tab.id} dir={tab.dir} /> : null}
-          {tab?.kind === "file" ? <Editor key={tab.id} tab={tab} /> : null}
-          {tab?.kind === "diff" ? <DiffView key={tab.id} tab={tab} /> : null}
+          {/* every tab stays mounted so an unsaved edit, a draft or a running shell survives a switch */}
+          {tabs.map((t) => (
+            <div key={t.id} className="pane" hidden={t.id !== activeID}>
+              {t.kind === "session" ? <SessionView tab={t} /> : null}
+              {t.kind === "models" ? <ModelsView dir={t.dir} /> : null}
+              {t.kind === "file" ? <Editor tab={t} /> : null}
+              {t.kind === "diff" ? <DiffView tab={t} /> : null}
+              {t.kind === "terminal" ? <TerminalView tab={t} active={t.id === activeID} /> : null}
+            </div>
+          ))}
           {!tab ? (
             <div className="empty big">
               <h1>Deberopa</h1>

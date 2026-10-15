@@ -214,6 +214,25 @@ function run({ app, win }) {
     log("a change made outside shows up in the open editor")
     await shot("editor")
 
+    // the terminal: a real shell, typed into with real key events
+    await click("[data-testid=open-terminal]")
+    await waitFor("the terminal", `!!document.querySelector(".xterm-rows") && !!document.querySelector(".xterm-helper-textarea")`, 15000)
+    await sleep(800)
+    await exec(`document.querySelector(".xterm-helper-textarea").focus(); true`)
+    for (const ch of "echo terminal-works-1234") {
+      win().webContents.sendInputEvent({ type: "keyDown", keyCode: ch })
+      win().webContents.sendInputEvent({ type: "char", keyCode: ch })
+      win().webContents.sendInputEvent({ type: "keyUp", keyCode: ch })
+    }
+    win().webContents.sendInputEvent({ type: "keyDown", keyCode: "Enter" })
+    win().webContents.sendInputEvent({ type: "keyUp", keyCode: "Enter" })
+    // the typed command is echoed once; the shell's answer is a second line with the marker
+    await waitFor("the shell's answer", `(document.querySelector(".xterm-rows").textContent.match(/terminal-works-1234/g) || []).length >= 2`, 15000)
+    log("a terminal ran a command")
+    await shot("terminal")
+    // switching tabs must not lose an unsaved edit or kill the shell
+    await click('[data-testid="file-hello.txt"]')
+    await waitFor("the editor again", `!!document.querySelector(".cm-content")`, 10000)
     await click("[data-testid=open-models]")
     await waitFor("models tab", `!!document.querySelector('[data-testid=models]')`, 10000)
     await waitFor("local info", `document.querySelector('[data-testid=models]').textContent.includes("This computer")`, 10000)

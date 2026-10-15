@@ -13,6 +13,7 @@ import { pendingPermissions, replyPermission, type PermissionReply } from "../pe
 import { createSession, deleteSession, getSession, listSessions, updateSession } from "../session/store"
 import { busySessions, BusyError, cancel, compactSession, isBusy, prompt, shell } from "../session/prompt"
 import { revert, unrevert, visibleMessages } from "../session/revert"
+import { closeTerminal, listTerminals, openTerminal, resizeTerminal, writeTerminal } from "../pty/pty"
 import { changedFiles, diffSince, revertFiles, snapshotStatus } from "../snapshot/snapshot"
 import { exportMarkdown, forkSession } from "../session/export"
 import { fuzzyFilter } from "../tui/fuzzy"
@@ -263,6 +264,32 @@ async function route(req: Request): Promise<Response> {
   }
   if (is("DELETE", "remote", "*")) {
     if (!(await removeRemoteHost(parts[1]!))) throw new HttpError(404, `No saved host named ${parts[1]}`)
+    return json(true)
+  }
+  // Interactive terminals: output arrives as `pty.data` events, the end as `pty.exit`.
+  if (is("GET", "pty")) return json(listTerminals())
+  if (is("POST", "pty")) {
+    const input = await body(req)
+    try {
+      return json(openTerminal({ cwd: typeof input.cwd === "string" ? input.cwd : undefined, cols: Number(input.cols) || undefined, rows: Number(input.rows) || undefined }), 201)
+    } catch (err) {
+      throw new HttpError(400, err instanceof Error ? err.message : String(err))
+    }
+  }
+  if (is("POST", "pty", "*", "input")) {
+    const input = await body(req)
+    if (typeof input.data !== "string") throw new HttpError(400, "data is required")
+    if (!writeTerminal(parts[1]!, input.data)) throw new HttpError(404, "No such terminal")
+    return json(true)
+  }
+  if (is("POST", "pty", "*", "resize")) {
+    const input = await body(req)
+    if (!Number.isFinite(Number(input.cols)) || !Number.isFinite(Number(input.rows))) throw new HttpError(400, "cols and rows are required")
+    if (!resizeTerminal(parts[1]!, Number(input.cols), Number(input.rows))) throw new HttpError(404, "No such terminal")
+    return json(true)
+  }
+  if (is("DELETE", "pty", "*")) {
+    if (!closeTerminal(parts[1]!)) throw new HttpError(404, "No such terminal")
     return json(true)
   }
   // What the agent changed: a unified diff against the snapshot taken before a step (the `hash` of a
