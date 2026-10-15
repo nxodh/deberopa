@@ -94,11 +94,16 @@ jobs:
                     "--extensionDevelopmentPath=$app\resources\app\extensions\deberopa-agent",
                     "--extensionTestsPath=$env:GITHUB_WORKSPACE\desktop\test\e2e\index.js", $work)
           $env:DEBEROPA_E2E_LOG = Join-Path $env:RUNNER_TEMP "e2e.log"
-          $p = Start-Process -FilePath $exe.FullName -ArgumentList $args -PassThru
+          $stdout = Join-Path $env:RUNNER_TEMP "app.stdout.txt"; $stderr = Join-Path $env:RUNNER_TEMP "app.stderr.txt"
+          Write-Host "starting $($exe.FullName)"
+          $p = Start-Process -FilePath $exe.FullName -ArgumentList ($args + @("--verbose", "--logsPath", "$env:RUNNER_TEMP\e2e-logs")) -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
           $null = $p.Handle
           # not -Wait: that also waits for children, and a server that outlives the app would hang the job
-          $timedOut = -not $p.WaitForExit(420000)
-          if ($timedOut) { Write-Host "the app did not exit in 7 minutes; stopping it"; taskkill /T /F /PID $p.Id | Out-Null }
+          $timedOut = -not $p.WaitForExit(240000)
+          if ($timedOut) { Write-Host "the app did not exit in 4 minutes; stopping it"; taskkill /T /F /PID $p.Id | Out-Null }
+          foreach ($f in @($stdout, $stderr)) { Write-Host "---- $f"; if (Test-Path $f) { Get-Content $f -Tail 60 } }
+          Get-ChildItem "$env:RUNNER_TEMP\e2e-logs" -Recurse -Filter *.log -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "==== $($_.FullName)"; Get-Content $_.FullName -Tail 40 }
+          Get-Process | Where-Object { $_.ProcessName -match 'Deberopa|deberopa|Code|electron' } | Format-Table Id, ProcessName, Responding -AutoSize
           Get-Process -Name deberopa -ErrorAction SilentlyContinue | Stop-Process -Force
           if (Test-Path $env:DEBEROPA_E2E_LOG) { Get-Content $env:DEBEROPA_E2E_LOG } else { Write-Host "(the test wrote no log: the extension host never started it)" }
           if ($timedOut) { throw "in-app test timed out" }
