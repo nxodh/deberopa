@@ -45,3 +45,14 @@ test("a source checkout refuses to self-replace", async () => {
   expect(isCompiled()).toBe(false)
   expect(upgrade()).rejects.toThrow(UpdateError)
 })
+
+test("a pre-release sorts before the release it leads up to", () => {
+  expect(compareVersions("0.3.0-beta.1", "0.3.0")).toBeLessThan(0)
+  expect(compareVersions("v0.3.0", "0.3.0-beta.1")).toBeGreaterThan(0)
+  expect(compareVersions("0.3.0-beta.1", "0.3.0-beta.2")).toBeLessThan(0)
+  expect(compareVersions("0.3.0-beta.10", "0.3.0-beta.2")).toBeGreaterThan(0)
+  expect(compareVersions("0.3.0-beta.1", "0.2.9")).toBeGreaterThan(0)
+  expect(compareVersions("0.3.0-beta.1", "0.3.0-beta.1")).toBe(0)
+  expect(compareVersions("0.3.0-alpha.3", "0.3.0-beta.1")).toBeLessThan(0)
+  expect(compareVersions("0.3.0+build.5", "0.3.0")).toBe(0)
+})

@@ -67,7 +67,15 @@ if (want("patch")) {
   if (existsSync(applied)) {
     console.log("patches already applied")
   } else {
-    for (const p of patches) run("git", ["apply", "--whitespace=nowarn", join(dir, p)])
+    // DEBEROPA_SKIP_PATCHES=0003,0002 leaves those patches out (for finding out what a patch is for)
+    const skip = (process.env.DEBEROPA_SKIP_PATCHES ?? "").split(",").map((s) => s.trim()).filter(Boolean)
+    for (const p of patches) {
+      if (skip.some((s) => p.startsWith(s))) {
+        console.warn(`skipping patch ${p}`)
+        continue
+      }
+      run("git", ["apply", "--whitespace=nowarn", join(dir, p)])
+    }
     // Whole directories we do not ship (listed in desktop/remove.json) are deleted before anything installs.
     for (const rel of JSON.parse(readFileSync(join(desktop, "remove.json"), "utf8"))) rmSync(join(src, rel), { recursive: true, force: true })
     // Files that are removed or replaced wholesale live in desktop/overlay and are copied over the tree.
@@ -87,11 +95,39 @@ if (want("patch")) {
   }
 }
 
-if (want("install")) run(npm, ["ci"])
+if (want("install")) {
+  // Dependencies download binaries from GitHub (ripgrep, Electron); a rate limit or a flaky connection
+  // fails the whole install, so try a few times before giving up.
+  let attempt = 0
+  for (;;) {
+    attempt++
+    const r = spawnSync(npm, ["ci"], { cwd: src, stdio: "inherit", env: { ...process.env, GIT_LFS_SKIP_SMUDGE: "1" }, shell: process.platform === "win32" })
+    if (r.status === 0) break
+    if (attempt >= 3) {
+      console.error(`npm ci failed ${attempt} times`)
+      process.exit(r.status ?? 1)
+    }
+    console.warn(`npm ci failed (exit ${r.status}); retrying in ${attempt * 20}s`)
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, attempt * 20_000)
+  }
+}
 if (want("compile")) run(npm, ["run", "compile-client"])
 const packaged = join(work, `VSCode-${target}`)
 if (want("package")) {
-  run(npm, ["run", "gulp", `vscode-${target}-min`])
+  // The build downloads the built-in extensions (js-debug and friends) from GitHub releases through its API;
+  // a rate limit answers 403 and ends the build, so try again after a pause.
+  let attempt = 0
+  for (;;) {
+    attempt++
+    const r = spawnSync(npm, ["run", "gulp", `vscode-${target}-min`], { cwd: src, stdio: "inherit", env: { ...process.env, GIT_LFS_SKIP_SMUDGE: "1" }, shell: process.platform === "win32" })
+    if (r.status === 0) break
+    if (attempt >= 3) {
+      console.error(`packaging failed ${attempt} times`)
+      process.exit(r.status ?? 1)
+    }
+    console.warn(`packaging failed (exit ${r.status}); retrying in ${attempt * 45}s`)
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, attempt * 45_000)
+  }
   console.log(`\npackaged: ${packaged}`)
 }
 if (want("bundle-cli")) {

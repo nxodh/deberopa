@@ -59,3 +59,11 @@ select:focus-visible { outline: 2px solid var(--vscode-focusBorder); }
 .pull { display: flex; gap: 6px; margin-top: 8px; }
 .pull input { flex: 1; min-width: 0; font: inherit; color: inherit; background: var(--vscode-input-background, transparent); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 3px 8px; }
 .pull input:focus-visible { outline: 2px solid var(--vscode-focusBorder); }
+select.sessions { max-width: 140px; }
+.suggest { border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--vscode-sideBar-background); margin-bottom: 6px; max-height: 180px; overflow-y: auto; }
+.suggest .opt { display: flex; gap: 8px; padding: 3px 8px; cursor: pointer; }
+.suggest .opt.on, .suggest .opt:hover { background: var(--soft); }
+.suggest .opt .sub { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msg.user .undo { display: block; margin-top: 4px; font-size: 11px; padding: 0 8px; opacity: .6; }
+.msg.user:hover .undo { opacity: 1; }
+.notice ul { margin: 4px 0 8px; padding-left: 18px; }

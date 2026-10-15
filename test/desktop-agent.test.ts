@@ -211,3 +211,34 @@ test("tool check, slots and model downloads reach the client and the conversatio
     useProject(dir, { permission: { edit: "ask" }, model: "mock/mock-1", snapshot: false, provider: { mock: { name: "Mock", api: mock.url, options: { apiKey: "sk-test-not-a-real-key-000000000000" }, models: { "mock-1": { name: "Mock 1", tool_call: true } } } } })
   }
 }, 30_000)
+
+test("sessions, trust, keys and commands used by the panel work against the real server", async () => {
+  const fresh = tmpDir()
+  useProject(fresh, { model: "mock/mock-1", snapshot: false, provider: { mock: { name: "Mock", api: mock.url, models: { "mock-1": { name: "Mock 1", tool_call: true } } } }, command: { hello: { template: "Say hello to $ARGUMENTS", description: "greet" } } })
+  const s2 = startServer({ port: 0 })
+  try {
+    const c = new DeberopaClient({ baseUrl: `http://127.0.0.1:${s2.port}` })
+    const a = await c.createSession("first")
+    const b = await c.createSession("second")
+    expect((await c.sessions()).map((s: any) => s.id)).toEqual(expect.arrayContaining([a.id, b.id]))
+    expect((await c.session(a.id)).title).toBe("first")
+    await c.renameSession(a.id, "renamed")
+    expect((await c.session(a.id)).title).toBe("renamed")
+    await c.deleteSession(b.id)
+    expect((await c.sessions()).some((s: any) => s.id === b.id)).toBe(false)
+
+    expect((await c.commands()).some((x: any) => x.name === "hello")).toBe(true)
+    mock.queue(reply.text("hello there"))
+    await c.runCommand(a.id, "hello", "world")
+    expect((await c.messages(a.id)).some((m: any) => m.role === "assistant")).toBe(true)
+
+    expect(Array.isArray((await c.auth()))).toBe(true)
+    expect(typeof (await c.trust()).trusted).toBe("boolean")
+    expect((await c.skills()).length).toBeGreaterThanOrEqual(0)
+    expect(typeof (await c.stats()).sessions).toBe("number")
+    await expect(c.setKey("no-such-provider", "sk-test-not-a-real-key-000000000000")).rejects.toMatchObject({ status: 404 })
+  } finally {
+    s2.stop(true)
+    useProject(dir, { permission: { edit: "ask" }, model: "mock/mock-1", snapshot: false, provider: { mock: { name: "Mock", api: mock.url, options: { apiKey: "sk-test-not-a-real-key-000000000000" }, models: { "mock-1": { name: "Mock 1", tool_call: true } } } } })
+  }
+}, 30_000)

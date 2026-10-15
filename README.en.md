@@ -39,6 +39,21 @@ deberopa run "explain what this repo does"     # non-interactive
 
 Run `/init` once per project to generate an `AGENTS.md` that is given to the agent at the start of every session.
 
+## Deberopa Desktop
+
+A desktop app for people who prefer a window to a terminal: a Code - OSS based editor with a conversation panel (permission prompts, tool cards, sessions, a local-models card). It bundles the `deberopa` command of the same version, so there is nothing else to install, and it is released together with the CLI under the same number. **0.3.0-beta.1 is a beta (a GitHub pre-release)**: the install scripts and `deberopa upgrade` keep installing the last full release (0.2.0); download the beta from the release page.
+
+| Target | File | Run |
+|---|---|---|
+| Debian 13 / Opereta (x86-64) | `deberopa-desktop-linux-x64.tar.gz` | unpack, then `deberopa-desktop-<version>-linux-x64/deberopa-desktop` |
+| Windows 11 (x86-64) | `deberopa-desktop-windows-x64.zip` | unpack, then `Deberopa Desktop.exe` |
+
+- There is no installer and no auto-update yet; unpack a newer release to update.
+- **It is not signed.** Windows may show SmartScreen or Smart App Control may block it. Check `checksums.txt` (SHA-256) and the GitHub build attestation (`gh attestation verify <file> --repo nxodh/deberopa`).
+- If it exits at once on Debian 13 because of Electron's sandbox, start it with `--no-sandbox`, or make `chrome-sandbox` owned by root with mode 4755.
+- No Microsoft marketplace or telemetry, and the Copilot extension is removed. Extensions: built-in ones and installing a VSIX directly.
+- Source and build: `desktop/`; design: [docs/desktop-design.md](docs/desktop-design.md).
+
 ## What is in 0.1
 
 - **Terminal UI**: streamed Markdown, per-tool views (diffs, command output, todo lists, subagent activity), multi-line editor with correct CJK/emoji handling and IME cursor placement, `@file` and `/command` completion, `!shell` mode, model / session / agent / theme pickers, permission prompts, message queueing, monochrome themes.

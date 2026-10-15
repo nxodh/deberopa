@@ -10,6 +10,11 @@
   let slots = null
   let toolcheck = null
   let pullName = ""
+  let sessions = []
+  let trust = null
+  let connectable = []
+  let suggestions = { kind: "", seq: 0, items: [], index: 0 }
+  let suggestSeq = 0
   let notice = ""
 
   const el = (tag, props, ...children) => {
@@ -79,7 +84,10 @@
 
   function messageNode(message) {
     const nodes = (message.parts || []).map(partNode).filter(Boolean)
-    if (message.role === "user") return nodes.length ? el("div", { class: "msg user" }, nodes) : null
+    if (message.role === "user") {
+      if (!nodes.length) return null
+      return el("div", { class: "msg user" }, nodes, state.busy ? null : el("button", { class: "undo", title: "Undo this message and the file changes it caused", onclick: () => vscode.postMessage({ type: "revert", messageID: message.id }) }, "Undo"))
+    }
     const err = message.error ? el("div", { class: "error" }, message.error.message) : null
     return nodes.length || err ? el("div", { class: "msg assistant" }, nodes, err) : null
   }
@@ -168,6 +176,75 @@
       pullProgress())
   }
 
+  function ago(ms) {
+    const s = Math.max(0, Math.round((Date.now() - ms) / 1000))
+    if (s < 60) return "now"
+    if (s < 3600) return Math.round(s / 60) + "m"
+    if (s < 86400) return Math.round(s / 3600) + "h"
+    return Math.round(s / 86400) + "d"
+  }
+
+  function sessionPicker() {
+    if (!sessions.length) return null
+    const select = el("select", { class: "sessions", "aria-label": "Session", onchange: (e) => e.target.value && vscode.postMessage({ type: "switchSession", id: e.target.value }) },
+      sessions.map((s) => el("option", { value: s.id }, s.title + " · " + ago(s.updated))))
+    select.value = state.sessionID || ""
+    return select
+  }
+
+  function trustBanner() {
+    if (!trust || trust.trusted || !trust.blocked || !trust.blocked.length) return null
+    return el("div", { class: "notice", role: "alert" },
+      el("div", {}, el("strong", {}, "This project's config is not trusted"), " — it asks to run programs or set endpoints, so it is ignored until you trust it:"),
+      el("ul", {}, trust.blocked.slice(0, 6).map((b) => el("li", {}, b))),
+      el("button", { class: "primary", onclick: () => vscode.postMessage({ type: "grantTrust" }) }, "Trust this project"))
+  }
+
+  let keyProvider = ""
+  let keyText = ""
+  function connectCard() {
+    if (choices.models.length || !connectable.length) return null
+    return el("div", { class: "local" },
+      el("div", { class: "head" }, el("strong", {}, "Use a hosted model instead")),
+      el("div", { class: "sub" }, "Local models come first (start a server above). To use a hosted model, add its API key. It is stored in your user data, never in the project."),
+      el("form", { class: "pull", onsubmit: (e) => { e.preventDefault(); const p = keyProvider || connectable[0].id; if (keyText.trim()) { vscode.postMessage({ type: "connect", provider: p, key: keyText.trim() }); keyText = "" } } },
+        el("select", { "aria-label": "Provider", onchange: (e) => { keyProvider = e.target.value } }, connectable.map((p) => el("option", { value: p.id }, p.name))),
+        el("input", { type: "password", autocomplete: "off", placeholder: "API key", "aria-label": "API key", oninput: (e) => { keyText = e.target.value } }),
+        el("button", { type: "submit" }, "Save")))
+  }
+
+  function renderSuggestions() {
+    const box = document.getElementById("suggest")
+    if (!box) return
+    box.replaceChildren(...suggestions.items.map((it, i) => el("div", { class: "opt" + (i === suggestions.index ? " on" : ""), onmousedown: (e) => { e.preventDefault(); applySuggestion(it) } },
+      el("span", {}, it.label), it.hint ? el("span", { class: "sub" }, it.hint) : null)))
+    box.style.display = suggestions.items.length ? "block" : "none"
+  }
+  function applySuggestion(item) {
+    const input = document.getElementById("input")
+    if (!input) return
+    const upto = input.value.slice(0, input.selectionStart)
+    const rest = input.value.slice(input.selectionStart)
+    const token = /(^|\s)([@/][^\s]*)$/.exec(upto)
+    if (token) {
+      const start = upto.length - token[2].length
+      input.value = input.value.slice(0, start) + item.value + (item.value.endsWith(" ") ? "" : " ") + rest
+      const at = start + item.value.length + (item.value.endsWith(" ") ? 0 : 1)
+      input.setSelectionRange(at, at)
+    }
+    suggestions = { kind: "", seq: 0, items: [], index: 0 }
+    renderSuggestions()
+    input.focus()
+  }
+  function maybeSuggest(input) {
+    const upto = input.value.slice(0, input.selectionStart)
+    const file = /(^|\s)@([^\s]*)$/.exec(upto)
+    const cmd = upto.indexOf("\n") === -1 ? /^\/([^\s]*)$/.exec(upto) : null
+    if (!file && !cmd) { suggestions = { kind: "", seq: 0, items: [], index: 0 }; return renderSuggestions() }
+    suggestSeq++
+    vscode.postMessage({ type: "suggest", kind: file ? "file" : "command", query: file ? file[2] : cmd[1], seq: suggestSeq })
+  }
+
   function render() {
     if (!state) return
     const log = document.getElementById("log")
@@ -191,8 +268,10 @@
           const u = contextUse()
           return u ? el("span", { class: "busy", title: `Context: ${u.used.toLocaleString()} of ${u.limit.toLocaleString()} tokens` }, `${compact(u.used)}/${compact(u.limit)} · ${u.pct}%`) : null
         })(),
+        sessionPicker(),
         el("button", { onclick: () => vscode.postMessage({ type: "newSession" }), title: "New session" }, "New")),
-      el("div", { id: "log" }, messages.length ? messages : [el("div", { class: "empty" }, "Ask Deberopa to work on this project.\nUse @file to attach a file."), localCard()]),
+      trustBanner(),
+      el("div", { id: "log" }, messages.length ? messages : [el("div", { class: "empty" }, "Ask Deberopa to work on this project.\nUse @file to attach a file."), localCard(), connectCard()]),
       state.todos.length ? el("div", { class: "todos" }, el("strong", {}, "Todo"), el("ul", {}, state.todos.map((t) => el("li", { class: t.status === "completed" ? "done" : "" }, `${t.status === "completed" ? "● " : t.status === "in_progress" ? "◐ " : "○ "}${t.content}`)))) : null,
       state.permissions.map((p) => el("div", { class: "perm", role: "alert" },
         el("div", { class: "title" }, p.title || `${p.permission} permission`),
@@ -206,6 +285,7 @@
       notice ? el("div", { class: "notice" }, notice) : null,
       el("footer", {},
         el("div", { class: "box" },
+          el("div", { id: "suggest", class: "suggest", style: "display:none" }),
           el("textarea", { id: "input", rows: "2", placeholder: "Message Deberopa  (Enter to send, Shift+Enter for a new line)", "aria-label": "Message" }),
           el("div", { class: "row" },
             el("span", { class: "pickers" },
@@ -225,7 +305,14 @@
       vscode.postMessage({ type: "send", text })
       input.value = ""
     }
+    input.addEventListener("input", () => maybeSuggest(input))
     input.addEventListener("keydown", (e) => {
+      if (suggestions.items.length) {
+        if (e.key === "ArrowDown") { e.preventDefault(); suggestions.index = (suggestions.index + 1) % suggestions.items.length; return renderSuggestions() }
+        if (e.key === "ArrowUp") { e.preventDefault(); suggestions.index = (suggestions.index - 1 + suggestions.items.length) % suggestions.items.length; return renderSuggestions() }
+        if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) { e.preventDefault(); return applySuggestion(suggestions.items[suggestions.index]) }
+        if (e.key === "Escape") { suggestions = { kind: "", seq: 0, items: [], index: 0 }; return renderSuggestions() }
+      }
       if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit() }
     })
     const send = document.getElementById("send")
@@ -237,7 +324,10 @@
 
   window.addEventListener("message", (event) => {
     const m = event.data
-    if (m.type === "state") { slots = m.slots || null; toolcheck = m.toolcheck || null; local = m.local || local; state = m.state; choices = m.choices || choices; selection = m.selection || {}; notice = ""; render() }
+    if (m.type === "state") { sessions = m.sessions || []; trust = m.trust || null; connectable = m.connectable || []; slots = m.slots || null; toolcheck = m.toolcheck || null; local = m.local || local; state = m.state; choices = m.choices || choices; selection = m.selection || {}; notice = ""; render() }
+    else if (m.type === "suggestions") {
+      if (m.seq === suggestSeq) { suggestions = { kind: m.kind, seq: m.seq, items: m.items || [], index: 0 }; renderSuggestions() }
+    }
     else if (m.type === "notice") { notice = m.text; render() }
     else if (m.type === "insert") {
       const input = document.getElementById("input")
