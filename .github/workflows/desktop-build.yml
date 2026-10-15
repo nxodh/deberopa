@@ -51,6 +51,8 @@ jobs:
       - name: Build the CLI that ships inside the app
         run: npm ci && npx bun run script/build.ts --target ${{ matrix.cli }}
       - name: Package
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node desktop/script/build.mjs --work ${{ runner.temp }}/deberopa-desktop --target ${{ matrix.target }} --stage package
       - name: Bundle the CLI
         run: node desktop/script/build.mjs --work ${{ runner.temp }}/deberopa-desktop --target ${{ matrix.target }} --stage bundle-cli --cli dist/${{ matrix.cli }}/${{ matrix.exe }}

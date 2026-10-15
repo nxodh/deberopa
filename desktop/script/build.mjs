@@ -114,7 +114,20 @@ if (want("install")) {
 if (want("compile")) run(npm, ["run", "compile-client"])
 const packaged = join(work, `VSCode-${target}`)
 if (want("package")) {
-  run(npm, ["run", "gulp", `vscode-${target}-min`])
+  // The build downloads the built-in extensions (js-debug and friends) from GitHub releases through its API;
+  // a rate limit answers 403 and ends the build, so try again after a pause.
+  let attempt = 0
+  for (;;) {
+    attempt++
+    const r = spawnSync(npm, ["run", "gulp", `vscode-${target}-min`], { cwd: src, stdio: "inherit", env: { ...process.env, GIT_LFS_SKIP_SMUDGE: "1" }, shell: process.platform === "win32" })
+    if (r.status === 0) break
+    if (attempt >= 3) {
+      console.error(`packaging failed ${attempt} times`)
+      process.exit(r.status ?? 1)
+    }
+    console.warn(`packaging failed (exit ${r.status}); retrying in ${attempt * 45}s`)
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, attempt * 45_000)
+  }
   console.log(`\npackaged: ${packaged}`)
 }
 if (want("bundle-cli")) {
