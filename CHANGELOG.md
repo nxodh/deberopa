@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.3.0-beta.2
+
+**Beta.** Replaces the Deberopa Desktop of 0.3.0-beta.1 (a Code - OSS based editor with a side panel) with an agent-first app, and adds models on other computers to the CLI and the app. A GitHub pre-release: `install.sh`, `install.ps1` and `deberopa upgrade` keep installing the last full release (0.2.0). Install explicitly with `DEBEROPA_VERSION=v0.3.0-beta.2`.
 
 - Model servers on other computers: `deberopa remote` saves a host (`add <name> <host:port> [--key] [--ca file]`), checks it (`check`: answers, kind, models, latency, key or certificate problems with a fix) and looks for servers on this network (`scan`, only when asked, sends no key, private addresses only). A saved host is a provider marked `"remote": true` in the global config; its key is kept in the credential store. Files, tools and the session stay on this computer; only inference is remote. The server has the same under `/remote` (`GET`, `POST`, `POST /remote/check`, `POST /remote/scan`, `DELETE /remote/<id>`).
 - Seeing and undoing what the agent changed: `GET /snapshot/diff?hash=…[&file=…]` (unified diff since the snapshot of a step), `POST /snapshot/revert` (put chosen files back; files that did not exist are removed) and `GET /snapshot/status`.
