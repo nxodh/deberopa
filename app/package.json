@@ -1,6 +1,6 @@
 {
   "name": "deberopa-desktop",
-  "version": "0.3.0-beta.1",
+  "version": "0.3.0-beta.2",
   "private": true,
   "description": "Deberopa Desktop: an agent-first app on top of `deberopa serve`",
   "license": "MIT",
