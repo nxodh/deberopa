@@ -110,24 +110,5 @@ jobs:
           $work = Join-Path $env:RUNNER_TEMP "e2e-work"; New-Item -ItemType Directory -Force $work | Out-Null
           $env:DEBEROPA_HOME = Join-Path $env:RUNNER_TEMP "e2e-home"
           $env:DEBEROPA_DISABLE_LOCAL_DETECT = "1"; $env:DEBEROPA_DISABLE_MODELS_FETCH = "1"
-          $exe = Get-ChildItem $app -Filter "Deberopa Desktop.exe" | Select-Object -First 1
-          if (-not $exe) { $exe = Get-ChildItem $app -Filter *.exe | Where-Object { $_.Name -notmatch 'unins|elevate|inno|crash' } | Select-Object -First 1 }
-          $args = @("--disable-gpu", "--disable-workspace-trust", "--user-data-dir", "$env:RUNNER_TEMP\e2e-ud", "--extensions-dir", "$env:RUNNER_TEMP\e2e-ex",
-                    "--extensionDevelopmentPath=$app\resources\app\extensions\deberopa-agent",
-                    "--extensionTestsPath=$env:GITHUB_WORKSPACE\desktop\test\e2e\index.js", $work)
-          $env:DEBEROPA_E2E_LOG = Join-Path $env:RUNNER_TEMP "e2e.log"
-          $stdout = Join-Path $env:RUNNER_TEMP "app.stdout.txt"; $stderr = Join-Path $env:RUNNER_TEMP "app.stderr.txt"
-          Write-Host "starting $($exe.FullName)"
-          $p = Start-Process -FilePath $exe.FullName -ArgumentList ($args + @("--verbose", "--logsPath", "$env:RUNNER_TEMP\e2e-logs")) -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
-          $null = $p.Handle
-          # not -Wait: that also waits for children, and a server that outlives the app would hang the job
-          $timedOut = -not $p.WaitForExit(240000)
-          if ($timedOut) { Write-Host "the app did not exit in 4 minutes; stopping it"; taskkill /T /F /PID $p.Id | Out-Null }
-          foreach ($f in @($stdout, $stderr)) { Write-Host "---- $f"; if (Test-Path $f) { Get-Content $f -Tail 60 } }
-          Get-ChildItem "$env:RUNNER_TEMP\e2e-logs" -Recurse -Filter *.log -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "==== $($_.FullName)"; Get-Content $_.FullName -Tail 40 }
-          Get-Process | Where-Object { $_.ProcessName -match 'Deberopa|deberopa|Code|electron' } | Format-Table Id, ProcessName, Responding -AutoSize
-          Get-Process -Name deberopa -ErrorAction SilentlyContinue | Stop-Process -Force
-          if (Test-Path $env:DEBEROPA_E2E_LOG) { Get-Content $env:DEBEROPA_E2E_LOG } else { Write-Host "(the test wrote no log: the extension host never started it)" }
-          if ($timedOut) { throw "in-app test timed out" }
-          Write-Host "exit code $($p.ExitCode)"
-          if ($p.ExitCode -ne 0) { throw "in-app test failed (exit $($p.ExitCode))" }
+          & "$env:GITHUB_WORKSPACE\desktop\test\e2e\run-windows.ps1" -App $app -Work $work
+          if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
