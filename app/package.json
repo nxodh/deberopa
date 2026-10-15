@@ -1,0 +1,20 @@
+{
+  "name": "deberopa-desktop",
+  "version": "0.3.0-beta.1",
+  "private": true,
+  "description": "Deberopa Desktop: an agent-first app on top of `deberopa serve`",
+  "license": "MIT",
+  "main": "main.cjs",
+  "scripts": {
+    "build": "bun run build.ts",
+    "start": "bun run build.ts && electron . --no-sandbox",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "electron": "44.7.2",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  }
+}

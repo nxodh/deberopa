@@ -1,0 +1,83 @@
+name: Desktop app
+
+# The agent-first Deberopa Desktop (app/): builds the window, starts it for real against a mock
+# model, and checks that a prompt gets an answer and a model server on another computer can be saved.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["app/**", "src/**", ".github/workflows/app.yml"]
+  pull_request:
+    paths: ["app/**", "src/**", ".github/workflows/app.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: App (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Debian 13 x64
+            os: ubuntu-latest
+            container: node:24-trixie
+          - name: Windows 11 x64
+            os: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        if: runner.os == 'Windows'
+        with:
+          node-version: "24.18.0"
+      - name: Libraries Electron needs (Debian 13)
+        if: runner.os == 'Linux'
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends xvfb xauth libgtk-3-0t64 libnss3 libgbm1 libasound2t64 libxss1 libxkbfile1 libxkbcommon0 libx11-xcb1 libdrm2 libatk-bridge2.0-0t64 libcups2t64 ca-certificates
+      - name: Install (CLI sources and the app)
+        run: |
+          npm ci
+          cd app && npm ci
+      - name: Type check the app
+        working-directory: app
+        run: npx tsc --noEmit -p tsconfig.json
+      - name: Build the app
+        working-directory: app
+        run: npm run build
+      - name: Run the app (Debian 13, headless)
+        if: runner.os == 'Linux'
+        working-directory: app
+        env:
+          DEBEROPA_APP_TEST: "1"
+          DEBEROPA_APP_TEST_LOG: ${{ runner.temp }}/app-test.log
+          DEBEROPA_APP_SHOTS: ${{ runner.temp }}/app-shots
+        run: |
+          status=0
+          xvfb-run -a ./node_modules/.bin/electron . --no-sandbox --disable-gpu --disable-dev-shm-usage > "$RUNNER_TEMP/app-test.out" 2> "$RUNNER_TEMP/app-test.err" || status=$?
+          echo "exit code: $status"
+          echo "---- app-test log"; cat "$RUNNER_TEMP/app-test.log" 2>/dev/null || echo "(no log written)"
+          echo "---- stdout"; tail -30 "$RUNNER_TEMP/app-test.out" | cut -c1-240
+          echo "---- stderr"; tail -30 "$RUNNER_TEMP/app-test.err" | cut -c1-240
+          grep -q "\[app-test\].* OK$" "$RUNNER_TEMP/app-test.log" || { echo "the app test did not report OK"; exit 1; }
+      - name: Run the app (Windows)
+        if: runner.os == 'Windows'
+        working-directory: app
+        shell: pwsh
+        run: ./test/run-windows.ps1
+      - name: Screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-screenshots-${{ runner.os }}
+          path: ${{ runner.temp }}/app-shots
+          if-no-files-found: ignore
+          retention-days: 14

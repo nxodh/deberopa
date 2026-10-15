@@ -85,6 +85,7 @@ CLI: `deberopa remote [list|add|remove|check|scan]`. 서버: `/remote` 아래 �
 | 터미널 | xterm.js + 쉘 프로세스 | |
 | 백엔드 | 번들한 `deberopa` 바이너리의 `serve`를 자식 프로세스로 실행 | CLI와 같은 코드 |
 | 빌드 | Bun으로 렌더러 번들, electron-builder 또는 electron-packager로 패키징 | |
+| 아이콘 | `assets/logo.png`에서 `app/script/make-icons.cjs`가 만든다. 원본은 정사각형이 아니고 원이 한쪽으로 치우쳐 있어, 원을 찾아 중앙에 맞추고 여백을 고르게 한 `build/icon.png`(창, 작업 표시줄), `icon.ico`(Windows), `icon.icns`(macOS)를 쓴다 | |
 
 버리는 것: Code - OSS 빌드, 패치 3개, 300MB 패키지, 내장 확장 방식. 남기는 것: 서버, 세션·도구·로컬 모델 코드, 패널에서 만든 채팅 UI 로직(`desktop/extensions/deberopa-agent/media`)을 새 UI로 옮길 때 참고.
 
