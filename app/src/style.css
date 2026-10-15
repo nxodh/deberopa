@@ -531,3 +531,47 @@ textarea {
 .editor-host .cm-editor {
   height: 100%;
 }
+
+.file-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 2px 0;
+}
+.diff {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.diff-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin: 0;
+  padding: 8px 0;
+  font: 12px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+.dl {
+  padding: 0 14px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.dl.meta {
+  color: var(--dim);
+}
+.dl.hunk {
+  font-weight: 700;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.dl.add {
+  background: var(--active);
+  font-weight: 600;
+}
+.dl.del {
+  background: var(--hover);
+  color: var(--dim);
+  text-decoration: line-through;
+}

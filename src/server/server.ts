@@ -1,3 +1,4 @@
+import path from "node:path"
 import { timingSafeEqual } from "node:crypto"
 import { VERSION } from "../global"
 import { project } from "../project"
@@ -12,6 +13,7 @@ import { pendingPermissions, replyPermission, type PermissionReply } from "../pe
 import { createSession, deleteSession, getSession, listSessions, updateSession } from "../session/store"
 import { busySessions, BusyError, cancel, compactSession, isBusy, prompt, shell } from "../session/prompt"
 import { revert, unrevert, visibleMessages } from "../session/revert"
+import { changedFiles, diffSince, revertFiles, snapshotStatus } from "../snapshot/snapshot"
 import { exportMarkdown, forkSession } from "../session/export"
 import { fuzzyFilter } from "../tui/fuzzy"
 import { allCredentials, removeCredential, setCredential } from "../auth/auth"
@@ -262,6 +264,28 @@ async function route(req: Request): Promise<Response> {
   if (is("DELETE", "remote", "*")) {
     if (!(await removeRemoteHost(parts[1]!))) throw new HttpError(404, `No saved host named ${parts[1]}`)
     return json(true)
+  }
+  // What the agent changed: a unified diff against the snapshot taken before a step (the `hash` of a
+  // patch part), and putting chosen files back to how they were then.
+  if (is("GET", "snapshot", "status")) return json(await snapshotStatus())
+  if (is("GET", "snapshot", "diff")) {
+    const hash = url.searchParams.get("hash") ?? ""
+    if (!/^[0-9a-f]{40,64}$/.test(hash)) throw new HttpError(400, "hash must be a snapshot id")
+    const file = url.searchParams.get("file")
+    const root = project().worktree
+    const target = file ? path.resolve(root, file) : undefined
+    if (target && !(target === root || target.startsWith(root + path.sep))) throw new HttpError(400, "file is outside the project")
+    return json({ hash, file, diff: await diffSince(hash, target ? [target] : undefined) })
+  }
+  if (is("POST", "snapshot", "revert")) {
+    const input = await body(req)
+    if (typeof input.hash !== "string" || !/^[0-9a-f]{40,64}$/.test(input.hash)) throw new HttpError(400, "hash must be a snapshot id")
+    if (!Array.isArray(input.files) || input.files.length === 0 || input.files.some((f: unknown) => typeof f !== "string")) throw new HttpError(400, "files must be a list of paths")
+    const root = project().worktree
+    const targets = (input.files as string[]).map((f) => path.resolve(root, f))
+    if (targets.some((t) => !(t === root || t.startsWith(root + path.sep)))) throw new HttpError(400, "a file is outside the project")
+    await revertFiles(input.hash, targets)
+    return json({ reverted: targets.map((t) => path.relative(root, t).split(path.sep).join("/")), changed: (await changedFiles(input.hash)).map((f) => path.relative(root, f).split(path.sep).join("/")) })
   }
   if (is("GET", "skill")) return json(Object.values(await listSkills()).map(({ content: _content, ...rest }) => rest))
   if (is("GET", "stats")) {

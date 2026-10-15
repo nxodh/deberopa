@@ -1,3 +1,4 @@
+import { DiffView } from "./DiffView"
 import { Editor } from "./Editor"
 import { FileTree } from "./FileTree"
 import { ModelsView } from "./ModelsView"
@@ -99,7 +100,9 @@ function TabBar() {
             ? conv?.title || projects[t.dir]?.sessions.find((x) => x.id === t.sessionID)?.title || "New session"
             : t.kind === "file"
               ? (t.path.split("/").pop() ?? t.path)
-              : "Models and servers"
+              : t.kind === "diff"
+                ? `Changes${t.file ? `: ${t.file.split(/[\\/]/).pop()}` : ""}`
+                : "Models and servers"
         return (
           <div key={t.id} role="tab" aria-selected={active === t.id} className={`tab${active === t.id ? " active" : ""}`}>
             <button className="tab-main" onClick={() => setActive(t.id)} title={label}>
@@ -159,6 +162,7 @@ export function App() {
           {tab?.kind === "session" ? <SessionView key={tab.id} tab={tab} /> : null}
           {tab?.kind === "models" ? <ModelsView key={tab.id} dir={tab.dir} /> : null}
           {tab?.kind === "file" ? <Editor key={tab.id} tab={tab} /> : null}
+          {tab?.kind === "diff" ? <DiffView key={tab.id} tab={tab} /> : null}
           {!tab ? (
             <div className="empty big">
               <h1>Deberopa</h1>

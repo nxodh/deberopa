@@ -3,8 +3,9 @@
 ## Unreleased
 
 - Model servers on other computers: `deberopa remote` saves a host (`add <name> <host:port> [--key] [--ca file]`), checks it (`check`: answers, kind, models, latency, key or certificate problems with a fix) and looks for servers on this network (`scan`, only when asked, sends no key, private addresses only). A saved host is a provider marked `"remote": true` in the global config; its key is kept in the credential store. Files, tools and the session stay on this computer; only inference is remote. The server has the same under `/remote` (`GET`, `POST`, `POST /remote/check`, `POST /remote/scan`, `DELETE /remote/<id>`).
+- Seeing and undoing what the agent changed: `GET /snapshot/diff?hash=…[&file=…]` (unified diff since the snapshot of a step), `POST /snapshot/revert` (put chosen files back; files that did not exist are removed) and `GET /snapshot/status`.
 - An Ollama configured only by address now gets its model list from its own API (before, such a provider had no models until they were written into the config).
-- Deberopa Desktop is being rebuilt as an agent-first app (`app/`, see `docs/desktop-v2.md`); the Code - OSS based beta is superseded. So far: projects and sessions with tabs, conversation with tool cards and permissions, a models and servers page (this computer, other computers, tool-call check, model download), a file tree and a code editor tab (syntax highlighting, search, save, picks up changes the agent makes), and the Deberopa icon rebuilt from the logo.
+- Deberopa Desktop is being rebuilt as an agent-first app (`app/`, see `docs/desktop-v2.md`); the Code - OSS based beta is superseded. So far: projects and sessions with tabs, conversation with tool cards and permissions, a models and servers page (this computer, other computers, tool-call check, model download), a file tree and a code editor tab (syntax highlighting, search, save, picks up changes the agent makes), a diff tab for the agent's changes with revert, and the Deberopa icon rebuilt from the logo.
 
 ## 0.3.0-beta.1
 

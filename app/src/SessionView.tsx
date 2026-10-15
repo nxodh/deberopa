@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import type { Message, Part } from "./conv"
-import { abort, compactSession, convKey, openFile, replyPermission, select, send, undoMessage, useStore, type ModelChoice, type Tab } from "./store"
+import { abort, compactSession, convKey, openDiff, openFile, replyPermission, select, send, undoMessage, useStore, type ModelChoice, type Tab } from "./store"
 import { compactNumber, short, Text } from "./text"
 
 const MARK: Record<string, string> = { pending: "◌", running: "◐", completed: "●", error: "✕" }
@@ -52,12 +52,23 @@ function PartView({ part, dir }: { part: Part; dir: string }) {
           </summary>
           <div className="files">
             {(part.files ?? []).map((f: string) => (
-              <div key={f}>
+              <div key={f} className="file-row">
                 <button className="link" onClick={() => openFile(dir, f)} title="Open in the editor">
                   {f}
                 </button>
+                <span className="spacer" />
+                {part.hash ? (
+                  <button onClick={() => openDiff(dir, part.hash, f)} data-testid="show-diff">
+                    Diff
+                  </button>
+                ) : null}
               </div>
             ))}
+            {part.hash && (part.files ?? []).length > 1 ? (
+              <div className="file-row">
+                <button onClick={() => openDiff(dir, part.hash)}>Diff of all {(part.files ?? []).length} files</button>
+              </div>
+            ) : null}
           </div>
         </details>
       )

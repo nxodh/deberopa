@@ -31,6 +31,7 @@ export interface ProjectState {
   trust?: { trusted: boolean; blocked: string[] }
 }
 export type Tab = { id: string; kind: "session"; dir: string; sessionID: string } | { id: string; kind: "models"; dir: string } | { id: string; kind: "file"; dir: string; path: string }
+  | { id: string; kind: "diff"; dir: string; hash: string; file?: string }
 export interface AppState {
   ready: boolean
   version: string
@@ -273,6 +274,12 @@ export function openFile(dir: string, path: string) {
   if (!rel) return notify("That file is outside the project folder.")
   const id = fileTabID(dir, rel)
   set((s) => ({ tabs: s.tabs.some((t) => t.id === id) ? s.tabs : [...s.tabs, { id, kind: "file", dir, path: rel }], active: id }))
+}
+
+/** The agent's change since the snapshot `hash` (a patch part), for one file or all of them. */
+export function openDiff(dir: string, hash: string, file?: string) {
+  const id = `diff:${convKey(dir, `${hash}:${file ?? ""}`)}`
+  set((s) => ({ tabs: s.tabs.some((t) => t.id === id) ? s.tabs : [...s.tabs, { id, kind: "diff", dir, hash, file }], active: id }))
 }
 
 export function markDirty(id: string, value: boolean) {

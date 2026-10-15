@@ -39,6 +39,22 @@ function mockModel() {
       }
       res.writeHead(200, { "content-type": "text/event-stream" })
       const chunk = (delta, finish, extra) => `data: ${JSON.stringify({ id: "m", object: "chat.completion.chunk", choices: [{ index: 0, delta, finish_reason: finish }], ...extra })}\n\n`
+      const messages = Array.isArray(body.messages) ? body.messages : []
+      const last = messages[messages.length - 1] || {}
+      const userText = (m) => (typeof m.content === "string" ? m.content : Array.isArray(m.content) ? m.content.map((c) => c.text || "").join("") : "")
+      const lastUser = [...messages].reverse().find((m) => m.role === "user")
+      if (last.role !== "tool" && lastUser && userText(lastUser).includes("make a file")) {
+        // the model asks to write a file: the app shows a permission card, then the change
+        const args = JSON.stringify({ filePath: path.join(projectDir, "generated.txt"), content: "made by the agent\n" })
+        res.write(chunk({ role: "assistant", tool_calls: [{ index: 0, id: "call_1", type: "function", function: { name: "write", arguments: args } }] }, null))
+        res.write(chunk({}, "tool_calls", { usage }))
+        return res.end("data: [DONE]\n\n")
+      }
+      if (last.role === "tool") {
+        res.write(chunk({ role: "assistant", content: "I wrote generated.txt" }, null))
+        res.write(chunk({}, "stop", { usage }))
+        return res.end("data: [DONE]\n\n")
+      }
       res.write(chunk({ role: "assistant", content: ANSWER }, null))
       res.write(chunk({}, "stop", { usage }))
       res.end("data: [DONE]\n\n")
@@ -64,6 +80,8 @@ async function prepare() {
   const project = fs.mkdtempSync(path.join(os.tmpdir(), "deberopa-app-proj-"))
   fs.writeFileSync(path.join(project, "hello.txt"), "hello\n")
   projectDir = project
+  // snapshots need a git repository: they are what the diff and the revert work from
+  require("node:child_process").execFileSync("git", ["init", "-q"], { cwd: project })
   const model = mockModel()
   const port = await listen(model)
   const ollama = fakeOllama()
@@ -75,7 +93,7 @@ async function prepare() {
   process.env.DEBEROPA_MODELS_URL = "http://127.0.0.1:9/none"
   process.env.DEBEROPA_CONFIG_CONTENT = JSON.stringify({
     model: "mock/mock-1",
-    snapshot: false,
+    snapshot: true,
     provider: { mock: { name: "Mock", api: `http://127.0.0.1:${port}/v1`, models: { "mock-1": { name: "Mock 1", tool_call: true, limit: { context: 100000, output: 4000 } } } } },
   })
   process.env.DEBEROPA_APP_OLLAMA_PORT = String(ollamaPort)
@@ -136,6 +154,31 @@ function run({ app, win }) {
     log("the model's answer is on screen")
     await waitFor("status bar", `document.querySelector(".status").textContent.includes("deberopa-app-proj-")`, 5000)
     await shot("session")
+
+    // the agent changes a file: permission card, then the change with a diff and a revert
+    await exec(`(window.confirm = () => true, true)`)
+    await type("[data-testid=composer]", "make a file")
+    await sleep(150)
+    await click("[data-testid=send]")
+    // writes inside the project are allowed by default; if a permission card does appear, grant it
+    const wrote = Date.now() + 40000
+    while (!fs.existsSync(path.join(projectDir, "generated.txt"))) {
+      await exec(`(() => { const b = [...document.querySelectorAll(".permission button")].find((x) => x.textContent.includes("Allow once")); if (b) b.click(); return true })()`)
+      if (Date.now() > wrote) throw new Error("the agent's file was not written")
+      await sleep(150)
+    }
+    await waitFor("the diff button", `!!document.querySelector('[data-testid="show-diff"]')`, 30000)
+    log("the agent wrote a file")
+    await click('[data-testid="show-diff"]')
+    await waitFor("the diff", `(() => { const d = document.querySelector('[data-testid=diff]'); return !!d && d.textContent.includes("made by the agent") })()`, 15000)
+    await shot("diff")
+    await click("[data-testid=revert]")
+    const reverted = Date.now() + 15000
+    while (fs.existsSync(path.join(projectDir, "generated.txt"))) {
+      if (Date.now() > reverted) throw new Error("the revert did not remove the agent's file")
+      await sleep(150)
+    }
+    log("the diff was shown and the agent's change was reverted")
 
     // the editor: open a file from the tree, change it, save it, and see it on disk
     await waitFor("the file in the tree", `!!document.querySelector('[data-testid="file-hello.txt"]')`, 10000)
