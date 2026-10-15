@@ -160,6 +160,7 @@ API 키는 `deberopa auth login`, TUI의 `/connect`, 또는 환경 변수로 등
 | 실행 중인 서버 확인, 꺼져 있으면 시작 방법 안내 | `/local` | `deberopa local` | `GET /local` |
 | 이 모델이 도구를 호출할 수 있는지 한 번 확인 (Ollama 네이티브 API 포함) | `/toolcheck` | `deberopa local check [제공자/모델]` | `POST /local/toolcheck` |
 | Ollama 모델 내려받기(진행률) | `/pull <모델>` | `deberopa local pull <모델>` | `POST /local/pull`, 이벤트 `local.pull` |
+| 다른 컴퓨터의 모델 서버 저장·점검·네트워크 탐색(탐색은 요청할 때만, 키를 보내지 않음) | | `deberopa remote [add\|check\|scan\|remove]` | `GET/POST /remote`, `POST /remote/check`, `POST /remote/scan` |
 | 모델이 쓰이는 방식(짧은 프롬프트 여부와 이유, 컨텍스트, 슬롯) | 상태 표시줄의 `compact`, `slots 1/2` | `deberopa local status` | `GET /provider`의 `mode`, `GET /local/slots` |
 | 응답 속도 | 상태 표시줄의 `34 tok/s` | | 메시지의 `timings` |
 
@@ -520,6 +521,7 @@ PR 리뷰와 `/deberopa` 댓글 응답 예시는 [`examples/github`](examples/gi
 | `deberopa upgrade [버전]` | 업데이트 (`--check`) |
 | `deberopa uninstall` | 제거 (`--dry-run`, `--keep-config`, `--keep-data`) |
 | `deberopa local [servers\|check\|pull\|status]` | 로컬 모델 서버 확인, 도구 호출 점검, Ollama 모델 내려받기, 모델 사용 방식 |
+| `deberopa remote [list\|add\|check\|scan\|remove]` | 다른 컴퓨터의 모델 서버(Ollama, LM Studio, llama.cpp, vLLM, Opereta) 저장, 점검, 같은 네트워크 탐색 |
 | `deberopa debug [config\|local]` | 경로·설정·제공자·도구 상태, 로컬 모델 서버 진단 |
 
 각 명령에 `--help`를 붙이면 옵션과 예시가 나옵니다.

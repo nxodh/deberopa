@@ -24,7 +24,7 @@ An AI coding agent for the terminal, written in TypeScript and compiled to singl
 - `src/plugin/` plugin loader and hooks; `src/acp/` Agent Client Protocol server; `src/config/trust.ts` project trust
 - `sdk/js/`, `sdk/python/`, `sdk/go/` HTTP API clients; `ide/vscode/` VS Code extension (own package.json); `action.yml` GitHub Action
 - `src/tui/keybinds.ts` terminal key mappings; `src/plugin/package.ts` explicitly installed npm packages; `src/session/share.ts` reviewed, read-only session sharing
-- `src/provider/localmode.ts` (mode, speed, slots, Ollama tool check and pull, start hints) and `localreport.ts` serve the terminal UI, `deberopa local` and the HTTP API alike; `desktop/` is Deberopa Desktop (Code - OSS build, patches, built-in `deberopa-agent` extension). CLI and Desktop change and release together
+- `src/provider/localmode.ts` (mode, speed, slots, Ollama tool check and pull, start hints) and `localreport.ts` serve the terminal UI, `deberopa local` and the HTTP API alike; `src/provider/remote.ts` (model servers on other computers: address parsing, check, LAN scan, saved hosts) serves `deberopa remote` and `/remote`. `desktop/` is the Code - OSS based Desktop beta, superseded by the agent-first app in `docs/desktop-v2.md`. CLI and Desktop change and release together
 - `test/helpers.ts` has the mock OpenAI-compatible server every loop test uses; call `endProject()` in `afterAll` after `useProject()` so config does not leak into the next test file
 
 ## Rules
@@ -35,6 +35,7 @@ An AI coding agent for the terminal, written in TypeScript and compiled to singl
 - The repository is public. Never commit keys, tokens, personal email addresses or machine-specific absolute paths; fixtures use obviously fake values such as `sk-test-not-a-real-key`. Anything that prints configuration or errors goes through `src/util/redact.ts`.
 - Tests set `DEBEROPA_HOME` to a temp directory (see `test/setup.ts`) and never call a real model API.
 - Project config is untrusted by default: anything in it that runs code or routes requests/keys is stripped in `src/config/trust.ts` until `deberopa trust`. New config keys with such effects must be added to `stripUntrusted`.
+- Remote model hosts: a scan sends no key and only walks private IPv4 addresses, on request; a key goes only to the address it was saved for and never over plain HTTP outside private networks; there is no option to skip certificate verification (use a CA file). `provider.<id>.remote` is stripped from project config.
 - Local-model behaviour (Ollama native API, compact prompt, text tool calls) lives in `src/provider/{local,ollama,compat}.ts`; verify changes against a real Ollama (`docker run ollama/ollama`, a small model like `qwen3:0.6b`), not only the mocks.
 - The system prompt and tool list are part of the provider-side prompt cache: keep them deterministic (no timestamps, stable ordering).
 - Ink imports `react-devtools-core` statically; `script/build.ts` stubs it. Build through that script rather than `bun build --compile` directly.

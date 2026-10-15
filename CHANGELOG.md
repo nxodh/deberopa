@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Model servers on other computers: `deberopa remote` saves a host (`add <name> <host:port> [--key] [--ca file]`), checks it (`check`: answers, kind, models, latency, key or certificate problems with a fix) and looks for servers on this network (`scan`, only when asked, sends no key, private addresses only). A saved host is a provider marked `"remote": true` in the global config; its key is kept in the credential store. Files, tools and the session stay on this computer; only inference is remote. The server has the same under `/remote` (`GET`, `POST`, `POST /remote/check`, `POST /remote/scan`, `DELETE /remote/<id>`).
+- An Ollama configured only by address now gets its model list from its own API (before, such a provider had no models until they were written into the config).
+- Deberopa Desktop is being rebuilt as an agent-first app (see `docs/desktop-v2.md`); the Code - OSS based beta is superseded.
+
 ## 0.3.0-beta.1
 
 **Beta.** The first release that includes Deberopa Desktop. It is a GitHub pre-release: `install.sh`, `install.ps1` and `deberopa upgrade` keep installing the last full release (0.2.0). Install a beta explicitly with `DEBEROPA_VERSION=v0.3.0-beta.1`. The full 0.3.0 follows once the owner has tested it.

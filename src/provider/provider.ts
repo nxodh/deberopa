@@ -1,16 +1,19 @@
 import { getConfig, readState, type ModelConfig } from "../config/config"
 import { allCredentials } from "../auth/auth"
-import { detectLocalServers, discoverOpenAIModels, fetchOperetaInfo, isLocalURL, lastDetectFailures, localAPIKey, type DetectedModel } from "./local"
+import { detectLocalServers, detectOllama, discoverOpenAIModels, fetchOperetaInfo, isLocalURL, lastDetectFailures, localAPIKey, type DetectedModel } from "./local"
 import { getCatalog, type CatalogModel, type CatalogProvider } from "./models"
 import { registerSecret } from "../util/redact"
 import { loadProviderCA, TlsConfigError } from "./tls"
 import { createLogger } from "../util/log"
 import type { Model, ProviderInfo } from "./types"
 
+/** Provider ids that `detectLocalServers` fills in itself. */
+const DETECTED_IDS = ["ollama", "lmstudio", "llamacpp", "vllm"]
+
 const log = createLogger("provider")
 
 /** Base URLs for providers whose catalog entry does not carry one. All speak OpenAI chat completions. */
-const KNOWN_BASE_URLS: Record<string, string> = {
+export const KNOWN_BASE_URLS: Record<string, string> = {
   openai: "https://api.openai.com/v1",
   google: "https://generativelanguage.googleapis.com/v1beta/openai",
   openrouter: "https://openrouter.ai/api/v1",
@@ -148,7 +151,7 @@ async function build(): Promise<Record<string, ProviderInfo>> {
       timeout: override?.options?.timeout,
       source,
       // a server with its own CA is one the user runs or was given: treat it like a local one
-      local: isLocalURL(baseURL) || !!tls,
+      local: isLocalURL(baseURL) || !!tls || override?.remote === true,
       models,
       ...(tls ? { tls, tlsSources } : {}),
       ...(problem ? { problem } : {}),
@@ -220,6 +223,17 @@ async function addLocalProviders(result: Record<string, ProviderInfo>, config: A
   await Promise.all(
     configured.map(async ([id, provider]) => {
       if (!provider.baseURL || !probing || provider.problem) return
+
+      // an Ollama server on another computer, configured by URL only: its models come from its own API.
+      // (The default `ollama` provider is filled in by detectLocalServers below.)
+      if (Object.keys(provider.models).length === 0 && provider.protocol === "ollama" && !DETECTED_IDS.includes(id)) {
+        const server = await detectOllama(provider.baseURL, 4000, { tls: provider.tls, key: provider.apiKey })
+        for (const d of Object.values(server?.models ?? {})) {
+          provider.models[d.id] = detectedToModel(id, d, config.provider?.[id]?.models?.[d.id])
+          if (d.context === undefined && config.provider?.[id]?.models?.[d.id]?.limit?.context === undefined) assumedContext.add(`${id}/${d.id}`)
+        }
+        if (server) provider.source = provider.source === "none" ? "config" : provider.source
+      }
 
       // providers configured by URL only: ask the server what it has
       if (Object.keys(provider.models).length === 0 && provider.protocol !== "ollama") {

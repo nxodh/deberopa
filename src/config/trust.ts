@@ -100,6 +100,11 @@ export function stripUntrusted(input: Config): { config: Config; blocked: string
       blocked.push(`provider.${id}.ca (decides which servers are trusted)`)
       delete provider.options.ca
     }
+    // Marking a provider as the user's own model host changes how it is probed and prompted.
+    if (provider.remote !== undefined) {
+      blocked.push(`provider.${id}.remote (marks a model host)`)
+      delete provider.remote
+    }
     if (moved.length) {
       blocked.push(`provider.${id}.${moved.join("/")} (decides where requests and keys go)`)
       delete provider.api

@@ -21,6 +21,7 @@ import { loadConfig, resetConfig } from "../config/config"
 import { listSkills } from "../skill/skill"
 import { usageStats } from "../session/stats"
 import { detectLocalServers, lastDetectFailures } from "../provider/local"
+import { addRemoteHost, checkRemote, listRemoteHosts, removeRemoteHost, scanNetwork } from "../provider/remote"
 import { DEFAULT_PORTS, modelMode, probeSlots, pullOllamaModel, startHint, toolCheckModel, validPullName } from "../provider/localmode"
 import { publish } from "../util/bus"
 
@@ -221,6 +222,46 @@ async function route(req: Request): Promise<Response> {
       .catch((err) => publish("local.pull", { provider: providerID, model: input.model, status: "error", done: true, error: err instanceof Error ? err.message : String(err) }))
       .finally(() => pulls.delete(key))
     return json({ accepted: true, provider: providerID, model: input.model }, 202)
+  }
+  // Model servers on other computers. A saved host is a provider; its key stays in the credential store
+  // and is used only for that host's address. Scanning happens only when a client asks, sends no key
+  // and walks only private addresses.
+  if (is("GET", "remote")) return json(await listRemoteHosts())
+  if (is("POST", "remote")) {
+    const input = await body(req)
+    if (typeof input.name !== "string" || typeof input.url !== "string") throw new HttpError(400, "name and url are required")
+    if (typeof input.key === "string") registerSecret(input.key)
+    try {
+      return json(await addRemoteHost({ name: input.name, url: input.url, key: typeof input.key === "string" ? input.key : undefined, ca: typeof input.ca === "string" ? input.ca : undefined }), 201)
+    } catch (err) {
+      throw new HttpError(400, err instanceof Error ? err.message : String(err))
+    }
+  }
+  if (is("POST", "remote", "check")) {
+    const input = await body(req)
+    if (typeof input.key === "string") registerSecret(input.key)
+    if (typeof input.id === "string") {
+      const host = (await listRemoteHosts()).find((h) => h.id === input.id)
+      const info = (await allProviders())[input.id]
+      if (!host || !info) throw new HttpError(404, `No saved host named ${input.id}`)
+      return json(await checkRemote(host.url, { key: info.apiKey, tls: info.tls, providerID: host.id }))
+    }
+    // an address that is not saved: only a key given in this request goes with it
+    if (typeof input.url !== "string") throw new HttpError(400, "id or url is required")
+    return json(await checkRemote(input.url, { key: typeof input.key === "string" ? input.key : undefined }))
+  }
+  if (is("POST", "remote", "scan")) {
+    const input = await body(req)
+    const hosts = Array.isArray(input.hosts) ? input.hosts.filter((h: unknown): h is string => typeof h === "string") : undefined
+    try {
+      return json(await scanNetwork({ hosts, signal: req.signal }))
+    } catch (err) {
+      throw new HttpError(400, err instanceof Error ? err.message : String(err))
+    }
+  }
+  if (is("DELETE", "remote", "*")) {
+    if (!(await removeRemoteHost(parts[1]!))) throw new HttpError(404, `No saved host named ${parts[1]}`)
+    return json(true)
   }
   if (is("GET", "skill")) return json(Object.values(await listSkills()).map(({ content: _content, ...rest }) => rest))
   if (is("GET", "stats")) {
