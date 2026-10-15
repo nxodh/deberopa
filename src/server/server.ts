@@ -1,10 +1,11 @@
+import path from "node:path"
 import { timingSafeEqual } from "node:crypto"
 import { VERSION } from "../global"
 import { project } from "../project"
 import { subscribe } from "../util/bus"
 import { redactDeep, registerSecret } from "../util/redact"
 import { listFiles } from "../util/walk"
-import { getConfig } from "../config/config"
+import { getConfig, globalConfigFile } from "../config/config"
 import { listAgents } from "../agent/agent"
 import { allProviders, defaultModel } from "../provider/provider"
 import { listCommands, runCommand } from "../command/command"
@@ -12,6 +13,11 @@ import { pendingPermissions, replyPermission, type PermissionReply } from "../pe
 import { createSession, deleteSession, getSession, listSessions, updateSession } from "../session/store"
 import { busySessions, BusyError, cancel, compactSession, isBusy, prompt, shell } from "../session/prompt"
 import { revert, unrevert, visibleMessages } from "../session/revert"
+import { mcpStatus } from "../mcp"
+import { lspStatus } from "../lsp"
+import { loadPlugins, pluginProblems } from "../plugin"
+import { closeTerminal, listTerminals, openTerminal, resizeTerminal, writeTerminal } from "../pty/pty"
+import { changedFiles, diffSince, revertFiles, snapshotStatus } from "../snapshot/snapshot"
 import { exportMarkdown, forkSession } from "../session/export"
 import { fuzzyFilter } from "../tui/fuzzy"
 import { allCredentials, removeCredential, setCredential } from "../auth/auth"
@@ -21,6 +27,7 @@ import { loadConfig, resetConfig } from "../config/config"
 import { listSkills } from "../skill/skill"
 import { usageStats } from "../session/stats"
 import { detectLocalServers, lastDetectFailures } from "../provider/local"
+import { addRemoteHost, checkRemote, listRemoteHosts, removeRemoteHost, scanNetwork } from "../provider/remote"
 import { DEFAULT_PORTS, modelMode, probeSlots, pullOllamaModel, startHint, toolCheckModel, validPullName } from "../provider/localmode"
 import { publish } from "../util/bus"
 
@@ -221,6 +228,109 @@ async function route(req: Request): Promise<Response> {
       .catch((err) => publish("local.pull", { provider: providerID, model: input.model, status: "error", done: true, error: err instanceof Error ? err.message : String(err) }))
       .finally(() => pulls.delete(key))
     return json({ accepted: true, provider: providerID, model: input.model }, 202)
+  }
+  // Model servers on other computers. A saved host is a provider; its key stays in the credential store
+  // and is used only for that host's address. Scanning happens only when a client asks, sends no key
+  // and walks only private addresses.
+  if (is("GET", "remote")) return json(await listRemoteHosts())
+  if (is("POST", "remote")) {
+    const input = await body(req)
+    if (typeof input.name !== "string" || typeof input.url !== "string") throw new HttpError(400, "name and url are required")
+    if (typeof input.key === "string") registerSecret(input.key)
+    try {
+      return json(await addRemoteHost({ name: input.name, url: input.url, key: typeof input.key === "string" ? input.key : undefined, ca: typeof input.ca === "string" ? input.ca : undefined }), 201)
+    } catch (err) {
+      throw new HttpError(400, err instanceof Error ? err.message : String(err))
+    }
+  }
+  if (is("POST", "remote", "check")) {
+    const input = await body(req)
+    if (typeof input.key === "string") registerSecret(input.key)
+    if (typeof input.id === "string") {
+      const host = (await listRemoteHosts()).find((h) => h.id === input.id)
+      const info = (await allProviders())[input.id]
+      if (!host || !info) throw new HttpError(404, `No saved host named ${input.id}`)
+      return json(await checkRemote(host.url, { key: info.apiKey, tls: info.tls, providerID: host.id }))
+    }
+    // an address that is not saved: only a key given in this request goes with it
+    if (typeof input.url !== "string") throw new HttpError(400, "id or url is required")
+    return json(await checkRemote(input.url, { key: typeof input.key === "string" ? input.key : undefined }))
+  }
+  if (is("POST", "remote", "scan")) {
+    const input = await body(req)
+    const hosts = Array.isArray(input.hosts) ? input.hosts.filter((h: unknown): h is string => typeof h === "string") : undefined
+    try {
+      return json(await scanNetwork({ hosts, signal: req.signal }))
+    } catch (err) {
+      throw new HttpError(400, err instanceof Error ? err.message : String(err))
+    }
+  }
+  if (is("DELETE", "remote", "*")) {
+    if (!(await removeRemoteHost(parts[1]!))) throw new HttpError(404, `No saved host named ${parts[1]}`)
+    return json(true)
+  }
+  // One page of facts for a settings screen: what is connected, loaded and where the config lives.
+  if (is("GET", "status")) {
+    const plugins = await loadPlugins().catch(() => [])
+    return json({
+      version: VERSION,
+      directory: project().directory,
+      worktree: project().worktree,
+      configFile: globalConfigFile(),
+      mcp: mcpStatus(),
+      lsp: await lspStatus().catch(() => []),
+      plugins: plugins.map((p) => ({ name: p.name, source: p.source })),
+      pluginProblems: pluginProblems().map((p: any) => redactDeep(p)),
+      snapshot: await snapshotStatus(),
+    })
+  }
+  // Interactive terminals: output arrives as `pty.data` events, the end as `pty.exit`.
+  if (is("GET", "pty")) return json(listTerminals())
+  if (is("POST", "pty")) {
+    const input = await body(req)
+    try {
+      return json(openTerminal({ cwd: typeof input.cwd === "string" ? input.cwd : undefined, cols: Number(input.cols) || undefined, rows: Number(input.rows) || undefined }), 201)
+    } catch (err) {
+      throw new HttpError(400, err instanceof Error ? err.message : String(err))
+    }
+  }
+  if (is("POST", "pty", "*", "input")) {
+    const input = await body(req)
+    if (typeof input.data !== "string") throw new HttpError(400, "data is required")
+    if (!writeTerminal(parts[1]!, input.data)) throw new HttpError(404, "No such terminal")
+    return json(true)
+  }
+  if (is("POST", "pty", "*", "resize")) {
+    const input = await body(req)
+    if (!Number.isFinite(Number(input.cols)) || !Number.isFinite(Number(input.rows))) throw new HttpError(400, "cols and rows are required")
+    if (!resizeTerminal(parts[1]!, Number(input.cols), Number(input.rows))) throw new HttpError(404, "No such terminal")
+    return json(true)
+  }
+  if (is("DELETE", "pty", "*")) {
+    if (!closeTerminal(parts[1]!)) throw new HttpError(404, "No such terminal")
+    return json(true)
+  }
+  // What the agent changed: a unified diff against the snapshot taken before a step (the `hash` of a
+  // patch part), and putting chosen files back to how they were then.
+  if (is("GET", "snapshot", "status")) return json(await snapshotStatus())
+  if (is("GET", "snapshot", "diff")) {
+    const hash = url.searchParams.get("hash") ?? ""
+    if (!/^[0-9a-f]{40,64}$/.test(hash)) throw new HttpError(400, "hash must be a snapshot id")
+    const file = url.searchParams.get("file")
+    const root = project().worktree
+    const target = file ? path.resolve(root, file) : undefined
+    if (target && !(target === root || target.startsWith(root + path.sep))) throw new HttpError(400, "file is outside the project")
+    return json({ hash, file, diff: await diffSince(hash, target ? [target] : undefined) })
+  }
+  if (is("POST", "snapshot", "revert")) {
+    const input = await body(req)
+    if (typeof input.hash !== "string" || !/^[0-9a-f]{40,64}$/.test(input.hash)) throw new HttpError(400, "hash must be a snapshot id")
+    if (!Array.isArray(input.files) || input.files.length === 0 || input.files.some((f: unknown) => typeof f !== "string")) throw new HttpError(400, "files must be a list of paths")
+    const root = project().worktree
+    const targets = (input.files as string[]).map((f) => path.resolve(root, f))
+    if (targets.some((t) => !(t === root || t.startsWith(root + path.sep)))) throw new HttpError(400, "a file is outside the project")
+    await revertFiles(input.hash, targets)
+    return json({ reverted: targets.map((t) => path.relative(root, t).split(path.sep).join("/")), changed: (await changedFiles(input.hash)).map((f) => path.relative(root, f).split(path.sep).join("/")) })
   }
   if (is("GET", "skill")) return json(Object.values(await listSkills()).map(({ content: _content, ...rest }) => rest))
   if (is("GET", "stats")) {

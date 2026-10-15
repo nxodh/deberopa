@@ -72,6 +72,5 @@ jobs:
           tar -xzf deberopa-desktop-linux-x64.tar.gz
           dir="$(ls -d deberopa-desktop-*-linux-x64)"
           test -x "$dir/deberopa-desktop"
-          test -f "$dir/resources/app/extensions/deberopa-agent/extension.js"
-          test ! -e "$dir/resources/app/extensions/copilot"
-          test "$("$dir/resources/deberopa/deberopa" --version)" = "${tag#v}"
+          test -f "$dir/resources/app.asar"
+          test "$("$dir/resources/deberopa" --version)" = "${tag#v}"

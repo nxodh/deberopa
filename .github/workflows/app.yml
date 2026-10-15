@@ -1,0 +1,154 @@
+name: Desktop app
+
+# The agent-first Deberopa Desktop (app/): builds the window, starts it for real against a mock
+# model, and checks that a prompt gets an answer and a model server on another computer can be saved.
+on:
+  workflow_dispatch:
+  # the release workflow builds, tests and archives the Desktop with exactly these steps
+  workflow_call:
+  push:
+    branches: [main]
+    paths: ["app/**", "src/**", "script/build.ts", ".github/workflows/app.yml"]
+  pull_request:
+    paths: ["app/**", "src/**", "script/build.ts", ".github/workflows/app.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: App (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Debian 13 x64
+            os: ubuntu-latest
+            container: node:24-trixie
+            cli: linux-x64
+            archive: linux-x64.tar.gz
+          - name: Windows 11 x64
+            os: windows-2022
+            cli: windows-x64
+            archive: windows-x64.zip
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        if: runner.os == 'Windows'
+        with:
+          node-version: "24.18.0"
+      - name: Libraries Electron needs (Debian 13)
+        if: runner.os == 'Linux'
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends xvfb xauth libgtk-3-0t64 libnss3 libgbm1 libasound2t64 libxss1 libxkbfile1 libxkbcommon0 libx11-xcb1 libdrm2 libatk-bridge2.0-0t64 libcups2t64 ca-certificates
+      - name: Install (CLI sources and the app)
+        run: |
+          npm ci
+          cd app && npm ci
+      - name: Download the Electron binary
+        # npm does not run install scripts it has not been told to allow, so fetch it explicitly
+        working-directory: app
+        run: node node_modules/electron/install.js
+      - name: Type check the app
+        working-directory: app
+        run: npx tsc --noEmit -p tsconfig.json
+      - name: Build the app
+        working-directory: app
+        run: npm run build
+      - name: Run the app (Debian 13, headless)
+        if: runner.os == 'Linux'
+        working-directory: app
+        env:
+          DEBEROPA_APP_TEST: "1"
+          DEBEROPA_APP_TEST_LOG: ${{ runner.temp }}/app-test.log
+          DEBEROPA_APP_SHOTS: ${{ runner.temp }}/app-shots
+        run: |
+          status=0
+          xvfb-run -a ./node_modules/.bin/electron . --no-sandbox --disable-gpu --disable-dev-shm-usage > "$RUNNER_TEMP/app-test.out" 2> "$RUNNER_TEMP/app-test.err" || status=$?
+          echo "exit code: $status"
+          echo "---- app-test log"; cat "$RUNNER_TEMP/app-test.log" 2>/dev/null || echo "(no log written)"
+          echo "---- stdout"; tail -30 "$RUNNER_TEMP/app-test.out" | cut -c1-240
+          echo "---- stderr"; tail -30 "$RUNNER_TEMP/app-test.err" | cut -c1-240
+          grep -q "\[app-test\].* OK$" "$RUNNER_TEMP/app-test.log" || { echo "the app test did not report OK"; exit 1; }
+          # the project that was open when the app was closed comes back at the next start
+          rm -f "$RUNNER_TEMP/app-test.log"
+          DEBEROPA_APP_TEST=restore xvfb-run -a ./node_modules/.bin/electron . --no-sandbox --disable-gpu --disable-dev-shm-usage > /dev/null 2>&1 || true
+          cat "$RUNNER_TEMP/app-test.log" 2>/dev/null || echo "(no log written)"
+          grep -q "\[app-test\].* OK$" "$RUNNER_TEMP/app-test.log" || { echo "the restore test did not report OK"; exit 1; }
+      - name: Run the app (Windows)
+        if: runner.os == 'Windows'
+        working-directory: app
+        shell: pwsh
+        run: |
+          ./test/run-windows.ps1
+          ./test/run-windows.ps1 -Mode restore
+      - name: Build the CLI that goes inside the app
+        shell: bash
+        run: npx bun run script/build.ts --target ${{ matrix.cli }}
+      - name: Package the app (Debian 13)
+        if: runner.os == 'Linux'
+        working-directory: app
+        run: node script/package.mjs --platform linux --arch x64 --cli ../dist/linux-x64/deberopa --out ../out
+      - name: Package the app (Windows)
+        if: runner.os == 'Windows'
+        working-directory: app
+        run: node script/package.mjs --platform win32 --arch x64 --cli ../dist/windows-x64/deberopa.exe --out ../out
+      - name: Run the packaged app (Debian 13, headless)
+        if: runner.os == 'Linux'
+        env:
+          DEBEROPA_APP_TEST: "1"
+          DEBEROPA_APP_TEST_LOG: ${{ runner.temp }}/pkg-test.log
+          DEBEROPA_APP_SHOTS: ${{ runner.temp }}/pkg-shots
+        run: |
+          status=0
+          xvfb-run -a out/Deberopa-linux-x64/deberopa-desktop --no-sandbox --disable-gpu --disable-dev-shm-usage > "$RUNNER_TEMP/pkg-test.out" 2> "$RUNNER_TEMP/pkg-test.err" || status=$?
+          echo "exit code: $status"
+          echo "---- app-test log"; cat "$RUNNER_TEMP/pkg-test.log" 2>/dev/null || echo "(no log written)"
+          echo "---- stderr"; tail -30 "$RUNNER_TEMP/pkg-test.err" | cut -c1-240
+          grep -q "\[app-test\].* OK$" "$RUNNER_TEMP/pkg-test.log" || { echo "the packaged app test did not report OK"; exit 1; }
+      - name: Run the packaged app (Windows)
+        if: runner.os == 'Windows'
+        working-directory: app
+        shell: pwsh
+        run: ./test/run-windows.ps1 -PackagedExe "${{ github.workspace }}\out\Deberopa-win32-x64\Deberopa.exe"
+      - name: Archive (Debian 13)
+        if: runner.os == 'Linux'
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          top="deberopa-desktop-$version-linux-x64"
+          rm -rf stage && mkdir stage && cp -a out/Deberopa-linux-x64 "stage/$top"
+          tar -C stage -czf deberopa-desktop-linux-x64.tar.gz "$top"
+          ls -la deberopa-desktop-linux-x64.tar.gz
+      - name: Archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          $top = "deberopa-desktop-$version-windows-x64"
+          Remove-Item -Recurse -Force stage -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory stage | Out-Null
+          Copy-Item -Recurse out\Deberopa-win32-x64 "stage\$top"
+          Compress-Archive -Path "stage\$top" -DestinationPath deberopa-desktop-windows-x64.zip
+          Get-Item deberopa-desktop-windows-x64.zip
+      - name: Upload the app
+        uses: actions/upload-artifact@v4
+        with:
+          name: deberopa-desktop-${{ matrix.archive }}
+          path: deberopa-desktop-${{ matrix.archive }}
+          retention-days: 14
+      - name: Screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-screenshots-${{ runner.os }}
+          path: ${{ runner.temp }}/app-shots
+          if-no-files-found: ignore
+          retention-days: 14

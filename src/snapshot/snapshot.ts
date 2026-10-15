@@ -122,12 +122,14 @@ export async function restore(hash: string) {
   await revertFiles(hash, now)
 }
 
-/** Unified diff between a snapshot and the working tree. */
-export async function diffSince(hash: string): Promise<string> {
+/** Unified diff between a snapshot and the working tree; `files` (absolute paths) limits it to those. */
+export async function diffSince(hash: string, files?: string[]): Promise<string> {
   const dir = await gitDir()
   if (!dir) return ""
   await git(dir, ["add", "--all", "."])
-  const diff = await git(dir, ["diff", "--no-ext-diff", hash, "--", "."])
+  const worktree = project().worktree
+  const rels = (files ?? []).filter((f) => isInside(worktree, f)).map((f) => path.relative(worktree, f).split(path.sep).join("/"))
+  const diff = await git(dir, ["diff", "--no-ext-diff", hash, "--", ...(files ? rels : ["."])])
   return diff.code === 0 ? diff.stdout : ""
 }
 

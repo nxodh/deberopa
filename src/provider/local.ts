@@ -220,16 +220,25 @@ async function inBatches<T, R>(items: T[], size: number, fn: (item: T) => Promis
   return out
 }
 
-export async function detectOllama(baseURL: string, timeoutMs = 700): Promise<LocalServer | undefined> {
-  const tags = await getJSON(`${baseURL}/api/tags`, timeoutMs)
+/** What a probe of a server we were told about may carry: its own CA, and its key. Neither is ever sent anywhere else. */
+export interface ServerAccess {
+  tls?: ProviderTls
+  key?: string
+}
+
+const authInit = (access: ServerAccess): RequestInit => (access.key ? { headers: { authorization: `Bearer ${access.key}` } } : {})
+
+export async function detectOllama(baseURL: string, timeoutMs = 700, access: ServerAccess = {}): Promise<LocalServer | undefined> {
+  const tags = await getJSON(`${baseURL}/api/tags`, timeoutMs, authInit(access), access.tls)
   if (!tags || !Array.isArray(tags.models)) return undefined
   const entries = (tags.models as any[]).filter((m) => typeof m?.name === "string").slice(0, 60)
   const shown = await inBatches(entries, 8, async (entry) => {
-    const info = await getJSON(`${baseURL}/api/show`, 4000, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ model: entry.name }),
-    })
+    const info = await getJSON(
+      `${baseURL}/api/show`,
+      4000,
+      { method: "POST", headers: { "content-type": "application/json", ...(access.key ? { authorization: `Bearer ${access.key}` } : {}) }, body: JSON.stringify({ model: entry.name }) },
+      access.tls,
+    )
     return { entry, info }
   })
 
@@ -261,9 +270,9 @@ export async function detectOllama(baseURL: string, timeoutMs = 700): Promise<Lo
   return { id: "ollama", name: "Ollama", protocol: "ollama", baseURL, models }
 }
 
-export async function detectLMStudio(baseURL: string, timeoutMs = 700): Promise<LocalServer | undefined> {
+export async function detectLMStudio(baseURL: string, timeoutMs = 700, access: ServerAccess = {}): Promise<LocalServer | undefined> {
   const root = baseURL.replace(/\/v1\/?$/, "")
-  const rich = await getJSON(`${root}/api/v0/models`, timeoutMs)
+  const rich = await getJSON(`${root}/api/v0/models`, timeoutMs, authInit(access), access.tls)
   const models: Record<string, DetectedModel> = {}
   if (rich && Array.isArray(rich.data)) {
     for (const m of rich.data as any[]) {
@@ -283,7 +292,7 @@ export async function detectLMStudio(baseURL: string, timeoutMs = 700): Promise<
       }
     }
   } else {
-    const plain = await getJSON(`${root}/v1/models`, timeoutMs)
+    const plain = await getJSON(`${root}/v1/models`, timeoutMs, authInit(access), access.tls)
     if (!plain || !Array.isArray(plain.data)) return undefined
     for (const m of plain.data as any[]) {
       if (typeof m?.id === "string" && !/embed/i.test(m.id)) {
@@ -299,11 +308,12 @@ export async function detectLlamaCpp(
   timeoutMs = 700,
   key?: string,
   onFailure?: (failure: DetectFailure) => void,
+  tls?: ProviderTls,
 ): Promise<LocalServer | undefined> {
   const root = baseURL.replace(/\/v1\/?$/, "")
   const auth: Record<string, string> = key ? { authorization: `Bearer ${key}` } : {}
   // /props exists only on llama.cpp's server, which keeps port 8080 from matching unrelated services
-  const propsResult = await probe(`${root}/props`, timeoutMs, { headers: auth })
+  const propsResult = await probe(`${root}/props`, timeoutMs, { headers: auth }, { tls })
   if (propsResult.status === 401 || propsResult.status === 403) {
     // there is a server, it wants a key; say so instead of pretending nothing is there
     onFailure?.({ id: "llamacpp", baseURL: root, status: propsResult.status })
@@ -311,11 +321,11 @@ export async function detectLlamaCpp(
   }
   const props = propsResult.ok ? propsResult.json : undefined
   if (!props || typeof props !== "object") return undefined
-  const modelsResult = await probe(`${root}/v1/models`, timeoutMs, { headers: auth })
+  const modelsResult = await probe(`${root}/v1/models`, timeoutMs, { headers: auth }, { tls })
   if (modelsResult.status === 401 || modelsResult.status === 403) onFailure?.({ id: "llamacpp", baseURL: root, status: modelsResult.status })
   const listed = modelsResult.ok ? modelsResult.json : undefined
 
-  const opereta = await fetchOperetaInfo(root, timeoutMs, propsResult.headers?.get("x-opereta"))
+  const opereta = await fetchOperetaInfo(root, timeoutMs, propsResult.headers?.get("x-opereta"), tls)
   const propsContext = typeof (props.default_generation_settings?.n_ctx ?? props.n_ctx) === "number" ? (props.default_generation_settings?.n_ctx ?? props.n_ctx) : undefined
   // Two sources can disagree (total vs per-slot). An over-estimate makes compaction fire too late,
   // so the smaller one wins; `maxContext` keeps what the model itself reported.
@@ -342,9 +352,9 @@ export async function detectLlamaCpp(
   return server
 }
 
-export async function detectVLLM(baseURL: string, timeoutMs = 700): Promise<LocalServer | undefined> {
+export async function detectVLLM(baseURL: string, timeoutMs = 700, access: ServerAccess = {}): Promise<LocalServer | undefined> {
   const root = baseURL.replace(/\/v1\/?$/, "")
-  const listed = await getJSON(`${root}/v1/models`, timeoutMs)
+  const listed = await getJSON(`${root}/v1/models`, timeoutMs, authInit(access), access.tls)
   if (!listed || !Array.isArray(listed.data)) return undefined
   const models: Record<string, DetectedModel> = {}
   for (const m of listed.data as any[]) {

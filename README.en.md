@@ -41,24 +41,29 @@ Run `/init` once per project to generate an `AGENTS.md` that is given to the age
 
 ## Deberopa Desktop
 
-A desktop app for people who prefer a window to a terminal: a Code - OSS based editor with a conversation panel (permission prompts, tool cards, sessions, a local-models card). It bundles the `deberopa` command of the same version, so there is nothing else to install, and it is released together with the CLI under the same number. **0.3.0-beta.1 is a beta (a GitHub pre-release)**: the install scripts and `deberopa upgrade` keep installing the last full release (0.2.0); download the beta from the release page.
+An agent-first desktop app (the shape of Orca, OpenCode Desktop or the Codex app). Projects and sessions on the left; tabs in the middle for sessions, a file editor, diffs of what the agent changed, terminals, and models and servers. It bundles the `deberopa` command of the same version, so there is nothing else to install, and it is released together with the CLI under the same number.
+
+- **Code editor**: syntax highlighting, search, save (`Cmd/Ctrl+S`). It picks up changes the agent makes to the open file and tells you when you have unsaved edits.
+- **See and undo what the agent changed**: the diff of a step, with a revert per file.
+- **Local models and models on another computer**: Ollama, LM Studio, llama.cpp, vLLM and Opereta on this computer are found automatically; a server on another computer on the network is saved, or found with "Look on this network". Files, tools and sessions stay on this computer; only inference is remote. `deberopa remote` does the same from the CLI.
+- A command palette (`Cmd/Ctrl+K`) and settings (API keys, project trust, MCP / language server / plugin status, usage).
 
 | Target | File | Run |
 |---|---|---|
 | Debian 13 / Opereta (x86-64) | `deberopa-desktop-linux-x64.tar.gz` | unpack, then `deberopa-desktop-<version>-linux-x64/deberopa-desktop` |
-| Windows 11 (x86-64) | `deberopa-desktop-windows-x64.zip` | unpack, then `Deberopa Desktop.exe` |
+| Windows 11 (x86-64) | `deberopa-desktop-windows-x64.zip` | unpack, then `Deberopa.exe` |
 
 - There is no installer and no auto-update yet; unpack a newer release to update.
 - **It is not signed.** Windows may show SmartScreen or Smart App Control may block it. Check `checksums.txt` (SHA-256) and the GitHub build attestation (`gh attestation verify <file> --repo nxodh/deberopa`).
 - If it exits at once on Debian 13 because of Electron's sandbox, start it with `--no-sandbox`, or make `chrome-sandbox` owned by root with mode 4755.
-- No Microsoft marketplace or telemetry, and the Copilot extension is removed. Extensions: built-in ones and installing a VSIX directly.
-- Source and build: `desktop/`; design: [docs/desktop-design.md](docs/desktop-design.md).
+- Source: `app/`; design: [docs/desktop-v2.md](docs/desktop-v2.md). The Code - OSS based Desktop in 0.3.0-beta.1 is replaced by this app.
 
 ## What is in 0.1
 
 - **Terminal UI**: streamed Markdown, per-tool views (diffs, command output, todo lists, subagent activity), multi-line editor with correct CJK/emoji handling and IME cursor placement, `@file` and `/command` completion, `!shell` mode, model / session / agent / theme pickers, permission prompts, message queueing, monochrome themes.
 - **Agents**: `build`, read-only `plan`, subagents `general` and `explore`; your own agents as Markdown files or config.
 - **Tools**: `bash`, `read`, `edit`, `multiedit`, `write`, `patch`, `glob`, `grep`, `list`, `webfetch`, `todowrite`/`todoread`, `task`, `skill`.
+- **Models on another computer**: `deberopa remote add gpu-box 192.168.0.20:11434` saves a model server that runs elsewhere; `deberopa remote scan` looks for servers on this network when you ask (it sends no key and walks only private addresses); `deberopa remote check` shows whether it answers, its models, latency and, if not, why (key, certificate, firewall, "listen on 0.0.0.0"). Files, tools and the session stay on this computer; only inference is remote. Use it as `deberopa -m gpu-box/<model>`. There is no way to switch certificate verification off: give a self-signed server's CA with `--ca`.
 - **Local models**: Ollama, LM Studio, llama.cpp and vLLM are detected automatically (see `deberopa debug local`; `--check-tools` sends one request per server to test tool calling). Servers that need an API key (llama-server `--api-key`, Opereta) are detected when `OPERETA_API_KEY` or `LLAMA_API_KEY` is set, and a 401 is reported instead of "nothing found". A Opereta gateway is recognised by its `X-Opereta` header or `/opereta/info`, and its per-slot context fills in providers that have no `limit.context` of their own. `provider.<id>.options.max_concurrency` (1-64) caps simultaneous requests to a server so subagents queue instead of earning 429s; titles yield to real work, aborts leave the queue immediately, and a gateway with a fixed slot count sets it automatically (the value you write always wins). Ollama is driven through its native API so the context window is set explicitly instead of being silently cut to 2-4K tokens; small models get a short prompt and the core tools only; tool calls written as text and `<think>` tags are recovered.
 - **Providers**: Anthropic natively; OpenAI, Google Gemini, OpenRouter, xAI, Groq, DeepSeek, Mistral and any OpenAI-compatible endpoint (Ollama, LM Studio, proxies). Model catalog from [models.dev](https://models.dev).
 - **Sessions**: saved on disk, resume, undo/redo with file restore, automatic compaction, fork, export/import.

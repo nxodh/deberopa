@@ -70,6 +70,10 @@
             ],
             "description": "Wire protocol. Defaults to openai (chat completions) except Anthropic; an Ollama endpoint defaults to ollama (its native API, which can set the context window)"
           },
+          "remote": {
+            "type": "boolean",
+            "description": "A model server on another computer that you run or were given. Probed and prompted like a local one. Written by `deberopa remote add`."
+          },
           "api": {
             "type": "string",
             "description": "Base URL of the API, e.g. http://localhost:11434/v1"

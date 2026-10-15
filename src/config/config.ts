@@ -36,6 +36,8 @@ export interface ProviderConfig {
   protocol?: "anthropic" | "openai" | "ollama"
   /** Base URL of the API. */
   api?: string
+  /** A model server the user runs or was given (another computer on the network): probed and prompted like a local one. Added by `deberopa remote add`; global config only. */
+  remote?: boolean
   /** Environment variables that may hold the API key. */
   env?: string[]
   options?: {
@@ -288,8 +290,8 @@ export function mergeConfig<T extends Record<string, any>>(a: T, b: T, pathKey =
   return out as T
 }
 
-/** Persist a change to the user's global config file, keeping whatever else is there. */
-export async function updateGlobalConfig(patch: Config) {
+/** Rewrite the user's global config file with `edit(current)`, keeping whatever else is there. */
+export async function editGlobalConfig(edit: (current: Config) => Config) {
   const file = globalConfigFile()
   let current: Config = {}
   if (await exists(file)) {
@@ -300,11 +302,16 @@ export async function updateGlobalConfig(patch: Config) {
       throw new Error(`Refusing to modify ${file}: it contains invalid JSON.`)
     }
   }
-  const next = mergeConfig(current, patch)
+  const next = edit(current)
   if (!next.$schema) next.$schema = `https://raw.githubusercontent.com/nxodh/deberopa/main/config.schema.json`
   await fs.mkdir(path.dirname(file), { recursive: true })
   await fs.writeFile(file, JSON.stringify(next, null, 2) + "\n")
   resetConfig()
+}
+
+/** Persist a change to the user's global config file, keeping whatever else is there. */
+export async function updateGlobalConfig(patch: Config) {
+  await editGlobalConfig((current) => mergeConfig(current, patch))
 }
 
 /** Small persisted UI state (last used model/agent, theme) kept out of the config file. */
