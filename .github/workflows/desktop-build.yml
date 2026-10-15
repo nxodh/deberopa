@@ -88,11 +88,13 @@ jobs:
           timeout 300 xvfb-run -a "$BIN" --no-sandbox --disable-gpu --disable-workspace-trust --verbose --enable-logging=stderr --v=0 \
             --logsPath "$RUNNER_TEMP/e2e-logs" --user-data-dir "$RUNNER_TEMP/e2e-ud" --extensions-dir "$RUNNER_TEMP/e2e-ex" \
             --extensionDevelopmentPath="$APP/resources/app/extensions/deberopa-agent" \
-            --extensionTestsPath="$GITHUB_WORKSPACE/desktop/test/e2e/index.js" "$WORK" > "$RUNNER_TEMP/e2e.out" 2> "$RUNNER_TEMP/e2e.err" || status=$?
+            --extensionTestsPath="$GITHUB_WORKSPACE/desktop/test/e2e/index.cjs" "$WORK" > "$RUNNER_TEMP/e2e.out" 2> "$RUNNER_TEMP/e2e.err" || status=$?
           echo "exit status: $status"
           echo "---- test log"; cat "$DEBEROPA_E2E_LOG" 2>/dev/null || echo "(the test wrote no log)"
+          echo "---- app stdout (tail)"; tail -20 "$RUNNER_TEMP/e2e.out" | cut -c1-240
           echo "---- app stderr (tail)"; tail -30 "$RUNNER_TEMP/e2e.err" | cut -c1-240
-          find "$RUNNER_TEMP/e2e-logs" -type f 2>/dev/null | sed "s#$RUNNER_TEMP/##" | sort | head -30
+          for f in window1/exthost/exthost.log window1/renderer.log; do echo "---- $f (tail)"; tail -40 "$RUNNER_TEMP/e2e-logs/$f" 2>/dev/null | cut -c1-260; done
+          echo "---- errors in all logs"; grep -rhiE "\[error\]|uncaught|cannot find|failed to|extensionTests|deberopa-agent|e2e" "$RUNNER_TEMP/e2e-logs" 2>/dev/null | head -30 | cut -c1-260
           pkill -f "deberopa serve" || true
           # passing means the test said so, not merely that the process ended
           grep -q "\[e2e\].* OK" "$DEBEROPA_E2E_LOG" || { echo "the in-app test did not report OK"; exit 1; }

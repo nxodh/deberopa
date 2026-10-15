@@ -35,7 +35,7 @@ foreach ($v in $variants) {
     "--user-data-dir", (Join-Path $env:RUNNER_TEMP "$tag-ud"),
     "--extensions-dir", (Join-Path $env:RUNNER_TEMP "$tag-ex"),
     "--extensionDevelopmentPath=$App\resources\app\extensions\deberopa-agent",
-    "--extensionTestsPath=$env:GITHUB_WORKSPACE\desktop\test\e2e\index.js",
+    "--extensionTestsPath=$env:GITHUB_WORKSPACE\desktop\test\e2e\index.cjs",
     "--verbose", "--logsPath", $logs,
     "--enable-logging=stderr", "--v=0",
     $Work)
@@ -52,6 +52,10 @@ foreach ($v in $variants) {
   Get-ChildItem $logs -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "   log file: $($_.FullName.Substring($logs.Length)) ($($_.Length) bytes)" }
   $renderer = Get-ChildItem $logs -Recurse -Filter "renderer.log" -ErrorAction SilentlyContinue | Select-Object -First 1
   if ($renderer) { Write-Host "-- renderer.log (tail)"; Get-Content $renderer.FullName -Tail 20 }
+  $exthost = Get-ChildItem $logs -Recurse -Filter "exthost.log" -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($exthost) { Write-Host "-- exthost.log (tail)"; Get-Content $exthost.FullName -Tail 40 }
+  Write-Host "-- matching lines in all logs"
+  Get-ChildItem $logs -Recurse -File -ErrorAction SilentlyContinue | Select-String -Pattern "\[error\]|uncaught|cannot find|failed to|extensionTests|deberopa-agent|e2e" -ErrorAction SilentlyContinue | Select-Object -First 30 | ForEach-Object { Write-Host $_.Line.Substring(0, [Math]::Min(260, $_.Line.Length)) }
   Write-Host "::endgroup::"
   if ((-not $timedOut) -and $exit -eq 0 -and (Test-Path $log) -and ((Get-Content $log -Raw) -match "\[e2e\].* OK")) {
     Write-Host "variant '$($v.name)' passed"

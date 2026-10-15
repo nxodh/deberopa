@@ -1,4 +1,5 @@
 "use strict"
+// (CommonJS on purpose: the repository root is "type": "module", and the extension host loads this file with require.)
 // Runs inside the extension host of the packaged Deberopa Desktop (--extensionTestsPath).
 // It checks, in the real app, that the built-in agent extension activates, starts the bundled CLI server
 // for the workspace folder, opens a session and reports its model choices.
